@@ -6,6 +6,7 @@ import {resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {WebSocketServer} from 'ws';
 import {createRooms} from './rooms.mjs';
+import {createPrivateHandoff,pairingBody} from './handoff-api.mjs';
 import {launch,seed,disc,sha256,installedIdentity} from '../../runtime/web/netplay/identity.mjs';
 const here=dirname(fileURLToPath(import.meta.url)),web=resolve(here,'../../runtime/web');
 /** Loopback listener, optionally behind one approved HTTPS proxy. Never serves a disc. */
@@ -19,6 +20,7 @@ export async function startRelay({engineRoot,port=0,httpsOrigin}={}) {
  files.set('/touch-controls.css',resolve(here,'../../web/app/MeleeTouchControls.css'));
  if(source)for(const name of ['runtime.mjs','runtime.html','gpu-preflight.mjs','disc-cache.mjs','save-migration.mjs','initial_pipeline_cache.db'])files.set('/engine/upstream/'+name,resolve(source,name));
  if(binary)for(const name of ['melee_browser.js','melee_browser.wasm','melee_browser.worker.js'])files.set('/engine/upstream/'+name,resolve(binary,name));
+ for(const [url,path] of [['/transfer/disc-transfer.mjs',resolve(web,'netplay/disc-transfer.mjs')],['/transfer/disc-cache.mjs',resolve(here,'../../web/lib/disc-cache.mjs')],['/transfer/rom-handoff-client.js',resolve(here,'../../../../web-prototype/src/rom-handoff-client.js')],['/shared/handoff-transfer.js',resolve(here,'../../../../web-prototype/shared/handoff-transfer.js')],['/shared/rom-handoff.js',resolve(here,'../../../../web-prototype/shared/rom-handoff.js')]])files.set(url,path);
  const required=[...files.keys()].filter(url=>url.startsWith('/engine/')&&!url.endsWith('melee_browser.worker.js'));
  let manifest,unavailable;
  try {
@@ -27,14 +29,20 @@ export async function startRelay({engineRoot,port=0,httpsOrigin}={}) {
   const engine=await sha256(new TextEncoder().encode(JSON.stringify(pinned)));
   manifest={files:pinned,launch,identity:await installedIdentity(engine,launch,{verifiedDisc:disc,installedSeed:seed,freshSaves:true})};
  }catch(error){unavailable=error.message;}
+ const handoff=createPrivateHandoff();
  const rooms=manifest&&createRooms({identity:manifest.identity,launch});
  const headers={'Cross-Origin-Opener-Policy':'same-origin','Cross-Origin-Embedder-Policy':'require-corp','Cross-Origin-Resource-Policy':'same-origin','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};
  let origin;const allowed=new Map();
  const server=createServer(async(req,res)=>{
   const reply=(code,type,body)=>{res.writeHead(code,{...headers,'Content-Type':type});res.end(body);};
   if(!allowed.has(req.headers.host))return reply(403,'text/plain','Invalid approved host.');
-  if(req.method!=='GET')return reply(405,'text/plain','GET only.');
   const url=new URL(req.url,origin);
+  if(url.pathname.startsWith('/api/handoff/')){
+   if(req.method!=='POST')return reply(405,'text/plain','POST only.');
+   if(req.headers.origin!==allowed.get(req.headers.host))return reply(403,'text/plain','Invalid pairing origin.');
+   try{return reply(200,'application/json',JSON.stringify(await handoff.receive(url.pathname,await pairingBody(req),req.socket.remoteAddress)));}catch(error){return reply(error.status||400,'application/json',JSON.stringify({error:error.status?error.message:'Invalid pairing request.'}));}
+  }
+  if(req.method!=='GET')return reply(405,'text/plain','GET only.');
   if(url.pathname==='/manifest')return reply(manifest?200:503,'application/json',JSON.stringify(manifest||{error:unavailable}));
   const path=files.get(url.pathname);if(!path)return reply(404,'text/plain','Not found.');
   try{const info=await stat(path);const ext=path.split('.').at(-1),type={html:'text/html',mjs:'text/javascript',js:'text/javascript',css:'text/css',wasm:'application/wasm'}[ext]||'application/octet-stream';res.writeHead(200,{...headers,'Content-Type':type,'Content-Length':info.size});createReadStream(path).on('error',()=>res.destroy()).pipe(res);}catch{reply(404,'text/plain','Runtime file unavailable.');}
@@ -48,8 +56,8 @@ export async function startRelay({engineRoot,port=0,httpsOrigin}={}) {
  await new Promise((accept,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',accept);});
  origin='http://127.0.0.1:'+server.address().port;
  allowed.set(new URL(origin).host,origin);if(httpsOrigin)allowed.set(new URL(httpsOrigin).host,httpsOrigin);
- const sweep=setInterval(()=>rooms?.sweep(),30000);sweep.unref();
- return {origin,manifest,async close(){clearInterval(sweep);rooms?.close();for(const client of wss.clients)client.terminate();await new Promise(r=>wss.close(r));await new Promise(r=>server.close(r));}};
+ const sweep=setInterval(()=>{rooms?.sweep();handoff.sweep();},30000);sweep.unref();
+ return {origin,manifest,async close(){clearInterval(sweep);rooms?.close();handoff.close();for(const client of wss.clients)client.terminate();await new Promise(r=>wss.close(r));await new Promise(r=>server.close(r));}};
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const args=process.argv.slice(2),value=name=>args[args.indexOf(name)+1];

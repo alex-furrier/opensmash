@@ -342,7 +342,7 @@ exact host/origin allowance in the relay as well as temporary HTTPS/WSS proxying
 Both changes are active for this temporary private test. No Funnel, public ingress,
 ACL or OS setting change was made. Existing tailnet access policy controls who can reach it.
 The iPhone needs approved tailnet access, current Safari with WebGPU, a successful
-adapter/cross-origin-isolation check, its own legal USA 1.02 ISO in Files, sufficient
+adapter/cross-origin-isolation check, its own legal USA 1.02 ISO selected locally or received by explicit pairing, sufficient
 memory/storage, and a trusted Ready tap for audio. Foreground touch, audio, Stop
 and a fresh session must pass on the actual phone before claiming compatibility.
 
@@ -353,7 +353,7 @@ origin allowance is implemented and tested. The relay does not
 start a second engine automatically. On the phone, open the approved HTTPS base
 URL and create a room (player 1). On the Mac, open a separate Chrome window at
 the same HTTPS URL with `?debug=1`, paste the phone's room link/code and join
-(player 2). Select the local ISO independently on each device. On the Mac, enable
+(player 2). Choose the Mac disc locally and pair it to the phone once, or select files independently. On the Mac, enable
 **Script this peer's owned player 2 input**, choose a profile, and press Ready
 on both. Keep Safari foreground and the Mac awake with its engine window visible;
 background tabs/minimization are unsupported. Leave room closes both sessions;
@@ -372,3 +372,37 @@ COOP/COEP, SharedArrayBuffer and WebGPU checks. Actual iPhone execution is pendi
 The foreground Serve route lasts only while its command runs; Ctrl+C stops that
 route. Stop its relay/browser processes separately. Never use `tailscale serve
 reset` for cleanup because existing routes belong to other tasks.
+
+
+The optional loading flow reuses upstream's existing device handoff and Melee
+OPFS cache. On the Mac choose the legal USA 1.02 ISO and press **Send selected
+disc**. On the phone enter the displayed code and press **Receive and save**.
+Compare the short certificate-bound confirmation on both screens, then confirm
+on the Mac. Pairing permits one receiver and expires after five minutes. File
+bytes travel over direct WebRTC, with explicit empty ICE configuration: both
+browsers must be on the same Wi-Fi; no STUN/TURN service is enabled. Pairing
+keys stay in bounded POST bodies. The loopback relay accepts signalling only.
+
+The receiver checks exact size before allocating storage, saves into upstream's
+incoming staging file, verifies every pinned SHA-256 chunk of the complete
+known image, then adopts that file into the existing versioned cache without a
+second ISO copy. A previous saved copy remains until successful commit. Cancel,
+validation failure and quota/write errors dispose partial files. Reload verifies
+and restores the saved copy; **Forget saved copy** removes only this cache.
+Browser storage availability, quota and eviction remain device dependent. The
+local file picker remains available. This is paired transfer of the user's own
+file, not the automatic public download seen in the deployed Smash64 launcher.
+
+[disc-transfer-proof.json](disc-transfer-proof.json) records a full 1,459,978,240
+byte actual Chrome transfer over the approved private HTTPS route, verification,
+reload without selecting a file, and cache removal. The same real-browser
+fixture covers cancellation and a sender-side byte mutation across the full
+transfer; mutation fails known-disc validation and both failures remove staging
+files. Focused checks also cover single receiver, expiry, exact role key,
+certificate agreement, frame/queue bounds, wrong size before allocation,
+quota/write cleanup, pending-fetch deadline, HTTP Host/Origin and JSON-only
+routes. All 65 focused checks and the intended TypeScript check pass. Run
+`engines/melee/tools/prove_disc_transfer.mjs` with private `MELEE_PC_ROOT`,
+`MELEE_ISO`, `PLAYWRIGHT_MODULE`, outside-repository `TEST_OUTPUT`, and optional
+approved `PROOF_ORIGIN`. No assets enter the repository or proof metadata.
+Actual iPhone transfer and gameplay remain unverified.

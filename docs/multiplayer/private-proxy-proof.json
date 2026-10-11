@@ -13,11 +13,15 @@
   "crossOriginIsolated": true,
   "webgpuAdapter": true,
   "focusedRelayTestsPassed": 2,
-  "sourceSha256": {
+  "phoneGameplay": "unverified; awaiting human phone run",
+  "preloading": "Paired private WebRTC transfer implemented; complete verification before OPFS cache acceptance; no ISO HTTP endpoint.",
+  "missingOriginAndWrongHostRejected": true,
+  "historicalSourceSha256": {
     "engines/melee/tools/netplay/server.mjs": "ec08326a0847681b4352269c33381be744dbac30a2fc903373f3dbc7cfe5b4ff",
     "engines/melee/tools/netplay/server.test.mjs": "5eb2bc95a0f21b68c1cd5268424ff1412dd6f6622e952b552ce9c7dd4c47f9ae"
   },
-  "phoneGameplay": "unverified; awaiting human phone run",
-  "preloading": "not implemented or activated; no asset endpoint",
-  "missingOriginAndWrongHostRejected": true
+  "sourceSha256": {
+    "engines/melee/tools/netplay/server.mjs": "c65272a25ef5bb26c65f59aa83958f63455fbfd0ff333a7b12d19d01ec46ab64",
+    "engines/melee/tools/netplay/server.test.mjs": "30563e1de4ac76c555a33ca6ca7a5e7fd7b56457ef9fefec58d984f9bc5a2566"
+  }
 }

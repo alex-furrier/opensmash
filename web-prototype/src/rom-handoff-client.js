@@ -78,9 +78,10 @@ class HandoffCancelled extends Error {
   }
 }
 
-async function api(path, { method = "GET", body } = {}) {
+async function api(path, { method = "GET", body, signal } = {}) {
   const response = await fetch(path, {
     method,
+    signal,
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
     cache: "no-store",
@@ -136,7 +137,7 @@ function sleep(ms, signal) {
  * uploading the offer, so against Firestore latency the host posted no
  * candidates at all and the peer could never connect.)
  */
-function attachCandidateRelay({ pc, room, role, key }) {
+function attachCandidateRelay({ pc, room, role, key, signal }) {
   const diag = { localTypes: new Set(), remoteTypes: new Set(), remoteCount: 0, postFailures: 0, gatheredNothing: false };
   let outbox = [];
   let flushTimer = 0;
@@ -147,7 +148,7 @@ function attachCandidateRelay({ pc, room, role, key }) {
     outbox = [];
     api(`/api/handoff/rooms/${room}/messages`, {
       method: "POST",
-      body: { role, key, messages: batch.map((candidate) => ({ type: "candidate", candidate })) },
+      signal, body: { role, key, messages: batch.map((candidate) => ({ type: "candidate", candidate })) },
     }).catch((error) => {
       diag.postFailures += batch.length;
       console.warn("[handoff] candidate relay failed:", error);
@@ -174,7 +175,7 @@ function attachCandidateRelay({ pc, room, role, key }) {
  * `until()` becomes true or throws on abort, timeout, or a failed ICE state.
  * `relayer` comes from attachCandidateRelay (attached earlier).
  */
-async function runSignalling({ pc, room, role, key, onRemote, until, signal, deadlineMs, relay = false, relayer }) {
+async function runSignalling({ pc, room, role, key, onRemote, until, signal, deadlineMs, relay = false, relayer, privatePolling = false }) {
   let cursor = 0;
   const pendingCandidates = [];
   let remoteDescriptionSet = false;
@@ -205,7 +206,9 @@ async function runSignalling({ pc, room, role, key, onRemote, until, signal, dea
     }
     let view;
     try {
-      view = await api(`/api/handoff/rooms/${room}/messages?role=${role}&key=${encodeURIComponent(key)}&after=${cursor}`);
+      view = privatePolling
+        ? await api(`/api/handoff/rooms/${room}/messages`, {method:'POST',body:{role,key,after:cursor,poll:true},signal})
+        : await api(`/api/handoff/rooms/${room}/messages?role=${role}&key=${encodeURIComponent(key)}&after=${cursor}`,{signal});
     } catch (error) {
       if (error.status === 404) throw new Error(`The other device ended the handoff before the connection came up. ${describeDiagnostics(pc, diag)}`);
       throw error;
@@ -258,31 +261,40 @@ function waitForChannelOpen(channel, signal, timeoutMs) {
   });
 }
 
+/** Compare this short authentication string on the two paired screens. */
+export async function pairingFingerprint(pc) {
+  const values=[pc.localDescription?.sdp,pc.remoteDescription?.sdp].map(sdp=>/^a=fingerprint:sha-256 ((?:[A-Fa-f0-9]{2}:){31}[A-Fa-f0-9]{2})\r?$/m.exec(sdp||'')?.[1]?.toUpperCase());
+  if(values.some(value=>!value))throw new Error('The paired connection has no authenticated certificate fingerprint.');
+  const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(values.sort().join('|'))));
+  return Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join('').slice(0,12).toUpperCase();
+}
+
 /**
  * Host side. `loadRom(game)` resolves to { name, bytes } or { name, file }.
  * The receiver requests its selected game before any file bytes are sent. `onState(state, detail)` receives:
  *   creating → waiting {code,url} → connecting → sending {sent,total} → done
  * Returns { code, url, promise, cancel }.
  */
-export function startRomHandoffHost({ loadRom, game = 'ssb64', onState = () => {} }) {
+export function startRomHandoffHost({ loadRom, game = 'ssb64', onState = () => {}, iceServers, confirmPeer, privatePolling = false, transferTimeoutMs }) {
   const controller = new AbortController();
   const { signal } = controller;
   let pc = null;
   let roomCode = null;
   let hostKey = null;
+  const timeout=transferTimeoutMs&&setTimeout(()=>controller.abort(),transferTimeoutMs);
 
   const promise = (async () => {
     onState("creating");
-    const created = await api("/api/handoff/rooms", { method: "POST", body: {} });
+    const created = await api("/api/handoff/rooms", { method: "POST", body: {}, signal });
     roomCode = created.code;
     hostKey = created.hostKey;
     const url = handoffUrl(location.origin, roomCode, game);
     onState("waiting", { code: roomCode, url, expiresAt: created.expiresAt });
 
-    const ice = await fetchIceConfig();
+    const ice = iceServers ? {iceServers,relay:false} : await fetchIceConfig();
     pc = new RTCPeerConnection({ iceServers: ice.iceServers });
     logCandidateTypes(pc, "host");
-    const relayer = attachCandidateRelay({ pc, room: roomCode, role: "host", key: hostKey });
+    const relayer = attachCandidateRelay({ pc, room: roomCode, role: "host", key: hostKey, signal });
     const channel = pc.createDataChannel("rom", { ordered: true });
     channel.binaryType = "arraybuffer";
     channel.bufferedAmountLowThreshold = BUFFER_LOW_WATER;
@@ -292,6 +304,7 @@ export function startRomHandoffHost({ loadRom, game = 'ssb64', onState = () => {
     await pc.setLocalDescription(offer);
     await api(`/api/handoff/rooms/${roomCode}/messages`, {
       method: "POST",
+      signal,
       body: { role: "host", key: hostKey, message: { type: "offer", sdp: pc.localDescription.sdp } },
     });
 
@@ -304,6 +317,7 @@ export function startRomHandoffHost({ loadRom, game = 'ssb64', onState = () => {
       signal,
       relay: ice.relay,
       relayer,
+      privatePolling,
       deadlineMs: WAIT_FOR_PEER_MS,
       onRemote: async (message) => {
         if (message.type === "answer") {
@@ -316,6 +330,7 @@ export function startRomHandoffHost({ loadRom, game = 'ssb64', onState = () => {
     await waitForChannelOpen(channel, signal, CONNECT_TIMEOUT_MS);
     api(`/api/handoff/rooms/${roomCode}/close`, { method: "POST", body: { role: "host", key: hostKey } }).catch(() => {});
 
+    if(confirmPeer){const fingerprint=await pairingFingerprint(pc);onState('pairing',{fingerprint});await confirmPeer({fingerprint,signal});if(signal.aborted)throw new HandoffCancelled();}
     try { await sendGameFile(channel, inbox, loadRom, onState); }
     catch (error) { try {channel.send(JSON.stringify({type:'error',message:error.message}));} catch {} throw error; }
     finally { inbox.dispose(); }
@@ -327,7 +342,7 @@ export function startRomHandoffHost({ loadRom, game = 'ssb64', onState = () => {
     if (error?.name === "HandoffCancelled") { onState("cancelled"); return; }
     onState("error", { error });
     throw error;
-  });
+  }).finally(()=>clearTimeout(timeout));
 
   return {
     promise,
@@ -340,7 +355,7 @@ export function startRomHandoffHost({ loadRom, game = 'ssb64', onState = () => {
  * the same validation the upload button runs. `onState(state, detail)`:
  *   joining → waiting → connecting → receiving {received,total} → done
  */
-export function receiveRomHandoff({ code, game = 'ssb64', onState = () => {}, signal } = {}) {
+export function receiveRomHandoff({ code, game = 'ssb64', onState = () => {}, signal, iceServers, expectedSize, privatePolling = false, transferTimeoutMs } = {}) {
   const roomCode = normalizeHandoffCode(code);
   const controller = new AbortController();
   const abortSignal = controller.signal;
@@ -349,18 +364,19 @@ export function receiveRomHandoff({ code, game = 'ssb64', onState = () => {}, si
   let pc = null;
   let guestKey = null;
   let cleanup = async () => {};
+  const timeout=transferTimeoutMs&&setTimeout(()=>controller.abort(),transferTimeoutMs);
 
   const promise = (async () => {
     if (!isHandoffCode(roomCode)) throw new Error("Enter the 6-character code shown on the other device.");
     onState("joining");
-    const joined = await api(`/api/handoff/rooms/${roomCode}/join`, { method: "POST", body: {} });
+    const joined = await api(`/api/handoff/rooms/${roomCode}/join`, { method: "POST", body: {}, signal:abortSignal });
     guestKey = joined.guestKey;
     onState("waiting");
 
-    const ice = await fetchIceConfig();
+    const ice = iceServers ? {iceServers,relay:false} : await fetchIceConfig();
     pc = new RTCPeerConnection({ iceServers: ice.iceServers });
     logCandidateTypes(pc, "guest");
-    const relayer = attachCandidateRelay({ pc, room: roomCode, role: "guest", key: guestKey });
+    const relayer = attachCandidateRelay({ pc, room: roomCode, role: "guest", key: guestKey, signal:abortSignal });
     let channel = null;
     let inbox;
     const channelReady = new Promise((resolve) => {
@@ -380,6 +396,7 @@ export function receiveRomHandoff({ code, game = 'ssb64', onState = () => {}, si
       signal: abortSignal,
       relay: ice.relay,
       relayer,
+      privatePolling,
       deadlineMs: CONNECT_TIMEOUT_MS,
       onRemote: async (message) => {
         if (message.type !== "offer") return;
@@ -389,6 +406,7 @@ export function receiveRomHandoff({ code, game = 'ssb64', onState = () => {}, si
         await pc.setLocalDescription(answer);
         await api(`/api/handoff/rooms/${roomCode}/messages`, {
           method: "POST",
+          signal:abortSignal,
           body: { role: "guest", key: guestKey, message: { type: "answer", sdp: pc.localDescription.sdp } },
         });
       },
@@ -398,8 +416,9 @@ export function receiveRomHandoff({ code, game = 'ssb64', onState = () => {}, si
     await waitForChannelOpen(channel, abortSignal, CONNECT_TIMEOUT_MS);
     api(`/api/handoff/rooms/${roomCode}/close`, { method: "POST", body: { role: "guest", key: guestKey } }).catch(() => {});
 
+    if(expectedSize!==undefined)onState('pairing',{fingerprint:await pairingFingerprint(pc)});
     let file;
-    try { file = await receiveGameFile(channel, inbox, game, onState, value => { cleanup = value; }); }
+    try { file = await receiveGameFile(channel, inbox, game, onState, value => { cleanup = value; }, {expectedSize}); }
     catch (error) { try {channel.send(JSON.stringify({type:'error',message:error.message}));} catch {} await cleanup(); throw error; }
     finally { inbox.dispose(); }
 
@@ -411,7 +430,7 @@ export function receiveRomHandoff({ code, game = 'ssb64', onState = () => {}, si
     if (error?.name === "HandoffCancelled") { onState("cancelled"); }
     else onState("error", { error });
     throw error;
-  });
+  }).finally(()=>clearTimeout(timeout));
 
   return { promise, dispose: () => cleanup(), cancel() { controller.abort(); } };
 }

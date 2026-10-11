@@ -4,11 +4,16 @@ export const TRANSFER_LIMITS = { ssb64: 64 * 1024 * 1024, melee: 2 * 1024 * 1024
 export function validateTransferHeader(header, game) {
   if (header.type !== 'header' || header.game !== game || !Number.isSafeInteger(header.size) || header.size <= 0 || header.size > TRANSFER_LIMITS[game]) throw new Error('The sending device offered an unexpected game or file size.');
 }
-export function channelInbox(channel, signal) {
+export function channelInbox(channel, signal, {maxQueuedFrames=128,maxQueuedBytes=2*1024*1024}={}) {
   const queue = [];
-  let waiter, failure;
-  const fail = error => { failure = error; waiter?.reject(error); waiter = null; };
-  const message = event => { if (waiter) { waiter.resolve(event.data); waiter = null; } else queue.push(event.data); };
+  let waiter, failure, queuedBytes=0;
+  const fail = error => { failure = error; queue.length=0;queuedBytes=0; waiter?.reject(error); waiter = null; };
+  const bytes=value=>typeof value==='string'?new TextEncoder().encode(value).length:value instanceof ArrayBuffer?value.byteLength:Infinity;
+  const message = event => {
+    if(failure)return;const size=bytes(event.data);
+    if(size>16384||(!waiter&&(queue.length>=maxQueuedFrames||queuedBytes+size>maxQueuedBytes))){fail(new Error('Transfer inbox exceeded its bounded frame/queue limit.'));try{channel.close?.();}catch{}return;}
+    if(waiter){waiter.resolve(event.data);waiter=null;}else{queue.push(event.data);queuedBytes+=size;}
+  };
   const closed = () => fail(new Error('The other device disconnected during the transfer.'));
   const aborted = () => fail(Object.assign(new Error('Handoff cancelled.'), {name:'HandoffCancelled'}));
   channel.addEventListener('message', message);
@@ -19,7 +24,7 @@ export function channelInbox(channel, signal) {
   return {
     async next() {
       if (failure) throw failure;
-      if (queue.length) return queue.shift();
+      if (queue.length) {const value=queue.shift();queuedBytes-=bytes(value);return value;}
       return new Promise((resolve,reject)=>{
         const timer = setTimeout(()=>fail(new Error('The other device stopped responding.')), 90000);
         waiter = {resolve:value=>{clearTimeout(timer);resolve(value);},reject:error=>{clearTimeout(timer);reject(error);}};
@@ -57,11 +62,12 @@ export async function sendGameFile(channel, inbox, loadRom, onState) {
   if ((await frame(inbox)).type !== 'received') throw new Error('The receiving device did not finish the transfer.');
   onState('done',{total:file.size});
 }
-export async function receiveGameFile(channel, inbox, game, onState, setCleanup) {
+export async function receiveGameFile(channel, inbox, game, onState, setCleanup, {expectedSize} = {}) {
   if (!Object.hasOwn(TRANSFER_LIMITS,game)) throw new Error('Unsupported game.');
   channel.send(JSON.stringify({type:'request',game}));
   const header = await frame(inbox);
   validateTransferHeader(header,game);
+  if(expectedSize!==undefined&&header.size!==expectedSize)throw new Error('The sending device offered the wrong disc size.');
   let writer, handle, directory, temporaryName;
   const receipt = {name: "", adopted: false};
   const chunks=[];

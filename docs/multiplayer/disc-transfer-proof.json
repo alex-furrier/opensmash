@@ -1,0 +1,71 @@
+{
+  "browser": "155.0.8059.39",
+  "origin": "approved-private-HTTPS",
+  "discBytes": 1459978240,
+  "sourceSha256": {
+    "engines/melee/runtime/web/netplay/disc-transfer.mjs": "1c5002780eabe6c2c78f6e2d51a759ece9077060aa81af391c2d9e0dd3b203cd",
+    "engines/melee/runtime/web/netplay/lobby-client.mjs": "50d803f23dc21935e39950dede102a3f4824a25c6b4e0de89f1589a84fcd9273",
+    "engines/melee/tools/netplay/handoff-api.mjs": "36426d5ba412d8aa8743cadf5702369fcaf1eb3af2b9ebceba4d568c78391d7d",
+    "engines/melee/tools/netplay/server.mjs": "c65272a25ef5bb26c65f59aa83958f63455fbfd0ff333a7b12d19d01ec46ab64",
+    "web-prototype/shared/handoff-transfer.js": "da1515fa445022c5f0293a6742928fefb21240a14a0ba4631b5bcc2b5bc9a63d",
+    "web-prototype/src/rom-handoff-client.js": "33f3a1dd48f8322d4ed00386a8c6ca16f6eb669bb77909181c03fa4de27f5537",
+    "engines/melee/web/lib/disc-cache.mjs": "15fc7e7d0b43ec92269bb5233ac763820b7d76d124f0ad26cae0a58a649bfa44"
+  },
+  "results": [
+    {
+      "scenario": "reference",
+      "passed": true,
+      "fullISO": true,
+      "confirmationBeforeBytes": true,
+      "cacheReload": true,
+      "partialCleaned": false,
+      "httpBinary": false,
+      "signallingBytes": 2558,
+      "maxSignalBodyBytes": 577
+    }
+  ],
+  "status": "full-disc-private-browser-transfer-and-reload-passed",
+  "receiver": "separate actual Chrome browser context with independent origin storage",
+  "runtimeEngineIdentity": "9674d3e1c9d3402b001ebcab66ffa065aff4eb4887882d5d58c15aed3d0104db",
+  "verification": "Exact size and every pinned SHA-256 chunk covering the complete known USA 1.02 image, before cache pointer adoption; repeated after reload",
+  "focusedTestsPassed": 65,
+  "typecheck": "npm run typecheck; lockfile-pinned TypeScript 5.9.3",
+  "sourceReview": "No blocking issue found; source-only review",
+  "externalIceServices": false,
+  "isoHttpEndpoint": false,
+  "phoneGameplay": "unverified; actual iPhone pairing, transfer, storage, touch, audio and gameplay require human device run",
+  "limits": [
+    "One explicitly paired receiver; code expires after five minutes; matching certificate-bound confirmation required before file bytes",
+    "Direct same-Wi-Fi WebRTC only; no STUN/TURN configuration",
+    "Whole operation expires after twenty minutes; storage quota/eviction and foreground execution remain browser dependent",
+    "Sender completion acknowledges received bytes; only receiver verification/cache acceptance establishes ready status"
+  ],
+  "faultProof": {
+    "origin": "loopback",
+    "browser": "155.0.8059.39",
+    "results": [
+      {
+        "scenario": "cancel",
+        "passed": true,
+        "fullISO": false,
+        "confirmationBeforeBytes": true,
+        "cacheReload": false,
+        "partialCleaned": true,
+        "httpBinary": false,
+        "signallingBytes": 2467,
+        "maxSignalBodyBytes": 576
+      },
+      {
+        "scenario": "mutation",
+        "passed": true,
+        "fullISO": true,
+        "confirmationBeforeBytes": true,
+        "cacheReload": false,
+        "partialCleaned": true,
+        "httpBinary": false,
+        "signallingBytes": 2560,
+        "maxSignalBodyBytes": 577
+      }
+    ]
+  }
+}

@@ -29,6 +29,14 @@ test('real loopback HTTP/WebSocket create, join, verify, Ready, relay, disconnec
   assert.equal(response.headers.get('cross-origin-embedder-policy'),'require-corp');
   await verifyRuntime(relay.manifest,async url=>new Uint8Array(await(await fetch(relay.origin+url)).arrayBuffer()));
   assert.equal((await fetch(relay.origin+'/private.iso')).status,404);
+  const pairing=relay.origin+'/api/handoff/rooms';
+  assert.equal((await fetch(pairing)).status,405);
+  assert.equal((await fetch(pairing,{method:'POST',headers:{Origin:'https://wrong.invalid','Content-Type':'application/json'},body:'{}'})).status,403);
+  assert.equal((await fetch(pairing,{method:'POST',headers:{Origin:relay.origin,'Content-Type':'application/octet-stream'},body:'private file bytes'})).status,415);
+  const pair=await fetch(pairing,{method:'POST',headers:{Origin:relay.origin,'Content-Type':'application/json'},body:'{}'});assert.equal(pair.status,200);
+  const pairCode=(await pair.json()).code;
+  const pairJoin=()=>fetch(pairing+'/'+pairCode+'/join',{method:'POST',headers:{Origin:relay.origin,'Content-Type':'application/json'},body:'{}'});
+  assert.equal((await pairJoin()).status,200);assert.equal((await pairJoin()).status,409);
   const rejectedHost=await new Promise((accept,reject)=>{get(relay.origin+'/',{headers:{Host:'other.invalid'}},response=>{response.resume();accept(response.statusCode);}).on('error',reject);});
   assert.equal(rejectedHost,403);
   const approvedHost=await new Promise((accept,reject)=>{get(relay.origin+'/',{headers:{Host:new URL(approved).host}},response=>{response.resume();accept(response.statusCode);}).on('error',reject);});assert.equal(approvedHost,200);

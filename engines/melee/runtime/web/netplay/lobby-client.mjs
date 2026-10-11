@@ -2,10 +2,11 @@
 import {installedIdentity,canonicalLaunch} from '/engine/netplay/identity.mjs';
 import {neutralTouchPad} from '/engine/touch-pad.mjs';
 import {mountTouchDeck,typingTarget} from '/engine/netplay/lobby-input.mjs';
+import {mountDiscTransfer} from '/transfer/disc-transfer.mjs';
 import {validateDebug} from '/engine/netplay/debug-opponent.mjs';
 const $=id=>document.getElementById(id),status=message=>{$('status').textContent=message;};
 let manifest,room,socket,frame,port,audioContext,audioNode,audioRing,iso,warm=false,starting=false,leaving=false;
-let runtimeGeneration=0;
+let runtimeGeneration=0,discTransfer;
 const held=new Set(),touch={current:neutralTouchPad()},touchController=mountTouchDeck($('touch-root'),touch);
 const debugging=new URLSearchParams(location.search).get('debug')==='1';$('debug-controls').hidden=!debugging;
 const keys={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down',KeyZ:'attack',KeyX:'special',KeyC:'jump',KeyQ:'shield',Enter:'start'};
@@ -13,8 +14,9 @@ function send(message){if(socket?.readyState!==WebSocket.OPEN)throw Error('Room 
 function post(data,transfer=[]){frame?.contentWindow.postMessage(data,location.origin,transfer);}
 function controls(){
  $('create').disabled=!!room||!manifest;$('join').disabled=!!room||!manifest;
- $('ready').disabled=!room||!warm||starting||leaving||!!room.ready;
- $('stop').disabled=!room;$('disc').disabled=starting||!!room?.ready;
+ $('ready').disabled=!room||!warm||starting||leaving||!!room.ready||!!discTransfer?.busy;
+ $('stop').disabled=!room;$('disc').disabled=starting||!!room?.ready||!!discTransfer?.busy;
+ discTransfer?.refresh();
  $('debug-scripted').disabled=room?.player!==1||starting||!!room?.ready;$('debug-scenario').disabled=starting||!!room?.ready;
 }
 function release(){held.clear();touchController.reset();post({type:'input',values:[0,0,0,0,0,0,0,0,1]});}
@@ -29,12 +31,12 @@ function destroyRuntime(){
  warm=false;starting=false;$('debug-measured').textContent='Stopped. Create a fresh room.';$('screen').replaceChildren();$('game').hidden=true;
 }
 function leave(reason='Room closed. Create a fresh room.'){
- if(leaving)return;leaving=true;
+ if(leaving)return;leaving=true;discTransfer?.cancel();
  try{if(room&&socket?.readyState===WebSocket.OPEN)send({type:'stop'});}catch{}
  destroyRuntime();iso=undefined;$('disc').value='';socket?.close();socket=undefined;room=undefined;$('share').hidden=true;$('players').textContent='Create or join a fresh room.';
  status(reason);leaving=false;controls();
 }
-async function sound(){
+async function sound(resume=true){
  if(audioContext)return true;
  const generation=runtimeGeneration,context=new AudioContext({sampleRate:48000});audioContext=context;
  try{
@@ -42,7 +44,7 @@ async function sound(){
   if(generation!==runtimeGeneration||audioContext!==context){await context.close().catch(()=>{});return false;}
   const ring=new SharedArrayBuffer(16+32768*2*4);
   const node=new AudioWorkletNode(context,'melee-audio',{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[2],processorOptions:{ring}});
-  audioRing=ring;audioNode=node;node.connect(context.destination);await context.resume();
+  audioRing=ring;audioNode=node;node.connect(context.destination);if(resume)await context.resume();
   return generation===runtimeGeneration&&audioContext===context;
  }catch(error){if(generation!==runtimeGeneration||audioContext!==context)return false;throw error;}
 }
@@ -109,16 +111,19 @@ window.addEventListener('message',async event=>{
 $('create').onclick=()=>connect({type:'create'});
 $('join-form').onsubmit=event=>{event.preventDefault();let code=$('room-code').value.trim();try{if(code.includes('://'))code=new URL(code).hash.slice(1);}catch{}if(!/^[a-f0-9]{32}$/.test(code)){status('Paste a valid room link or code.');return;}connect({type:'join',room:code});};
 $('copy').onclick=async()=>{try{await navigator.clipboard.writeText($('room-link').value);status('Room link copied.');}catch{status('Select the room link and copy it.');}};
-$('disc').onchange=async()=>{
+async function chooseDisc(selected,automatic=false){
  let generation=runtimeGeneration;
  try{
   if(room?.ready)throw Error('Create a fresh room before changing the verified game.');
   if(frame||audioContext)destroyRuntime();generation=runtimeGeneration;
-  const selected=$('disc').files[0];iso=selected;if(!selected)return;
-  if(!await sound()||generation!==runtimeGeneration||iso!==selected)return;
+  iso=selected;controls();if(!selected)return;
+  if(!await sound(!automatic)||generation!==runtimeGeneration||iso!==selected)return;
   warmRuntime();
  }catch(error){if(generation===runtimeGeneration)leave(error.message);}
-};
+}
+$('disc').onchange=()=>chooseDisc($('disc').files[0]);
+discTransfer=mountDiscTransfer({getFile:()=>iso,acceptFile:file=>chooseDisc(file,true),canChange:()=>!starting&&!room?.ready&&!leaving,onBusy:()=>controls()});
+void discTransfer.restore();
 $('ready').onclick=async()=>{
  const currentRoom=room,currentContext=audioContext,generation=runtimeGeneration;
  try{
