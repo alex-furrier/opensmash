@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createConfirmedInput, neutralPad} from '../web/lib/netplay/confirmed-input.mjs';
+import {createConfirmedInput, neutralPad} from '../runtime/web/netplay/confirmed-input.mjs';
 
 const identity = {engine: 'engine-hash', disc: 'disc-hash', rules: 'rules-hash', costumes: 'stock', seed: '17'};
 function pair({session = 'fresh', change = x => x, delay = () => 0, timeoutMs = 1000, otherIdentity = identity} = {}) {

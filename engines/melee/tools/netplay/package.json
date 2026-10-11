@@ -1,0 +1,12 @@
+{
+  "name": "opensmash-melee-local-netplay",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test rooms.test.mjs server.test.mjs"
+  },
+  "dependencies": {
+    "ws": "8.22.0"
+  }
+}

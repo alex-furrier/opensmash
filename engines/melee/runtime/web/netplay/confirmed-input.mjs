@@ -32,6 +32,7 @@ export function createConfirmedInput({channel, session, player, identity, timeou
   const key = identityKey(identity);
   let tick = 0, remoteTick = 0, started = false, peerReady = false, busy = false;
   let stopped, remote, unsubscribe, peerAccepted = false;
+  let appliedRemote, appliedAck = false, appliedBusy = false, appliedTick = -1;
   const waiters = new Set();
   const wake = () => { for (const fn of [...waiters]) fn(); };
   function stop(reason = 'Session stopped', notify = true) {
@@ -68,12 +69,24 @@ export function createConfirmedInput({channel, session, player, identity, timeou
         if (!started || !peerReady || remote || message.tick !== remoteTick || message.tick !== tick ||
             !Number.isSafeInteger(message.tick) || !token(message.state))
           throw Error('Input sequence mismatch');
-        remote = {pad: padCopy(message.pad), state: message.state};
+        const preparation = message.preparation || [false, false];
+        if (!Array.isArray(preparation) || preparation.length !== 2 || !preparation.every(n => typeof n === 'boolean'))
+          throw Error('Invalid preparation readiness');
+        remote = {pad: padCopy(message.pad), state: message.state, preparation};
         remoteTick++;
       } else if (message.type === 'accepted') {
         if (!busy || !remote || peerAccepted || message.tick !== tick)
           throw Error('Confirmation sequence mismatch');
         peerAccepted = true;
+      } else if (message.type === 'applied') {
+        if (!started || !peerReady || appliedRemote || !Number.isSafeInteger(message.tick) || message.tick <= appliedTick ||
+            !(message.tick === tick - 1 || (busy && peerAccepted && message.tick === tick)) || !token(message.state))
+          throw Error('Applied sequence mismatch');
+        appliedRemote = {tick: message.tick, state: message.state};
+      } else if (message.type === 'appliedAccepted') {
+        if (!appliedBusy || appliedAck || message.tick !== tick - 1)
+          throw Error('Applied confirmation mismatch');
+        appliedAck = true;
       } else throw Error('Unknown input message');
       wake();
     } catch (error) { stop(error.message); }
@@ -87,9 +100,9 @@ export function createConfirmedInput({channel, session, player, identity, timeou
       try { channel.send({type: 'ready', session, player, version: 1, identity: key}); }
       catch (error) { stop(error.message); throw stopped; }
     },
-    async synchronize(frame, acquireOwnedPad, state) {
+    async synchronize(frame, acquireOwnedPad, state, preparation = [false, false]) {
       check();
-      if (!started || busy || frame !== tick || !Number.isSafeInteger(frame) || !token(state)) {
+      if (!started || busy || appliedBusy || frame !== tick || !Number.isSafeInteger(frame) || !token(state)) {
         stop('Invalid engine boundary'); throw stopped;
       }
       busy = true;
@@ -97,8 +110,10 @@ export function createConfirmedInput({channel, session, player, identity, timeou
         await waitFor(() => peerReady);
         check();
         // Acquire once, here, after Ready. The callback cannot supply the peer's pad.
+        if (!Array.isArray(preparation) || preparation.length !== 2 || !preparation.every(n => typeof n === 'boolean'))
+          throw Error('Invalid preparation readiness');
         const local = padCopy(acquireOwnedPad());
-        channel.send({type: 'input', session, player, tick, pad: local.slice(), state});
+        channel.send({type: 'input', session, player, tick, pad: local.slice(), state, preparation: preparation.slice()});
         await waitFor(() => Boolean(remote));
         check();
         if (remote.state !== state) throw Error('Selected state mismatch');
@@ -107,10 +122,29 @@ export function createConfirmedInput({channel, session, player, identity, timeou
         check();
         const pads = [neutralPad(), neutralPad(), neutralPad(), neutralPad()];
         pads[player] = local; pads[1 - player] = remote.pad.slice();
+        Object.defineProperty(pads, 'preparation', {value: preparation.map((ready, i) => ready && remote.preparation[i])});
         remote = undefined; peerAccepted = false; tick++;
         return pads;
       } catch (error) { stop(error.message); throw stopped; }
       finally { busy = false; }
+    },
+    // Complete every consumed tick, including the final one. This confirms only
+    // the caller's canonical selected-state digest, never a rollback snapshot.
+    async confirmApplied(frame, state) {
+      check();
+      if (busy || appliedBusy || frame !== tick - 1 || frame !== appliedTick + 1 || !token(state)) {
+        stop('Invalid applied boundary'); throw stopped;
+      }
+      appliedBusy = true;
+      try {
+        channel.send({type: 'applied', session, player, tick: frame, state});
+        await waitFor(() => Boolean(appliedRemote));
+        if (appliedRemote.tick !== frame || appliedRemote.state !== state) throw Error('Applied selected state mismatch');
+        channel.send({type: 'appliedAccepted', session, player, tick: frame});
+        await waitFor(() => appliedAck);
+        appliedRemote = undefined; appliedAck = false; appliedTick = frame;
+      } catch (error) { stop(error.message); throw stopped; }
+      finally { appliedBusy = false; }
     },
     stop,
   };

@@ -1,9 +1,12 @@
-# Melee multiplayer: confirmed-input foundation
+# Melee multiplayer: local confirmed-input prototype
 
-This branch adds a small two-player input-session contract and asset-free Node
-and browser proofs. It does **not** enable multiplayer in the launcher yet.
-The shipping engine cannot await this contract without a browser engine hook.
-No relay, public room service, deployment, ROM transfer or rollback is included.
+This branch contains an opt-in engine source patch, a two-player confirmed-input
+session, and a standalone loopback browser lobby. The candidate WASM builds and
+focused tests pass. **Real-engine browser gameplay is not yet verified**; the
+integration remains local and unpushed until that proof is complete.
+
+The ordinary launcher and clean engine pin remain unchanged. No hosting,
+deployment, ROM transfer, reconnect into an old match, or rollback is included.
 
 ## Ancestry and game selection
 
@@ -11,7 +14,11 @@ This repository is a history-preserving fork of
 [turtlesoupy/opensmash](https://github.com/turtlesoupy/opensmash), based on
 `41410c4336df193ea693f8a1afdb9ee0a96bcf5a`. Its MIT LICENSE remains unchanged.
 Engine licenses and authorship remain with their respective upstream projects.
-This module is original MIT code; no game assets or experiment binaries were imported.
+The launcher/session/relay additions are original MIT code. The engine patch
+preserves upstream authorship and licensing: port code is GPL-3.0-or-later,
+while upstream labels the decompiled game directories unlicensed. See the
+[engine licensing](https://github.com/turtlesoupy/opensmash-melee-pc/blob/5bc531aafcc941866f2c916afebc38ee75543222/LICENSE.md).
+No game assets or experiment binaries were imported.
 
 Both games are supported on upstream **main**, not merely historical branches.
 The README says “Super Smash Bros. 64 and Super Smash Bros. Melee in the browser”.
@@ -74,7 +81,7 @@ need identical verified costume manifests before Ready.
 
 ## Implemented contract
 
-`engines/melee/web/lib/netplay/confirmed-input.mjs` exposes
+`engines/melee/runtime/web/netplay/confirmed-input.mjs` exposes
 `createConfirmedInput({channel, session, player, identity, timeoutMs})`.
 The channel is one ordered, reliable connection to the assigned peer and must
 report disconnects. `send` dispatches synchronously; async transport failures
@@ -98,11 +105,19 @@ This is not a room registry or generic engine coordinator.
    timeout or Stop fail closed. Close the runtime as well as the session. A new
    match requires a fresh runtime, fresh session identifier and fresh transport.
    No reconnect into old simulation state is supported.
+7. After the actual raw head is consumed and the engine tick completes, call
+   `await confirmApplied(tick, selectedStateAndAppliedPadDigest)`. Both peers
+   compare and acknowledge that result before the next tick or finite-trial
+   completion. The final tick is covered by this same gate.
+8. Intro/match graphics readiness travels with each input packet. The adapter
+   releases preparation only when both flags are true for the same confirmed
+   tick; wall-clock graphics readiness cannot advance one simulation early.
 
 At most one local synchronization and one remote pad packet are retained.
-Input delivery acceptance cannot prove identical execution: the engine's next
-canonical state confirmation catches exercised divergences. Final-state
-confirmation is required before declaring a finite trial complete.
+Input delivery acceptance cannot prove identical execution. The bridge hashes
+RNG, scene kind, four upstream 12-float player records as raw bits, and the
+actually consumed pads after every tick. This is explicitly selected state,
+not a full game snapshot or proof of complete state closure.
 Application message suppression tests protocol faults, not TCP packet loss.
 
 ## Evidence and acceptance gates
@@ -137,45 +152,98 @@ the complete server file passes all 5 tests with loopback access. Other failures
 missing zip dependency, `window` absent in browser-session test, audio-startup
 assertion, and monorepo-path assertion. The shared-site suite completed with
 190 pass and 7 fail, encountering missing dependencies and loopback restrictions.
-These suites are not reported green. No dependency
-installation or heavy engine build was performed.
+These suites are not reported green. These baseline failures are separate from the new focused tests. Audio startup,
+browser-session and monorepo-path failures were reproduced in a pristine archive
+of upstream `41410c4`; missing dependencies remain environment limitations.
 
 Dependency versions were read from current source and lockfiles, not refreshed:
 site pnpm 11.5.0, React 19.2.8, Vite 8.2.2, three 0.160.1;
 engine pin Emscripten 6.0.9/LLVM 22, documented GCC 16/Node 22.13+.
 The proof used existing Node 26.7.0 and Chrome 155.0.8059.39.
 
-## Next bounded engine slice and stop conditions
+## Local engine and lobby
 
-Implement an opt-in browser-owned gate beside the existing `pc_net_sync` boundary,
-with explicit capability/version negotiation in `runtime.mjs`. Keep the hook
-disabled for normal solo play. Preserve native UDP behavior and reject combining
-the browser gate with native netplay, record/replay or synctest. Source owners:
-`platforms/browser/` for the Asyncify/pad adapter and runtime lifecycle;
-`src/melee/gm/gmscene.c` for the single tick-boundary call; this repository's
-`MeleeFrameWorker`/session transport for per-launch ownership. Avoid a second
-frame loop and avoid exposing unrelated module globals.
+`runtime/patches/browser/confirmed-input.patch` applies only to pinned engine
+`5bc531aafcc941866f2c916afebc38ee75543222`. Its adjacent JSON pins the patch and
+each modified source file. Preparation rejects unrelated checkout changes:
 
-Before building, coordinate with the existing benchmark/Nix owner. Full build
-requires LLVM 22 LibTooling, GCC 16, emsdk 6.0.9, CMake/Ninja and engine dependencies.
-Start at **two build jobs**, one paired browser cohort at a time; output only
-to this task's checkout. Do not alter the other experiment or wait on its admin
-authentication for source work. Build duration and peak memory are unmeasured.
+```sh
+python3 engines/melee/tools/prepare_confirmed_input.py /path/to/isolated/melee-pc --apply
+# Use the existing pinned toolchain; this helper installs nothing.
+cd /path/to/isolated/melee-pc
+python3 tools/browser/build.py --jobs 2
+```
 
-Required game proof: two independently owned acquisition callbacks, exact
-applied PADStatus traces and canonical player fields at logical ticks; identical
-engine/disc/rules/costumes/seed; movement, attack, stock loss and respawn; terminal
-confirmation; actual engine input and RNG/state mutations; seeded ordered holds,
-timeout/disconnect and fresh-runtime neutral recovery. No progress after mismatch,
-no simulation during missing input, no stale queue-head consumption. Test solo
-unchanged behavior and scene/reset transitions. Stop on mismatch, queue invariant
-failure, crash, missing milestone or five seconds without progress after release.
+The patch adds a browser capability, Asyncify gates before/after the existing
+`gm_RunSimTick`, and an observer at actual raw-head consumption. The suspended
+queue head is held with queue type 2; physical tail samples are discarded before
+the confirmed head is consumed. Four complete ten-field PADStatus records are
+validated without struct padding. Each launcher fighter uses the upstream
+one-based port override, correcting the original shared-port-zero mapping.
+Native netplay, record/replay and synctest cannot share this owner. Solo hooks
+remain disabled, and no alternate simulation loop was introduced.
 
-Only after that proof, add a standalone browser create-room/share-link/Ready/play
-flow and an ephemeral relay with per-room ownership. No production hosting or
-new persistent security/network configuration is authorized by this foundation.
+The runtime validates replacement assets and match configuration before starting
+the input session. A netplay launch independently verifies the local disc and
+served runtime bytes, derives rules/stock-costume/seed identity, and uses a fresh
+memory card. Fail/Stop closes the room; recovery destroys the whole iframe and
+worker pool. Stale socket, audio and Ready continuations cannot act on a new room.
+The personalized-character pipeline is preserved; this prototype accepts stock
+Fox versus Captain Falcon on Final Destination only.
+
+From repository root, after building the candidate:
+
+```sh
+cd engines/melee/tools/netplay
+npm ci --ignore-scripts
+node server.mjs --engine-root /path/to/isolated/melee-pc --port 8787
+```
+
+Open `http://127.0.0.1:8787/` in two browser windows. Create a room, copy its link,
+join in the other window, choose each window's legal local USA 1.02 ISO, then
+press Ready in both. The relay binds **127.0.0.1 only** and validates Host and
+WebSocket Origin. It allowlists source/runtime files, caps message and room
+buffers, and has no asset upload or disc route. It sends only input, selected
+state digests, readiness, and session metadata. This local link is usable only
+on the same computer. Remote hosting requires separate work and approval.
+
+The relay uses pinned `ws` 8.22.0 (verified against its official package source).
+It is isolated from the existing frontend dependencies. No network or OS settings
+were changed. The candidate build used an existing Emscripten 6.0.9/LLVM 22
+installation and private copies of its cache and dependency sources: 989 game
+units, 639 build steps, two jobs, 405.28 seconds. Build and copied caches occupied
+about 1.9 GB. Peak RAM was not measured. `candidate-build.json` records the exact
+compiled JS/WASM and served-source hashes; it contains metadata only.
+
+Focused acceptance currently passes 22 JS cases plus the real loopback server
+case, and two extracted-C tests (actual queue/consumer logic and launcher port
+mapping). The lifecycle tests deliberately delay old socket/audio/Ready events
+across fresh rooms. The C harness replaces JS suspension and platform services;
+it does not prove Asyncify, the complete scene loop, graphics or audio behavior.
+
+```sh
+node --test engines/melee/tests/confirmed_input.test.mjs engines/melee/tests/browser_bridge.test.mjs engines/melee/tests/netplay_identity.test.mjs engines/melee/tests/netplay_lifecycle.test.mjs engines/melee/tools/netplay/rooms.test.mjs
+node --test engines/melee/tools/netplay/server.test.mjs
+python3 /path/to/isolated/melee-pc/tests/browser/test_confirmed_input.py
+```
+
+## Remaining real-engine acceptance
+
+The gameplay browser is held while the separate benchmark owns the quiet window.
+When released, prove two independently owned acquisition callbacks, exact applied
+PADStatus traces and selected state at logical ticks; movement, independent attack,
+stock loss and respawn; terminal confirmation; actual input and RNG mutation
+controls; seeded ordered holds, timeout/disconnect and fresh-runtime neutral
+recovery. Require progress and milestones, not matching idle traces. Verify solo
+behavior and scene transitions. Stop on mismatch, queue invariant failure, crash,
+missing milestone or five seconds without progress after release; preserve failure
+evidence rather than weakening a comparison.
+
+The earlier asset-free browser report remains evidence for its recorded module
+hash and counter fixture only. It supplies no gameplay result for this candidate.
 WAN performance, background tabs, audio wall-clock interactions, cross-platform
-determinism, fixed-delay pipelining and reconnect remain unsupported.
+determinism, fixed-delay pipelining, reconnect and complete rollback remain
+unsupported until separately established.
 
 ## Prior work and alternatives
 

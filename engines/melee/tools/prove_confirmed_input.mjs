@@ -4,7 +4,7 @@ import {readFile, writeFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 const require = createRequire(import.meta.url);
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const source = await readFile(new URL('../web/lib/netplay/confirmed-input.mjs', import.meta.url), 'utf8');
+const source = await readFile(new URL('../runtime/web/netplay/confirmed-input.mjs', import.meta.url), 'utf8');
 const browser = await chromium.launch({channel: 'chrome', headless: true});
 const results = [];
 try {

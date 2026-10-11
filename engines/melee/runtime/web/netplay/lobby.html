@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OpenSmash · Melee room</title><link rel="stylesheet" href="/lobby.css">
+<main><header><a href="/">OpenSmash</a><span>Local multiplayer prototype</span></header>
+<section class="intro"><p class="eyebrow">Melee · Two players</p><h1>Make room for a rival.</h1><p>Fox versus Captain Falcon. Final Destination. Four stocks, eight minutes.</p></section>
+<section class="lobby"><div><h2>Your room</h2><button id="create">Create room</button><form id="join-form"><label for="room-code">Room link or code</label><div class="inline"><input id="room-code" autocomplete="off" placeholder="Paste a room link"><button id="join">Join</button></div></form><div id="share" hidden><label for="room-link">Share this link</label><input id="room-link" readonly><button id="copy">Copy link</button></div><p id="players">Create or join a room to begin.</p></div>
+<div><h2>Your game</h2><label class="file" for="disc">Choose your local USA 1.02 Melee ISO<input type="file" id="disc" accept=".iso"></label><p class="muted">Your game stays on this computer. The relay exchanges controller inputs and verification hashes.</p><button id="ready" disabled>Ready</button><button id="stop" class="secondary" disabled>Leave room</button></div></section>
+<p id="status" role="status" aria-live="polite">Checking the local runtime…</p>
+<section id="game" hidden><div id="screen"></div><p>Arrows move · Z attack · X special · C jump · Q shield · Enter start. Each player uses their own keyboard or first gamepad.</p></section>
+<footer>Loopback only. Use two browser windows on this computer. Remote hosting and rollback are outside this prototype.</footer></main><script type="module" src="/lobby-client.mjs"></script></html>
