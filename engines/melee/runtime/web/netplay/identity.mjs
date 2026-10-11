@@ -9,7 +9,7 @@ export async function sha256(bytes) {
 export function canonicalLaunch(value) {
  if(!value || Object.keys(value).sort().join(',')!==Object.keys(launch).sort().join(',') ||
   !Object.keys(launch).every(key=>key==='packedPorts' ? Array.isArray(value[key])&&value[key].length===4&&value[key].every((n,i)=>n===launch[key][i]) : value[key]===launch[key]))
-  throw Error('This local prototype supports Fox versus Captain Falcon on Final Destination, four stocks and eight minutes.');
+  throw Error('This local prototype supports Donkey Kong versus Fox on Battlefield, four stocks and eight minutes.');
  return JSON.stringify(launch);
 }
 export async function installedIdentity(engine, config, {verifiedDisc, installedSeed, freshSaves, costumes=[], cssAssets=[]}) {

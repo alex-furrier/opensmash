@@ -1,7 +1,7 @@
 {
-  "status": "built-not-gameplay-verified",
+  "status": "built-local-multiplayer-gameplay-verified",
   "engineBase": "5bc531aafcc941866f2c916afebc38ee75543222",
-  "sourcePatchSha256": "523358f6a722e4728a88809b9775a12092bf3646f67d6c8ba5904019cae177e6",
+  "sourcePatchSha256": "4c367e254cef6d56e49c19e231b0a52b6f7b1542a346c5406482380a594278d3",
   "jobs": 2,
   "buildSeconds": 405.282751083374,
   "manifest": {
@@ -36,11 +36,11 @@
       },
       {
         "url": "/engine/netplay/identity.mjs",
-        "sha256": "cbbced3df300fd10898c5f4bf4a5ce8a671efdce3c70e47d8259f29fa7cdd1fb"
+        "sha256": "5dd5a8314a06aab829a7556ffc4b662e65cd100bfd19ad85c8b205fdcdc5e99e"
       },
       {
         "url": "/engine/upstream/runtime.mjs",
-        "sha256": "6f94c2d56a1fe5aa476a99b02dce04133a248da638a5df6abe2dfcbbf77c9d94"
+        "sha256": "fc41f871bf47387fd055ef8c1b383207bab56b6209aeb79708111eb8a945aad8"
       },
       {
         "url": "/engine/upstream/runtime.html",
@@ -85,7 +85,7 @@
       ]
     },
     "identity": {
-      "engine": "80209f921032aaa6053df23fd093762cf090da7b69dec14377bfbe1368c33e15",
+      "engine": "e2be3d7be6c80ec12641ea908b2758edf644c0888bf12d8c022a2e2f77c539ce",
       "disc": "0de05981a34156b9cedcef73c73d4244ac05cf6149ab3c9cfed917698819e464",
       "rules": "4fc1555619a038f7093d8c665f1611269d477903c741a69d2ef78bc5b83a23e6",
       "costumes": "stock",
@@ -93,17 +93,18 @@
     }
   },
   "lobbySourceSha256": {
-    "engines/melee/runtime/web/netplay/identity.mjs": "cbbced3df300fd10898c5f4bf4a5ce8a671efdce3c70e47d8259f29fa7cdd1fb",
+    "engines/melee/runtime/web/netplay/identity.mjs": "5dd5a8314a06aab829a7556ffc4b662e65cd100bfd19ad85c8b205fdcdc5e99e",
     "engines/melee/runtime/web/netplay/lobby.css": "d2a2968facc7ce4e40351fa07c08fb4200e28bc648f33478a1270a03d88af12a",
     "engines/melee/runtime/web/netplay/confirmed-input.mjs": "bf9f50e53b642d9901fb6f238b2749f04b0cf363c30130bf22c732674ba98426",
     "engines/melee/runtime/web/netplay/browser-bridge.mjs": "daf4d3c859e7bb8e6d3df9298c62ce272f5cf343b1d0a8e60b0fdcd873478fd6",
-    "engines/melee/runtime/web/netplay/lobby.html": "e9df8fa556d3bb029b0e767ab9f4fc71a167fd6936d54160c4193807b41fafdd",
-    "engines/melee/runtime/web/netplay/lobby-client.mjs": "c21c8e16a800b64094cdbfdf2dd2b4dee569d27d1918065cb574e05bc4d648b2",
+    "engines/melee/runtime/web/netplay/lobby.html": "59fff1df7669fea8ea6c55f7b30108a2f5bed766ca1818cc7dd6853b2c717ee2",
+    "engines/melee/runtime/web/netplay/lobby-client.mjs": "6e0f1eefa7cd09f0f136a775ddafb0c296647f2a238cf6288a786c139f0abafa",
     "engines/melee/tools/netplay/rooms.test.mjs": "9bf4ad79f3c44f4c1baf06b9997aa2a4692413baf7a4892dadddc26652c8ea31",
     "engines/melee/tools/netplay/rooms.mjs": "81261e45655d870f46fd9563456398ce8546807794dd0fe81f002b0cb117ff78",
     "engines/melee/tools/netplay/package-lock.json": "a4d2c1880c6cfa67543846a8056b380a88f462c016ff44e38b4f0bacb3fb5838",
     "engines/melee/tools/netplay/package.json": "72fea34ead80439a4ab73ce1ec01d4bb055297443b3bd3e73ec9207b4232317b",
     "engines/melee/tools/netplay/server.mjs": "6979fa1be719c8f5359a30db6d7028590a4d4fc0705f41221b6109604bdb75bc",
     "engines/melee/tools/netplay/server.test.mjs": "553baae360e1f5234ff44fca42e782a6f7d72888d52b542eb65c4ce65de9a828"
-  }
+  },
+  "note": "Compiled engine unchanged after build; served runtime source includes explicit worker shutdown. Browser matrix uses the exact final manifest identity."
 }

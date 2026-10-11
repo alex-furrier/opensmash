@@ -2,8 +2,10 @@
 
 This branch contains an opt-in engine source patch, a two-player confirmed-input
 session, and a standalone loopback browser lobby. The candidate WASM builds and
-focused tests pass. **Real-engine browser gameplay is not yet verified**; the
-integration remains local and unpushed until that proof is complete.
+focused tests pass. The actual lobby runs two local Melee clients with independently
+owned inputs: reference, ordered hold and seeded jitter each passed 4,000 matching
+logical ticks with attacks, movement, stock loss and respawn. Mutation, disconnect
+and fresh-session recovery checks also passed. This remains a local prototype.
 
 The ordinary launcher and clean engine pin remain unchanged. No hosting,
 deployment, ROM transfer, reconnect into an old match, or rollback is included.
@@ -189,7 +191,9 @@ served runtime bytes, derives rules/stock-costume/seed identity, and uses a fres
 memory card. Fail/Stop closes the room; recovery destroys the whole iframe and
 worker pool. Stale socket, audio and Ready continuations cannot act on a new room.
 The personalized-character pipeline is preserved; this prototype accepts stock
-Fox versus Captain Falcon on Final Destination only.
+Donkey Kong versus Fox on Battlefield only. These values use upstream CharacterKind IDs 1/2 and
+external StageKind 31, as defined in [fighter enums](https://github.com/turtlesoupy/opensmash-melee-pc/blob/5bc531aafcc941866f2c916afebc38ee75543222/src/melee/ft/forward.h#L130)
+and [stage enums](https://github.com/turtlesoupy/opensmash-melee-pc/blob/5bc531aafcc941866f2c916afebc38ee75543222/src/melee/gr/forward.h#L175).
 
 From repository root, after building the candidate:
 
@@ -215,7 +219,7 @@ units, 639 build steps, two jobs, 405.28 seconds. Build and copied caches occupi
 about 1.9 GB. Peak RAM was not measured. `candidate-build.json` records the exact
 compiled JS/WASM and served-source hashes; it contains metadata only.
 
-Focused acceptance currently passes 22 JS cases plus the real loopback server
+Focused acceptance currently passes 23 JS cases plus the real loopback server
 case, and two extracted-C tests (actual queue/consumer logic and launcher port
 mapping). The lifecycle tests deliberately delay old socket/audio/Ready events
 across fresh rooms. The C harness replaces JS suspension and platform services;
@@ -227,33 +231,54 @@ node --test engines/melee/tools/netplay/server.test.mjs
 python3 /path/to/isolated/melee-pc/tests/browser/test_confirmed_input.py
 ```
 
-## Remaining real-engine acceptance
+## Real-engine acceptance
 
-`engines/melee/tools/prove_netplay.mjs` is prepared but unexecuted. It uses fresh
-Chrome contexts, the actual lobby/relay, and local File selection. Its script
-acquires distinct pads at each client's owned C callback, requires independently
-timed fighter attacks, movement, stock loss/respawn and matching 4,000-tick applied
-traces, then runs an ordered hold, seeded message jitter, applied-input mutation,
-startup RNG intervention after Ready validation, actual disconnect during a held
-acquisition, and fresh neutral runtimes. It writes trace details to the local
-output directory; public summaries contain hashes and metadata. These scenarios
-are application-protocol checks, not TCP packet-loss or WAN measurements.
+[gameplay-proof.json](gameplay-proof.json) records final-runtime evidence from
+Chrome 155.0.8059.39. The test uses the actual lobby/relay and each window's local
+File selection. Distinct scripted pads enter at each client's owned C acquisition
+callback; comparisons use actual applied four-port PADStatus records and the
+selected 50-word state at every logical tick, including the final tick.
 
-The gameplay browser is held while the separate benchmark owns the quiet window.
-When released, prove two independently owned acquisition callbacks, exact applied
-PADStatus traces and selected state at logical ticks; movement, independent attack,
-stock loss and respawn; terminal confirmation; actual input and RNG mutation
-controls; seeded ordered holds, timeout/disconnect and fresh-runtime neutral
-recovery. Require progress and milestones, not matching idle traces. Verify solo
-behavior and scene transitions. Stop on mismatch, queue invariant failure, crash,
-missing milestone or five seconds without progress after release; preserve failure
-evidence rather than weakening a comparison.
+| Scenario | Observed result |
+| --- | --- |
+| Reference | 4,000 matched ticks per client; independently timed attacks, movement, stock loss/respawn, rendered frames and mixer audio progress. |
+| Ordered hold | Same gameplay requirements; an 80 ms owned-input hold stops both logical traces until release. |
+| Seeded ordered jitter | Same gameplay requirements under 0–2 ms application-message delays. |
+| Applied-input mutation | Actual accepted pad mutated before consumption; both stop at 582 confirmed ticks. |
+| Startup RNG mutation | Seed changed after Ready validation, before actual game startup; stops before tick zero. |
+| Disconnect | Client closes during held acquisition at tick 900; peer stops with no further confirmed progress. |
+| Same-page fresh room | Old engines/workers closed, new room and fresh iframe, 4,000 matched neutral ticks from tick zero. |
+| Solo smoke | Initial setup acknowledged; playable scene 2, 300 rendered frames, netplay hooks disabled. |
 
-The earlier asset-free browser report remains evidence for its recorded module
-hash and counter fixture only. It supplies no gameplay result for this candidate.
-WAN performance, background tabs, audio wall-clock interactions, cross-platform
-determinism, fixed-delay pipelining, reconnect and complete rollback remain
-unsupported until separately established.
+Reference, hold, jitter, both mutation controls and fresh recovery verify zero
+surviving workers after Stop/failure. Disconnect verifies fail-stop progress; its
+contexts are closed in final cleanup. Pool termination is requested synchronously
+before iframe removal; actual worker targets close asynchronously, within the
+bounded five-second check (about 1.5–2 seconds observed).
+The 23 focused JS cases, one real HTTP/WebSocket server case and two extracted-C
+cases provide narrower failure/lifecycle checks. The real-game evidence does not
+inherit results from the separate prior experiment.
+
+Run the private acceptance driver only in an assigned quiet window, supplying
+`MELEE_PC_ROOT`, `MELEE_ISO`, `PLAYWRIGHT_MODULE` and an outside-repository
+`TEST_OUTPUT`, then `node engines/melee/tools/prove_netplay.mjs`. The default
+`build/netplay-proof` directory is ignored by the root `/build/` rule. Screenshots,
+raw game traces and local assets remain private; the public report contains only
+source-bound metadata and trace hashes. Earlier failed attempts are retained
+locally and their causes are summarized in the report.
+
+The solo smoke test uses the existing controller acknowledgement for initial
+memory-card setup, then requires playable scene 2 and 300 rendered frames with
+confirmed-input ENV and callbacks disabled. Earlier missing-input timeouts are
+retained as driver failures. This smoke check is narrower than a complete solo
+regression suite. Full timed match/results transitions, WAN performance, background tabs, audio wall-clock
+interactions, cross-platform determinism, fixed-delay pipelining, reconnect and
+complete rollback remain unsupported until separately established. Application
+message delay checks are not TCP packet-loss measurements. The selected-state
+comparison does not establish complete game-state equivalence.
+
+The earlier asset-free browser report supplies counter-fixture evidence for its
+recorded module hash only.
 
 ## Prior work and alternatives
 

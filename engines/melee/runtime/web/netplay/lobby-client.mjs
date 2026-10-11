@@ -15,7 +15,11 @@ function controls(){
 function release(){held.clear();post({type:'input',values:[0,0,0,0,0,0,0,0,1]});}
 function destroyRuntime(){
  runtimeGeneration++;
- release();post({type:'netplay-stop'});port?.close();port=undefined;frame?.remove();frame=undefined;
+ release();post({type:'netplay-stop'});
+ // Close the runtime synchronously before removing its realm. An iframe removal
+ // does not reliably dispatch pagehide/unload or terminate its worker pool.
+ frame?.contentWindow.dispatchEvent?.(new Event('opensmash-runtime-close'));
+ port?.close();port=undefined;frame?.remove();frame=undefined;
  audioNode?.disconnect();audioNode=undefined;audioRing=undefined;audioContext?.close().catch(()=>{});audioContext=undefined;
  warm=false;starting=false;$('screen').replaceChildren();$('game').hidden=true;
 }

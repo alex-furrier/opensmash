@@ -1,11 +1,11 @@
 {
   "baseRevision": "5bc531aafcc941866f2c916afebc38ee75543222",
-  "patchSha256": "523358f6a722e4728a88809b9775a12092bf3646f67d6c8ba5904019cae177e6",
+  "patchSha256": "4c367e254cef6d56e49c19e231b0a52b6f7b1542a346c5406482380a594278d3",
   "files": {
     "platforms/browser/CMakeLists.txt": "cc299e67e1e3cb288c8fd2fc2fce35c5d2a9e613045bff7ba0025487909df3a4",
     "platforms/browser/confirmed_input.c": "26b2c8c3515ee25c64163cb10ac50985b56eb9649825e6eb275d200ef24270ed",
     "platforms/browser/launch.c": "44424607722c1c84d10f0192b8b9e020c7d641bf5d1fe995ef06ba216c6e823d",
-    "platforms/browser/runtime.mjs": "6f94c2d56a1fe5aa476a99b02dce04133a248da638a5df6abe2dfcbbf77c9d94",
+    "platforms/browser/runtime.mjs": "fc41f871bf47387fd055ef8c1b383207bab56b6209aeb79708111eb8a945aad8",
     "src/melee/gm/gmscene.c": "e6ee283aa53c33846b23bd15ce2af2c02c5cb77d7898496d012d7d8803782635",
     "src/sysdolphin/baselib/controller.c": "1fffd47d125c6866546eccce98981d1f555019052569504c2c937dd94ad94302",
     "tests/browser/test_confirmed_input.py": "b05db4684d738f43c119cc596714f6fea1c766ac34b1c254ea2504823eeba66c"
