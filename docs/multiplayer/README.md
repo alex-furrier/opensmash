@@ -229,6 +229,16 @@ python3 /path/to/isolated/melee-pc/tests/browser/test_confirmed_input.py
 
 ## Remaining real-engine acceptance
 
+`engines/melee/tools/prove_netplay.mjs` is prepared but unexecuted. It uses fresh
+Chrome contexts, the actual lobby/relay, and local File selection. Its script
+acquires distinct pads at each client's owned C callback, requires independently
+timed fighter attacks, movement, stock loss/respawn and matching 4,000-tick applied
+traces, then runs an ordered hold, seeded message jitter, applied-input mutation,
+startup RNG intervention after Ready validation, actual disconnect during a held
+acquisition, and fresh neutral runtimes. It writes trace details to the local
+output directory; public summaries contain hashes and metadata. These scenarios
+are application-protocol checks, not TCP packet-loss or WAN measurements.
+
 The gameplay browser is held while the separate benchmark owns the quiet window.
 When released, prove two independently owned acquisition callbacks, exact applied
 PADStatus traces and selected state at logical ticks; movement, independent attack,
