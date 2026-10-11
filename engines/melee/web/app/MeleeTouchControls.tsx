@@ -1,45 +1,18 @@
 import './MeleeTouchControls.css';
 import {useEffect,useRef,type MutableRefObject,type PointerEvent} from 'react';
-import {neutralTouchPad,stickVector,type TouchPad} from '../lib/touch-pad';
-const actions=[['L','Shield',0x40],['Start','Pause',0x1000],['Z','Grab',0x10],['X','Jump',0x400],['B','Special',0x200],['A','Attack',0x100]] as const;
+import {createTouchController,touchActions as actions,type TouchPad} from '../lib/touch-pad.mjs';
 export default function MeleeTouchControls({pad}:{pad:MutableRefObject<TouchPad>}){
  const deck=useRef<HTMLDivElement>(null);
- const pointers=useRef(new Map<number,{kind:string;button?:number;element:HTMLElement;rect:DOMRect}>());
- const refresh=()=>{
-  let buttons=0;for(const p of pointers.current.values())buttons|=p.button||0;
-  pad.current.buttons=buttons;pad.current.active=pointers.current.size>0;
- };
- const release=(id:number)=>{
-  const p=pointers.current.get(id);if(!p)return;pointers.current.delete(id);
-  if(p.kind==='main'){pad.current.x=pad.current.y=0;pad.current.main=false;}
-  if(p.kind==='c'){pad.current.cx=pad.current.cy=0;pad.current.c=false;}
-  if(![...pointers.current.values()].some(other=>other.element===p.element)){
-   p.element.setAttribute('aria-pressed','false');p.element.style.setProperty('--dx','0px');p.element.style.setProperty('--dy','0px');
-  }
-  refresh();
- };
+ const controller=useRef(createTouchController(pad)).current;
  useEffect(()=>{
-  const reset=()=>{for(const id of [...pointers.current.keys()])release(id);pad.current=neutralTouchPad();};
+  const reset=()=>controller.reset();
   const visibility=()=>{if(document.hidden)reset();};
   window.addEventListener('blur',reset);window.addEventListener('pagehide',reset);window.addEventListener('orientationchange',reset);window.addEventListener('resize',reset);document.addEventListener('visibilitychange',visibility);
   return()=>{reset();window.removeEventListener('blur',reset);window.removeEventListener('pagehide',reset);window.removeEventListener('orientationchange',reset);window.removeEventListener('resize',reset);document.removeEventListener('visibilitychange',visibility);};
  },[]);
- const move=(e:PointerEvent<HTMLElement>)=>{
-  const p=pointers.current.get(e.pointerId);if(!p||p.button)return;
-  const rect=p.rect,radius=rect.width*.36;
-  const dx=e.clientX-rect.left-rect.width/2,dy=e.clientY-rect.top-rect.height/2;
-  const {x,y}=stickVector(dx,dy,radius),scale=Math.min(1,radius/(Math.hypot(dx,dy)||1));
-  if(p.kind==='main'){pad.current.x=x;pad.current.y=y;pad.current.main=true;}
-  else{pad.current.cx=x;pad.current.cy=y;pad.current.c=true;}
-  p.element.style.setProperty('--dx',`${dx*scale}px`);p.element.style.setProperty('--dy',`${dy*scale}px`);
- };
  const handlers=(kind:string,button?:number)=>({
-  onPointerDown:(e:PointerEvent<HTMLElement>)=>{
-   e.preventDefault();
-   if(!button&&[...pointers.current.values()].some(p=>p.kind===kind))return;
-   const rect=e.currentTarget.getBoundingClientRect();
-   e.currentTarget.setPointerCapture(e.pointerId);pointers.current.set(e.pointerId,{kind,button,element:e.currentTarget,rect});e.currentTarget.setAttribute('aria-pressed','true');move(e);refresh();
-  },onPointerMove:move,onPointerUp:(e:PointerEvent<HTMLElement>)=>release(e.pointerId),onPointerCancel:(e:PointerEvent<HTMLElement>)=>release(e.pointerId),onLostPointerCapture:(e:PointerEvent<HTMLElement>)=>release(e.pointerId)
+  onPointerDown:(e:PointerEvent<HTMLElement>)=>controller.begin(e,kind,button),onPointerMove:controller.move,
+  onPointerUp:(e:PointerEvent<HTMLElement>)=>controller.release(e.pointerId),onPointerCancel:(e:PointerEvent<HTMLElement>)=>controller.release(e.pointerId),onLostPointerCapture:(e:PointerEvent<HTMLElement>)=>controller.release(e.pointerId)
  });
  return <div ref={deck} className="melee-touch-deck" aria-label="Melee touch controller" onContextMenu={e=>e.preventDefault()}>
   <div className="melee-touch-shoulders">{actions.slice(0,3).map(([label,help,bit])=><button key={label} className={`melee-touch-button touch-${label.toLowerCase()}`} aria-label={`${label}: ${help}`} aria-pressed="false" {...handlers(label,bit)}><span>{label}</span><small>{help}</small></button>)}</div>

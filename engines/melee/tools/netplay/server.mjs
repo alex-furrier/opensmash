@@ -13,7 +13,9 @@ export async function startRelay({engineRoot,port=0}={}) {
  const source=engineRoot&&resolve(engineRoot,'platforms/browser'),binary=engineRoot&&resolve(engineRoot,'build/browser/runtime/platforms/browser');
  const files=new Map([['/',resolve(web,'netplay/lobby.html')],['/lobby-client.mjs',resolve(web,'netplay/lobby-client.mjs')],['/lobby.css',resolve(web,'netplay/lobby.css')]]);
  for(const name of ['verify-disc.mjs','disc.mjs','disc-chunks.mjs','local-files.mjs','audio-worklet.js'])files.set('/engine/'+name,resolve(web,name));
- for(const name of ['confirmed-input.mjs','browser-bridge.mjs','identity.mjs'])files.set('/engine/netplay/'+name,resolve(web,'netplay',name));
+ for(const name of ['confirmed-input.mjs','browser-bridge.mjs','identity.mjs','debug-opponent.mjs','lobby-input.mjs'])files.set('/engine/netplay/'+name,resolve(web,'netplay',name));
+ files.set('/engine/touch-pad.mjs',resolve(here,'../../web/lib/touch-pad.mjs'));
+ files.set('/touch-controls.css',resolve(here,'../../web/app/MeleeTouchControls.css'));
  if(source)for(const name of ['runtime.mjs','runtime.html','gpu-preflight.mjs','disc-cache.mjs','save-migration.mjs','initial_pipeline_cache.db'])files.set('/engine/upstream/'+name,resolve(source,name));
  if(binary)for(const name of ['melee_browser.js','melee_browser.wasm','melee_browser.worker.js'])files.set('/engine/upstream/'+name,resolve(binary,name));
  const required=[...files.keys()].filter(url=>url.startsWith('/engine/')&&!url.endsWith('melee_browser.worker.js'));

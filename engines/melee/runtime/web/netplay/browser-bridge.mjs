@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import {createConfirmedInput} from './confirmed-input.mjs';
+import {createDebugInput} from './debug-opponent.mjs';
 
 async function selectedDigest(state, previousApplied) {
   if (!Array.isArray(state) || state.length !== 50 || !state.every(n => Number.isInteger(n) && n >= 0 && n <= 0xffffffff))
@@ -21,13 +22,15 @@ export function installConfirmedInput(Module, config, {acquireOwnedPad, onTick, 
     throw Error('This runtime already owns an input session.');
   if (['MELEE_NET', 'MELEE_NET_RECORD', 'MELEE_NET_REPLAY', 'MELEE_NET_SYNCTEST'].some(k => Module.ENV[k]))
     throw Error('Confirmed input cannot share native netplay or replay ownership.');
+  if(config.debug?.scripted&&config.player!==1)throw Error('Scripted debug opponent must own player 2');
+  const debugInput=config.debug&&createDebugInput(config.debug,{playable:()=>!Module._opensmash_preparation_state||Module._opensmash_preparation_state()===4&&![1,2].includes(Module._opensmash_intro_state?.())});
   const session = createConfirmedInput(config);
-  let pendingTick, appliedTick = -1, previousApplied;
+  let pendingTick, appliedTick = -1, previousApplied, debugMetric;
   Module.onConfirmedInputError = message => { session.stop(message); onError?.(message); };
   Module.onConfirmedInput = async (tick, local, state) => {
     if (pendingTick !== undefined || tick !== appliedTick + 1) throw Error('Engine tick ownership mismatch');
     const digest = await selectedDigest(state, previousApplied);
-    const pads = await session.synchronize(tick, () => acquireOwnedPad ? acquireOwnedPad(tick, local.slice()) : local.slice(), digest, Module.confirmedPreparationReady || [false, false]);
+    const pads = await session.synchronize(tick, async () => {let pad=acquireOwnedPad?await acquireOwnedPad(tick,local.slice()):local.slice();if(debugInput){const result=await debugInput(tick,pad,state);pad=result.pad;debugMetric=result.metric;}return pad;}, digest, Module.confirmedPreparationReady || [false, false]);
     // Both readiness values travel with the confirmed tick, so graphics timing
     // cannot release the simulation on different logical ticks.
     if (pads.preparation[0]) Module._opensmash_finish_intro_preparation?.();
@@ -40,7 +43,7 @@ export function installConfirmedInput(Module, config, {acquireOwnedPad, onTick, 
       throw Error('Consumed engine tick ownership mismatch');
     await session.confirmApplied(tick, await selectedDigest(state, pads));
     previousApplied = pads.slice(); appliedTick = tick; pendingTick = undefined;
-    onTick?.({tick, pads: pads.slice(), selectedState: state.slice()});
+    onTick?.({tick, pads: pads.slice(), selectedState: state.slice(), ...(debugMetric?{debug:debugMetric}:{})});
   };
   Module.ENV.MELEE_BROWSER_CONFIRMED_INPUT = '1';
   return {start: () => session.start(), stop: reason => session.stop(reason)};

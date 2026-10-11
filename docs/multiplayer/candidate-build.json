@@ -1,5 +1,5 @@
 {
-  "status": "built-local-multiplayer-gameplay-verified",
+  "status": "historical-built-local-multiplayer-gameplay-verified",
   "engineBase": "5bc531aafcc941866f2c916afebc38ee75543222",
   "sourcePatchSha256": "4c367e254cef6d56e49c19e231b0a52b6f7b1542a346c5406482380a594278d3",
   "jobs": 2,
@@ -106,5 +106,5 @@
     "engines/melee/tools/netplay/server.mjs": "6979fa1be719c8f5359a30db6d7028590a4d4fc0705f41221b6109604bdb75bc",
     "engines/melee/tools/netplay/server.test.mjs": "553baae360e1f5234ff44fca42e782a6f7d72888d52b542eb65c4ce65de9a828"
   },
-  "note": "Compiled engine unchanged after build; served runtime source includes explicit worker shutdown. Browser matrix uses the exact final manifest identity."
+  "note": "Historical candidate for gameplay-proof.json. Current debug/touch candidate is identified in debug-touch-proof.json; compiled WASM and engine source patch unchanged."
 }

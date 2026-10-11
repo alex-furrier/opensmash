@@ -42,11 +42,11 @@ export function createConfirmedInput({channel, session, player, identity, timeou
     unsubscribe?.(); wake();
   }
   function check() { if (stopped) throw stopped; }
-  function waitFor(predicate) {
+  function waitFor(predicate,reason='Peer timed out') {
     check();
     if (predicate()) return Promise.resolve();
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => stop('Peer timed out'), timeoutMs);
+      const timer = setTimeout(() => stop(reason), timeoutMs);
       const poll = () => {
         if (!stopped && !predicate()) return;
         clearTimeout(timer); waiters.delete(poll);
@@ -112,7 +112,11 @@ export function createConfirmedInput({channel, session, player, identity, timeou
         // Acquire once, here, after Ready. The callback cannot supply the peer's pad.
         if (!Array.isArray(preparation) || preparation.length !== 2 || !preparation.every(n => typeof n === 'boolean'))
           throw Error('Invalid preparation readiness');
-        const local = padCopy(acquireOwnedPad());
+        let acquired=false,value,acquisitionError;
+        Promise.resolve(acquireOwnedPad()).then(pad=>{value=pad;acquired=true;wake();},error=>{acquisitionError=error;acquired=true;wake();});
+        await waitFor(()=>acquired,'Owned input timed out');check();
+        if(acquisitionError)throw acquisitionError;
+        const local = padCopy(value);
         channel.send({type: 'input', session, player, tick, pad: local.slice(), state, preparation: preparation.slice()});
         await waitFor(() => Boolean(remote));
         check();

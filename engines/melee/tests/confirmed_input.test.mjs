@@ -147,3 +147,18 @@ test('disconnect and concurrent engine boundaries reject without fallback', asyn
     await assert.rejects(first, /boundary/);
   } finally { p.close(); }
 });
+
+test('asynchronous owned acquisition times out and late resolution sends no input', async () => {
+  const p = pair({timeoutMs: 25}); let resolveLate;
+  try {
+    const results = await Promise.allSettled(p.peers.map((peer, player) => peer.synchronize(0,
+      () => player ? neutralPad() : new Promise(resolve => { resolveLate = resolve; }), 'same')));
+    assert.ok(results.every(result => result.status === 'rejected'));
+    assert.match(results[0].reason.message, /Owned input timed out/);
+    const before = p.sent[0].filter(message => message.type === 'input').length;
+    assert.equal(before, 0);
+    resolveLate(neutralPad());
+    await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(p.sent[0].filter(message => message.type === 'input').length, before);
+  } finally { p.close(); }
+});

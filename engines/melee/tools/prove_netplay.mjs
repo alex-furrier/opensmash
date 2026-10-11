@@ -30,6 +30,7 @@ function milestones(rows){
  });
 }
 async function pair(scenario){
+ const debugScenario=scenario.startsWith('debug-')?scenario.slice(6):undefined;
  const contexts=[],pages=[],errors=[[],[]],consoleRows=[[],[]],liveWorkers=[new Set(),new Set()],workerPeaks=[0,0];
  const waitWorkers=async()=>{const start=Date.now();while(liveWorkers.some(workers=>workers.size)&&Date.now()-start<5000)await new Promise(r=>setTimeout(r,50));return Date.now()-start;};
  try{
@@ -37,7 +38,7 @@ async function pair(scenario){
    const context=await browser.newContext({viewport:{width:1050,height:1050}});contexts.push(context);
    await context.route('**/*',route=>new URL(route.request().url()).origin===relay.origin?route.continue():route.abort());
    await context.addInitScript(({player,scenario,ticks})=>{
-    if(window===parent){window.proof={rows:[],acquired:[],errors:[],delays:[],mutations:[],holds:[],shutdowns:[],frames:0,playable:0,audioFrames:0,audioPeak:0};
+    if(window===parent){window.proof={rows:[],acquired:[],errors:[],delays:[],mutations:[],holds:[],shutdowns:[],frames:0,playable:0,audioFrames:0,audioPeak:0,debugMetrics:[]};
      if(scenario==='jitter'){
       const Native=window.WebSocket;
       window.WebSocket=class extends Native{
@@ -51,7 +52,7 @@ async function pair(scenario){
       };
      }
 window.addEventListener('opensmash-runtime',event=>{
-     const row=event.detail;if(row.type==='confirmed-tick'){window.proof.rows.push({tick:row.tick,pads:row.pads,state:row.selectedState});if((row.tick+1)%500===0)console.log('[netplay proof] confirmed '+(row.tick+1)+' ticks');}
+     const row=event.detail;if(row.type==='confirmed-tick'){if(row.debug)window.proof.debugMetrics.push(row.debug);window.proof.rows.push({tick:row.tick,pads:row.pads,state:row.selectedState});if((row.tick+1)%500===0)console.log('[netplay proof] confirmed '+(row.tick+1)+' ticks');}
      if(row.type==='error')window.proof.errors.push(row.message);
      if(row.type==='frame')window.proof.frames++;if(row.type==='playable')window.proof.playable++;
      if(row.type==='progress'){window.proof.audioFrames=Math.max(window.proof.audioFrames,row.audioFrames||0);window.proof.audioPeak=Math.max(window.proof.audioPeak,row.audioPeak||0);}
@@ -94,7 +95,7 @@ window.addEventListener('opensmash-runtime',event=>{
    const page=await context.newPage();pages.push(page);
    page.on('worker',worker=>{liveWorkers[player].add(worker);workerPeaks[player]=Math.max(workerPeaks[player],liveWorkers[player].size);worker.on('close',()=>liveWorkers[player].delete(worker));});
    page.on('pageerror',error=>errors[player].push(error.message));page.on('console',message=>{const text=message.text();consoleRows[player].push(text);if(text.startsWith('[netplay proof]'))console.log(scenario,'player '+(player+1),text);});
-   await page.goto(relay.origin);
+   await page.goto(relay.origin+(debugScenario&&player===1?'/?debug=1':''));
   }
   await pages[0].locator('#create').click();await pages[0].locator('#share').waitFor({state:'visible'});
   const link=await pages[0].locator('#room-link').inputValue();await pages[1].locator('#room-code').fill(link);await pages[1].locator('#join').click();
@@ -103,6 +104,7 @@ window.addEventListener('opensmash-runtime',event=>{
    const frame=pages[1].frames().find(f=>f.url().endsWith('/runtime.html'));
    await frame.evaluate(()=>{const original=Module.callMain;Module.callMain=(...args)=>{Module.ENV.MELEE_SEED='18';return original(...args);};});
   }
+  if(debugScenario){await pages[1].locator('#debug-scripted').check();await pages[1].locator('#debug-scenario').selectOption(debugScenario);}
   console.log(scenario,'both local runtime identities verified; pressing Ready');
   await pages[0].locator('#ready').click();await pages[0].waitForTimeout(100);
   assert.ok((await Promise.all(pages.map(page=>page.evaluate(()=>window.proof.acquired.length)))).every(n=>n===0),'Engine started before both Ready');
@@ -115,7 +117,7 @@ window.addEventListener('opensmash-runtime',event=>{
    await pages[0].locator('#stop').click();await pages[1].waitForFunction(()=>document.getElementById('stop').disabled);
    await waitWorkers();assert.ok(liveWorkers.every(workers=>workers.size===0),'Old engine workers survived Stop');
    const oldLink=link;
-   for(const page of pages)await page.evaluate(()=>{window.proof={rows:[],acquired:[],errors:[],delays:[],mutations:[],holds:[],shutdowns:[],frames:0,playable:0,audioFrames:0,audioPeak:0};});
+   for(const page of pages)await page.evaluate(()=>{window.proof={rows:[],acquired:[],errors:[],delays:[],mutations:[],holds:[],shutdowns:[],frames:0,playable:0,audioFrames:0,audioPeak:0,debugMetrics:[]};});
    await pages[0].locator('#create').click();await pages[0].locator('#share').waitFor({state:'visible'});
    const newLink=await pages[0].locator('#room-link').inputValue();assert.notEqual(newLink,oldLink);
    await pages[1].locator('#room-code').fill(newLink);await pages[1].locator('#join').click();
@@ -151,7 +153,13 @@ window.addEventListener('opensmash-runtime',event=>{
    if(scenario==='hold')assert.ok(proof[1].holds.length===1&&proof[1].holds[0].ms>=80&&proof[1].holds[0].before===proof[1].holds[0].after);
    await pages[0].locator('#screen').screenshot({path:resolve(output,scenario+'-private-play.png')});
    result.milestones=milestones(proof[0].rows);
-   if(scenario!=='fresh'){
+   if(debugScenario){
+    assert.equal(proof[1].debugMetrics.length,ticks);assert.ok(proof[1].debugMetrics.every(m=>m.scripted&&m.scenario===debugScenario));
+    assert.ok(result.milestones.every(m=>m.present>100&&m.movement>20&&m.attack),'Missing scripted gameplay progress');
+    const delayed=proof[1].debugMetrics.filter(m=>m.requestedMs>0);
+    if(debugScenario!=='reference')assert.ok(delayed.length&&delayed.every(m=>m.measuredMs>=m.requestedMs-2));
+    result.debug={scenario:debugScenario,ownedPlayer:1,metrics:proof[1].debugMetrics.filter(m=>m.requestedMs>0).slice(0,5),delayedTicks:delayed.length,metricsHash:hash(proof[1].debugMetrics)};
+   }else if(scenario!=='fresh'){
     assert.ok(result.milestones.every(m=>m.present>100&&m.movement>20&&m.attack&&m.stockLoss&&m.respawn),'Missing gameplay milestone');
     assert.ok(result.milestones[1].firstAttackTick-result.milestones[0].firstAttackTick>=60,'Fighters did not respond to independently timed owned attacks');
    }else assert.ok(proof.every(p=>p.acquired.every(row=>row.pad.every(n=>n===0))));

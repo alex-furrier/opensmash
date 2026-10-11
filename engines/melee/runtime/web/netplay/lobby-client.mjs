@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
 import {installedIdentity,canonicalLaunch} from '/engine/netplay/identity.mjs';
+import {neutralTouchPad} from '/engine/touch-pad.mjs';
+import {mountTouchDeck,typingTarget} from '/engine/netplay/lobby-input.mjs';
+import {validateDebug} from '/engine/netplay/debug-opponent.mjs';
 const $=id=>document.getElementById(id),status=message=>{$('status').textContent=message;};
 let manifest,room,socket,frame,port,audioContext,audioNode,audioRing,iso,warm=false,starting=false,leaving=false;
 let runtimeGeneration=0;
-const held=new Set();
+const held=new Set(),touch={current:neutralTouchPad()},touchController=mountTouchDeck($('touch-root'),touch);
+const debugging=new URLSearchParams(location.search).get('debug')==='1';$('debug-controls').hidden=!debugging;
 const keys={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down',KeyZ:'attack',KeyX:'special',KeyC:'jump',KeyQ:'shield',Enter:'start'};
 function send(message){if(socket?.readyState!==WebSocket.OPEN)throw Error('Room connection unavailable.');socket.send(JSON.stringify(message));}
 function post(data,transfer=[]){frame?.contentWindow.postMessage(data,location.origin,transfer);}
@@ -11,8 +15,9 @@ function controls(){
  $('create').disabled=!!room||!manifest;$('join').disabled=!!room||!manifest;
  $('ready').disabled=!room||!warm||starting||leaving||!!room.ready;
  $('stop').disabled=!room;$('disc').disabled=starting||!!room?.ready;
+ $('debug-scripted').disabled=room?.player!==1||starting||!!room?.ready;$('debug-scenario').disabled=starting||!!room?.ready;
 }
-function release(){held.clear();post({type:'input',values:[0,0,0,0,0,0,0,0,1]});}
+function release(){held.clear();touchController.reset();post({type:'input',values:[0,0,0,0,0,0,0,0,1]});}
 function destroyRuntime(){
  runtimeGeneration++;
  release();post({type:'netplay-stop'});
@@ -21,7 +26,7 @@ function destroyRuntime(){
  frame?.contentWindow.dispatchEvent?.(new Event('opensmash-runtime-close'));
  port?.close();port=undefined;frame?.remove();frame=undefined;
  audioNode?.disconnect();audioNode=undefined;audioRing=undefined;audioContext?.close().catch(()=>{});audioContext=undefined;
- warm=false;starting=false;$('screen').replaceChildren();$('game').hidden=true;
+ warm=false;starting=false;$('debug-measured').textContent='Stopped. Create a fresh room.';$('screen').replaceChildren();$('game').hidden=true;
 }
 function leave(reason='Room closed. Create a fresh room.'){
  if(leaving)return;leaving=true;
@@ -55,7 +60,7 @@ async function begin(){
  };ownedPort.start();
  post({type:'surface',direct:true});
  post({type:'select',launch:manifest.launch,costumes:[],cssAssets:[],renderWidth:960,requestedAt:Date.now(),
-  netplay:{session:room.session,player:room.player,identity:room.localIdentity,port:channel.port2}},[channel.port2]);
+  netplay:{session:room.session,player:room.player,identity:room.localIdentity,port:channel.port2,...(room.debug?{debug:room.debug}:{})}},[channel.port2]);
  $('game').hidden=false;status('Both players ready. Opening Melee…');controls();
 }
 function connect(request){
@@ -95,7 +100,8 @@ window.addEventListener('message',async event=>{
    warm=true;status('Local game verified. Press Ready when you are set.');controls();
   }else if(data.type==='status')status(data.message);
   else if(data.type==='error')leave(data.message);
-  else if(data.type==='playable')status('Match running. You control player '+(room.player+1)+'.');
+  else if(data.type==='playable')status(room.debug?.scripted?'Scripted test opponent running. This is not native CPU AI.':'Match running. You control player '+(room.player+1)+'.');
+  else if(data.type==='confirmed-tick'&&data.debug){const m=data.debug;$('debug-measured').textContent='Tick '+m.tick+' · '+m.scenario+' · requested '+m.requestedMs+' ms · measured '+m.measuredMs.toFixed(1)+' ms input wait';}
   // Observation has no authority over the simulation or remote input.
   window.dispatchEvent(new CustomEvent('opensmash-runtime',{detail:data}));
  }catch(error){if(room===currentRoom&&frame===currentFrame)leave(error.message);}
@@ -119,16 +125,18 @@ $('ready').onclick=async()=>{
   await currentContext?.resume();
   if(room!==currentRoom||audioContext!==currentContext||generation!==runtimeGeneration)return;
   if(!room?.localIdentity)throw Error('Verify your local game first.');
-  room.ready=true;send({type:'ready',identity:room.localIdentity});status('Ready. Waiting for the other player…');controls();
+  room.debug=debugging?validateDebug({scripted:room.player===1&&$('debug-scripted').checked,scenario:$('debug-scenario').value,seed:17}):undefined;
+  release();room.ready=true;send({type:'ready',identity:room.localIdentity});status('Ready. Waiting for the other player…');controls();
  }catch(error){if(room===currentRoom&&generation===runtimeGeneration)leave(error.message);}
 };
 $('stop').onclick=()=>leave('You left the room. Create a fresh room to play again.');
-window.addEventListener('keydown',event=>{if(!starting||!keys[event.code])return;event.preventDefault();held.add(keys[event.code]);});
+window.addEventListener('keydown',event=>{if(!starting||room?.debug?.scripted||typingTarget(event.target)||!keys[event.code])return;event.preventDefault();held.add(keys[event.code]);});
 window.addEventListener('keyup',event=>{if(keys[event.code])held.delete(keys[event.code]);});
+document.addEventListener('focusin',event=>{if(typingTarget(event.target))release();});
 window.addEventListener('blur',release);document.addEventListener('visibilitychange',()=>{if(document.hidden)release();});
-window.addEventListener('pagehide',()=>leave());
+window.addEventListener('pagehide',()=>leave());window.addEventListener('orientationchange',release);window.addEventListener('resize',release);
 function physical(){
- if(starting&&frame&&!document.hidden){
+ if(starting&&frame&&!document.hidden&&!room?.debug?.scripted){
   let button=(held.has('attack')?256:0)|(held.has('special')?512:0)|(held.has('jump')?1024:0)|(held.has('shield')?64:0)|(held.has('start')?4096:0);
   let x=(held.has('right')?80:0)-(held.has('left')?80:0),y=(held.has('up')?80:0)-(held.has('down')?80:0),cx=0,cy=0,left=held.has('shield')?255:0,right=0;
   const pad=navigator.getGamepads?.()[0];
@@ -137,6 +145,7 @@ function physical(){
    button|=(pressed(0)?256:0)|(pressed(1)?512:0)|((pressed(2)||pressed(3))?1024:0)|(pressed(4)?64:0)|(pressed(5)?32:0)|(pressed(9)?4096:0);
    left=Math.round((pad.buttons[6]?.value||0)*255);right=Math.round((pad.buttons[7]?.value||0)*255);
   }
+  const mobile=touch.current;button|=mobile.buttons;if(mobile.main){x=mobile.x;y=mobile.y;}if(mobile.c){cx=mobile.cx;cy=mobile.cy;}if(mobile.buttons&64)left=255;
   post({type:'input',values:[0,button,x,y,cx,cy,left,right,1]});
  }
  requestAnimationFrame(physical);

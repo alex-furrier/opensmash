@@ -3,7 +3,7 @@
 This branch contains an opt-in engine source patch, a two-player confirmed-input
 session, and a standalone loopback browser lobby. The candidate WASM builds and
 focused tests pass. The actual lobby runs two local Melee clients with independently
-owned inputs: reference, ordered hold and seeded jitter each passed 4,000 matching
+owned inputs: the preceding candidate's reference, ordered hold and seeded jitter each passed 4,000 matching
 logical ticks with attacks, movement, stock loss and respawn. Mutation, disconnect
 and fresh-session recovery checks also passed. This remains a local prototype.
 
@@ -233,7 +233,7 @@ python3 /path/to/isolated/melee-pc/tests/browser/test_confirmed_input.py
 
 ## Real-engine acceptance
 
-[gameplay-proof.json](gameplay-proof.json) records final-runtime evidence from
+[gameplay-proof.json](gameplay-proof.json) records the preceding candidate's evidence from
 Chrome 155.0.8059.39. The test uses the actual lobby/relay and each window's local
 File selection. Distinct scripted pads enter at each client's owned C acquisition
 callback; comparisons use actual applied four-port PADStatus records and the
@@ -297,3 +297,48 @@ Asyncify/DVD callbacks, JS and audio ownership. A selected checksum cannot repla
 a full snapshot. Partial rollback and unrelated frameworks were therefore rejected.
 The [Slippi desync account](https://medium.com/project-slippi/fighting-desyncs-in-melee-replays-370a830bf88b)
 motivates canonical-state and actual mutation checks rather than input parity alone.
+
+## Shared touch controls and opt-in scripted peer
+
+The lobby and ordinary React Melee page use the same `touch-pad.mjs` pointer
+ownership, radial deadzone, button OR logic and existing touch CSS. Main/C sticks
+and multiple buttons can be held together; blur, hidden page, resize/orientation,
+pointer cancellation and room teardown release controls. Editable fields suppress
+game keyboard input. The ordinary launcher retains its existing controls.
+
+For a local test opponent, open the second lobby window with `?debug=1`, join the
+first window's room, and select **Script this peer's owned player 2** before Ready.
+Both windows still choose their own legal local ISO. Only the second peer acquires
+the scripted pad, once at the existing engine boundary; it shares the real room,
+identity checks, Ready barrier and confirmed-input protocol. The script waits for
+prepared gameplay and then moves, attacks and jumps. This is a deterministic
+fixture, not native CPU AI. It does not spawn an automatic second engine.
+
+Reference adds no wait. Delay requests 10 ms at every owned acquisition; jitter
+uses seed 17 for 0–12 ms waits; hold requests 150 ms at tick 600. The UI reports
+requested and measured acquisition wait separately. These are local application
+waits, not RTT, real TCP packet loss or WAN measurements. Pending acquisition
+times out or rejects on Stop; late completion cannot send a pad to a closed room.
+
+[debug-touch-proof.json](debug-touch-proof.json) identifies this candidate's exact
+served sources and bounded real-game evidence. The historical 4,000-tick matrix
+above remains tied to its earlier engine identity. The compiled C engine and
+source patch did not change for this feature. Focused JS checks include the new
+shared pointer logic, deterministic debug input and async acquisition timeout.
+The real Chrome touch UI fixture uses a mocked runtime surface at 390×844 and
+844×390; it establishes UI behavior, not iOS or mobile gameplay support. Run
+`engines/melee/tools/prove_touch_ui.mjs` with `MELEE_PC_ROOT`, existing
+`PLAYWRIGHT_MODULE` and private outside-repository `TEST_OUTPUT`. Type checking
+could not run because this checkout has no installed `tsc`; no package was installed.
+
+Phone gameplay remains unverified. A proposed private Tailscale Serve route is
+`https://<approved-tailnet-host>:8450/` to loopback
+`http://127.0.0.1:8787`, after explicit approval. Read-only inspection found port
+8450 unused; existing routes must be preserved. This would require an explicit
+exact host/origin allowance in the relay as well as temporary HTTPS/WSS proxying.
+Neither change has been activated. No Funnel, public ingress, ACL or OS setting
+change is proposed. Existing tailnet access policy controls who can reach it.
+The iPhone needs approved tailnet access, current Safari with WebGPU, a successful
+adapter/cross-origin-isolation check, its own legal USA 1.02 ISO in Files, sufficient
+memory/storage, and a trusted Ready tap for audio. Foreground touch, audio, Stop
+and a fresh session must pass on the actual phone before claiming compatibility.

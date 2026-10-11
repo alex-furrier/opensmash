@@ -1,0 +1,690 @@
+{
+  "browser": "155.0.8059.39",
+  "manifest": {
+    "files": [
+      {
+        "url": "/engine/verify-disc.mjs",
+        "sha256": "92127667e8668b978959a6a6b591241c822d594b02f4d83754b03b4c9eee4aad"
+      },
+      {
+        "url": "/engine/disc.mjs",
+        "sha256": "d5129518900585b9b5c48572b2cd500e5143b60c14e248b0e5a6bf27e5b7d731"
+      },
+      {
+        "url": "/engine/disc-chunks.mjs",
+        "sha256": "bfced06182eb1d9bac133e4c2b95ccb39666f7436501dceea80160935e3cd7ff"
+      },
+      {
+        "url": "/engine/local-files.mjs",
+        "sha256": "5af43731413c056dc66c2f8cdf5aa75a9bd34c4b6f722c0454cf6fbaf4988918"
+      },
+      {
+        "url": "/engine/audio-worklet.js",
+        "sha256": "7b1e66572d58e643e4969cf9c5b79f86c8b49a3b4ae1b82c6323dbc8f01f9037"
+      },
+      {
+        "url": "/engine/netplay/confirmed-input.mjs",
+        "sha256": "28cb83e6fba378359afc0157ef452bb4261546f81ee85d8beb1a5c4d0663fdfa"
+      },
+      {
+        "url": "/engine/netplay/browser-bridge.mjs",
+        "sha256": "b853edf9fd26b528129edaf901ed1e749e33d676b717377c6c5684b9c102550c"
+      },
+      {
+        "url": "/engine/netplay/identity.mjs",
+        "sha256": "5dd5a8314a06aab829a7556ffc4b662e65cd100bfd19ad85c8b205fdcdc5e99e"
+      },
+      {
+        "url": "/engine/netplay/debug-opponent.mjs",
+        "sha256": "e02637c1483f88fe5f7afef8a972c5495a36b5e1e0dc0359356bf8f80a6fc03e"
+      },
+      {
+        "url": "/engine/netplay/lobby-input.mjs",
+        "sha256": "7dde1cd681b9e9d7915ba7e44f6ec28717d8a9014116ee80dcd04f9e3ec11d82"
+      },
+      {
+        "url": "/engine/touch-pad.mjs",
+        "sha256": "e2646ac4ed96d90fe457a148cc59a8dfe54ff9260a6f7b1674ca32d1b0ef7f22"
+      },
+      {
+        "url": "/engine/upstream/runtime.mjs",
+        "sha256": "fc41f871bf47387fd055ef8c1b383207bab56b6209aeb79708111eb8a945aad8"
+      },
+      {
+        "url": "/engine/upstream/runtime.html",
+        "sha256": "82c3551ac0edaed5d471c3218a84aad6fcd70558c3651f1336a6c186ce3682a2"
+      },
+      {
+        "url": "/engine/upstream/gpu-preflight.mjs",
+        "sha256": "7c7a55235d8e789dbca86d4070f32b27156709cd992c3e78b446a7abfce2ce5a"
+      },
+      {
+        "url": "/engine/upstream/disc-cache.mjs",
+        "sha256": "b1bed4857ac2657231a2e7fb70d768a53b919fb81a3d4a638aae74c5b0f0c6d4"
+      },
+      {
+        "url": "/engine/upstream/save-migration.mjs",
+        "sha256": "7f1f447e0afaa3bbf4f7423a755884d668358e72fa35b3ff396d4186626d6a2e"
+      },
+      {
+        "url": "/engine/upstream/initial_pipeline_cache.db",
+        "sha256": "c9f625281f817be5829d17a3950e7b5b85a0261b6dce7461723f074a800128ae"
+      },
+      {
+        "url": "/engine/upstream/melee_browser.js",
+        "sha256": "5d69f2fd4a2ddcff50cc5d04084bcd14fb9b3eefef0cde96861855aec97ceda7"
+      },
+      {
+        "url": "/engine/upstream/melee_browser.wasm",
+        "sha256": "1049dee5b8efde9e4d92b4d025d5bc10fa6d0ea4fd958fb8394bb82670098720"
+      }
+    ],
+    "launch": {
+      "mode": 0,
+      "stage": 31,
+      "level": 9,
+      "stocks": 4,
+      "minutes": 8,
+      "packedPorts": [
+        1,
+        2,
+        768,
+        768
+      ]
+    },
+    "identity": {
+      "engine": "9674d3e1c9d3402b001ebcab66ffa065aff4eb4887882d5d58c15aed3d0104db",
+      "disc": "0de05981a34156b9cedcef73c73d4244ac05cf6149ab3c9cfed917698819e464",
+      "rules": "4fc1555619a038f7093d8c665f1611269d477903c741a69d2ef78bc5b83a23e6",
+      "costumes": "stock",
+      "seed": "17"
+    }
+  },
+  "results": [
+    {
+      "scenario": "debug-reference",
+      "workerPeaks": [
+        4,
+        4
+      ],
+      "readyBarrier": true,
+      "presentation": [
+        {
+          "frames": 1115,
+          "playable": 1,
+          "audioFrames": 641120,
+          "audioPeak": 0.9923338890075684
+        },
+        {
+          "frames": 1115,
+          "playable": 1,
+          "audioFrames": 639200,
+          "audioPeak": 0.8154256939888
+        }
+      ],
+      "holds": [
+        [],
+        []
+      ],
+      "ticks": [
+        1200,
+        1200
+      ],
+      "traceHashes": [
+        "897ef22d103c8d091eda709e1ff06aad645536407f1c16a43ddcb5602034ced5",
+        "897ef22d103c8d091eda709e1ff06aad645536407f1c16a43ddcb5602034ced5"
+      ],
+      "acquisitionHashes": [
+        "370849b1978e7fddd688aa2cdf919ee33d0f49766100fe15c9e0d97f5b7a2414",
+        "21110ee646d8d97ecc83aa7fc4cfb21ede1ab09e51fd4c893127310070bf13a5"
+      ],
+      "delayHashes": [
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      ],
+      "errors": [
+        [],
+        []
+      ],
+      "pageErrors": [
+        [],
+        []
+      ],
+      "milestones": [
+        {
+          "present": 943,
+          "movement": 142.1999740600586,
+          "attack": true,
+          "firstAttackTick": 459,
+          "stockLoss": true,
+          "respawn": true
+        },
+        {
+          "present": 943,
+          "movement": 35.026774406433105,
+          "attack": true,
+          "firstAttackTick": 489,
+          "stockLoss": false,
+          "respawn": false
+        }
+      ],
+      "debug": {
+        "scenario": "reference",
+        "ownedPlayer": 1,
+        "metrics": [],
+        "delayedTicks": 0,
+        "metricsHash": "bc411e79d58d1ad8bb5636983cc1029dbe4161c9b4b6249faa0a27ee6237f30d"
+      },
+      "passed": true,
+      "workerShutdownMs": 1974,
+      "workersAfterStop": [
+        0,
+        0
+      ],
+      "disconnectedBoth": true
+    },
+    {
+      "scenario": "debug-delay",
+      "workerPeaks": [
+        4,
+        4
+      ],
+      "readyBarrier": true,
+      "presentation": [
+        {
+          "frames": 1115,
+          "playable": 1,
+          "audioFrames": 671040,
+          "audioPeak": 0.9540358781814575
+        },
+        {
+          "frames": 1115,
+          "playable": 1,
+          "audioFrames": 671360,
+          "audioPeak": 0.9540358781814575
+        }
+      ],
+      "holds": [
+        [],
+        []
+      ],
+      "ticks": [
+        1200,
+        1200
+      ],
+      "traceHashes": [
+        "897ef22d103c8d091eda709e1ff06aad645536407f1c16a43ddcb5602034ced5",
+        "897ef22d103c8d091eda709e1ff06aad645536407f1c16a43ddcb5602034ced5"
+      ],
+      "acquisitionHashes": [
+        "370849b1978e7fddd688aa2cdf919ee33d0f49766100fe15c9e0d97f5b7a2414",
+        "21110ee646d8d97ecc83aa7fc4cfb21ede1ab09e51fd4c893127310070bf13a5"
+      ],
+      "delayHashes": [
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      ],
+      "errors": [
+        [],
+        []
+      ],
+      "pageErrors": [
+        [],
+        []
+      ],
+      "milestones": [
+        {
+          "present": 943,
+          "movement": 142.1999740600586,
+          "attack": true,
+          "firstAttackTick": 459,
+          "stockLoss": true,
+          "respawn": true
+        },
+        {
+          "present": 943,
+          "movement": 35.026774406433105,
+          "attack": true,
+          "firstAttackTick": 489,
+          "stockLoss": false,
+          "respawn": false
+        }
+      ],
+      "debug": {
+        "scenario": "delay",
+        "ownedPlayer": 1,
+        "metrics": [
+          {
+            "tick": 0,
+            "scenario": "delay",
+            "scripted": true,
+            "requestedMs": 10,
+            "measuredMs": 10.324999809265137
+          },
+          {
+            "tick": 1,
+            "scenario": "delay",
+            "scripted": true,
+            "requestedMs": 10,
+            "measuredMs": 10.9350004196167
+          },
+          {
+            "tick": 2,
+            "scenario": "delay",
+            "scripted": true,
+            "requestedMs": 10,
+            "measuredMs": 11.279999732971191
+          },
+          {
+            "tick": 3,
+            "scenario": "delay",
+            "scripted": true,
+            "requestedMs": 10,
+            "measuredMs": 11.144999504089355
+          },
+          {
+            "tick": 4,
+            "scenario": "delay",
+            "scripted": true,
+            "requestedMs": 10,
+            "measuredMs": 11.040000915527344
+          }
+        ],
+        "delayedTicks": 1200,
+        "metricsHash": "d61d34760b4d562d040a433455da8483c59d51d49df1b2bc286301dba2f551ef"
+      },
+      "passed": true,
+      "workerShutdownMs": 1964,
+      "workersAfterStop": [
+        0,
+        0
+      ],
+      "disconnectedBoth": true
+    },
+    {
+      "scenario": "debug-jitter",
+      "workerPeaks": [
+        4,
+        4
+      ],
+      "readyBarrier": true,
+      "presentation": [
+        {
+          "frames": 945,
+          "playable": 1,
+          "audioFrames": 640000,
+          "audioPeak": 0.8604010939598083
+        },
+        {
+          "frames": 945,
+          "playable": 1,
+          "audioFrames": 637920,
+          "audioPeak": 0.8705027103424072
+        }
+      ],
+      "holds": [
+        [],
+        []
+      ],
+      "ticks": [
+        1200,
+        1200
+      ],
+      "traceHashes": [
+        "a1d6a064898d57d9bfc1b89947628ad9d2999b4c14693446c525a7dab9a1ce37",
+        "a1d6a064898d57d9bfc1b89947628ad9d2999b4c14693446c525a7dab9a1ce37"
+      ],
+      "acquisitionHashes": [
+        "72df0bd27bf7b54ecf0bbd64859735cdaabed7c27cf2ddaf2b988f341e296605",
+        "79b006d20780b798248cae7404303797cf86d5ed1d42818e7b55c3e46e83ee57"
+      ],
+      "delayHashes": [
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      ],
+      "errors": [
+        [],
+        []
+      ],
+      "pageErrors": [
+        [],
+        []
+      ],
+      "milestones": [
+        {
+          "present": 859,
+          "movement": 138.59997272491455,
+          "attack": true,
+          "firstAttackTick": 629,
+          "stockLoss": true,
+          "respawn": false
+        },
+        {
+          "present": 859,
+          "movement": 34.72677516937256,
+          "attack": true,
+          "firstAttackTick": 659,
+          "stockLoss": false,
+          "respawn": false
+        }
+      ],
+      "debug": {
+        "scenario": "jitter",
+        "ownedPlayer": 1,
+        "metrics": [
+          {
+            "tick": 0,
+            "scenario": "jitter",
+            "scripted": true,
+            "requestedMs": 1,
+            "measuredMs": 1.3450002670288086
+          },
+          {
+            "tick": 2,
+            "scenario": "jitter",
+            "scripted": true,
+            "requestedMs": 11,
+            "measuredMs": 11.309999465942383
+          },
+          {
+            "tick": 3,
+            "scenario": "jitter",
+            "scripted": true,
+            "requestedMs": 1,
+            "measuredMs": 1.2899999618530273
+          },
+          {
+            "tick": 4,
+            "scenario": "jitter",
+            "scripted": true,
+            "requestedMs": 1,
+            "measuredMs": 1.2749996185302734
+          },
+          {
+            "tick": 5,
+            "scenario": "jitter",
+            "scripted": true,
+            "requestedMs": 2,
+            "measuredMs": 2.564999580383301
+          }
+        ],
+        "delayedTicks": 1114,
+        "metricsHash": "312e97e34bb1d35504d2f0823ed6e61876b1dfe9a68b6bc509aa485da2839ae3"
+      },
+      "passed": true,
+      "workerShutdownMs": 1973,
+      "workersAfterStop": [
+        0,
+        0
+      ],
+      "disconnectedBoth": true
+    },
+    {
+      "scenario": "debug-hold",
+      "workerPeaks": [
+        4,
+        4
+      ],
+      "readyBarrier": true,
+      "presentation": [
+        {
+          "frames": 1112,
+          "playable": 1,
+          "audioFrames": 640800,
+          "audioPeak": 0.9226693511009216
+        },
+        {
+          "frames": 1112,
+          "playable": 1,
+          "audioFrames": 641280,
+          "audioPeak": 0.8586746454238892
+        }
+      ],
+      "holds": [
+        [],
+        []
+      ],
+      "ticks": [
+        1200,
+        1200
+      ],
+      "traceHashes": [
+        "0ab71c1aaa487c2d86489e83e72082710a65c5472c291caf35182f2d0653f0a7",
+        "0ab71c1aaa487c2d86489e83e72082710a65c5472c291caf35182f2d0653f0a7"
+      ],
+      "acquisitionHashes": [
+        "46197977e4f0dcf2df68f9e8a29a6bee416b6afbb570ca51c309ef8447d8d983",
+        "a005616c992e5d313b5de2ca1ad8df4c6ae9521fe1977745c264f7cd560e0525"
+      ],
+      "delayHashes": [
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      ],
+      "errors": [
+        [],
+        []
+      ],
+      "pageErrors": [
+        [],
+        []
+      ],
+      "milestones": [
+        {
+          "present": 940,
+          "movement": 142.1999740600586,
+          "attack": true,
+          "firstAttackTick": 462,
+          "stockLoss": true,
+          "respawn": true
+        },
+        {
+          "present": 940,
+          "movement": 35.026774406433105,
+          "attack": true,
+          "firstAttackTick": 492,
+          "stockLoss": false,
+          "respawn": false
+        }
+      ],
+      "debug": {
+        "scenario": "hold",
+        "ownedPlayer": 1,
+        "metrics": [
+          {
+            "tick": 600,
+            "scenario": "hold",
+            "scripted": true,
+            "requestedMs": 150,
+            "measuredMs": 152.04999923706055
+          }
+        ],
+        "delayedTicks": 1,
+        "metricsHash": "438dca0806191f51454bb91c0836ec61c9ceaedd19f54f2b5502fc9eee9f13d0"
+      },
+      "passed": true,
+      "workerShutdownMs": 1967,
+      "workersAfterStop": [
+        0,
+        0
+      ],
+      "disconnectedBoth": true
+    },
+    {
+      "scenario": "reference",
+      "workerPeaks": [
+        4,
+        4
+      ],
+      "readyBarrier": true,
+      "presentation": [
+        {
+          "frames": 1118,
+          "playable": 1,
+          "audioFrames": 640480,
+          "audioPeak": 0.8587772846221924
+        },
+        {
+          "frames": 1118,
+          "playable": 1,
+          "audioFrames": 641120,
+          "audioPeak": 0.9060384035110474
+        }
+      ],
+      "holds": [
+        [],
+        []
+      ],
+      "ticks": [
+        1200,
+        1200
+      ],
+      "traceHashes": [
+        "9b250136337097520eafc6bdbaa431b15952e85782c1af1d15ee8074d5b23f79",
+        "9b250136337097520eafc6bdbaa431b15952e85782c1af1d15ee8074d5b23f79"
+      ],
+      "acquisitionHashes": [
+        "453a8a55fbe82ba6ab087188074ef9155a2091e7b351f6a0a15a70caa6972fd9",
+        "abae0d38925b2ce9e785b5750eb9cf7a6dcf687e318704ea6a9d77abdadde772"
+      ],
+      "delayHashes": [
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      ],
+      "errors": [
+        [],
+        []
+      ],
+      "pageErrors": [
+        [],
+        []
+      ],
+      "milestones": [
+        {
+          "present": 946,
+          "movement": 141.7999725341797,
+          "attack": true,
+          "firstAttackTick": 456,
+          "stockLoss": true,
+          "respawn": true
+        },
+        {
+          "present": 946,
+          "movement": 147.63098526000977,
+          "attack": true,
+          "firstAttackTick": 546,
+          "stockLoss": true,
+          "respawn": true
+        }
+      ],
+      "passed": true,
+      "workerShutdownMs": 1959,
+      "workersAfterStop": [
+        0,
+        0
+      ],
+      "disconnectedBoth": true
+    },
+    {
+      "scenario": "solo",
+      "passed": true,
+      "ownership": {
+        "enabled": null,
+        "inputCallback": false,
+        "appliedCallback": false,
+        "scene": 2
+      },
+      "frames": 300,
+      "playable": 1,
+      "setupConfirmations": 1
+    }
+  ],
+  "sourceSha256": {
+    "engines/melee/runtime/web/netplay/browser-bridge.mjs": "b853edf9fd26b528129edaf901ed1e749e33d676b717377c6c5684b9c102550c",
+    "engines/melee/runtime/web/netplay/confirmed-input.mjs": "28cb83e6fba378359afc0157ef452bb4261546f81ee85d8beb1a5c4d0663fdfa",
+    "engines/melee/runtime/web/netplay/debug-opponent.mjs": "e02637c1483f88fe5f7afef8a972c5495a36b5e1e0dc0359356bf8f80a6fc03e",
+    "engines/melee/runtime/web/netplay/identity.mjs": "5dd5a8314a06aab829a7556ffc4b662e65cd100bfd19ad85c8b205fdcdc5e99e",
+    "engines/melee/runtime/web/netplay/lobby-client.mjs": "4bfd5a6541a10ff99e3ed381b5e3bc320de089ec496396399eaa5c81e002d486",
+    "engines/melee/runtime/web/netplay/lobby-input.mjs": "7dde1cd681b9e9d7915ba7e44f6ec28717d8a9014116ee80dcd04f9e3ec11d82",
+    "engines/melee/runtime/web/netplay/lobby.css": "e7f53f0906943aac623cdb803db666da330fd90bd62099115ca9fcdce5213d4c",
+    "engines/melee/runtime/web/netplay/lobby.html": "d0532ab6e44e6a07a96c827b7150014b7c995ec69e6ff96046c7e7eeb248ac05",
+    "engines/melee/tools/netplay/server.mjs": "d11c09b693020a28f79ade04a8adc3e8161b59e96e3ff5ab4b2c2af7bc5d0bdf",
+    "engines/melee/tools/prove_netplay.mjs": "d5e59b2c4266a5a29d821d539e01b69b441b03f5f62c2798079d50137b79e535",
+    "engines/melee/tools/prove_touch_ui.mjs": "a21573a6385c85ced7ca0dc82b41139b40975107f337b638fe4110422c020ec9",
+    "engines/melee/web/app/MeleeTouchControls.tsx": "342a9db4feb545bf44ac913338cc5428121d64aa41339486d446e90741ddb00b",
+    "engines/melee/web/lib/touch-pad.d.mts": "96bccb551e67115d3ef020afd3e33afdd98cd533df6e0ee995789f66a03b0829",
+    "engines/melee/web/lib/touch-pad.mjs": "e2646ac4ed96d90fe457a148cc59a8dfe54ff9260a6f7b1674ca32d1b0ef7f22"
+  },
+  "touchUI": {
+    "browser": "155.0.8059.39",
+    "engineIdentity": "9674d3e1c9d3402b001ebcab66ffa065aff4eb4887882d5d58c15aed3d0104db",
+    "results": [
+      {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "passed": true,
+        "simultaneous": [
+          0,
+          256,
+          97,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "release": true,
+        "cancel": true,
+        "blur": true,
+        "typing": true,
+        "stop": true,
+        "horizontalOverflow": false,
+        "fixture": "real lobby UI with mocked runtime; no iOS/gameplay claim"
+      },
+      {
+        "viewport": {
+          "width": 844,
+          "height": 390
+        },
+        "passed": true,
+        "simultaneous": [
+          0,
+          256,
+          97,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "release": true,
+        "cancel": true,
+        "blur": true,
+        "typing": true,
+        "stop": true,
+        "horizontalOverflow": false,
+        "fixture": "real lobby UI with mocked runtime; no iOS/gameplay claim"
+      }
+    ]
+  },
+  "focusedChecks": {
+    "javascript": 28,
+    "javascriptPassed": 28,
+    "extractedC": 2,
+    "extractedCPassed": 2,
+    "typecheck": "unavailable: tsc not installed; no installation performed",
+    "independentSourceReview": "no blocking defect found"
+  },
+  "interpretation": [
+    "Paired debug and ordinary reference each compare actual applied four-port inputs plus selected 50-word state at all 1200 logical ticks. Selected-state comparison is not complete state equivalence or rollback.",
+    "Debug acquisitionHashes identify the driver physical input before the scripted override; applied trace hashes and debug metrics identify actual scripted owned input.",
+    "Delay/jitter/hold measure injected owned acquisition waits, not RTT, WAN or TCP packet loss.",
+    "Touch UI fixture uses a mocked runtime in Chrome, not iOS gameplay.",
+    "The preceding 4000-tick gameplay-proof.json is historical evidence for its explicitly recorded identity.",
+    "First debug jitter attempt matched 1200 ticks but failed the attack milestone because the script started before prepared gameplay; retained privately, corrected and rerun all four profiles.",
+    "No new C engine build or network/security setting change. Existing compiled WASM/source patch unchanged."
+  ]
+}

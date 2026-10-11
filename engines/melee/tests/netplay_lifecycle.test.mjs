@@ -22,8 +22,8 @@ async function fixture(){
  }
  class Node{connect(){}disconnect(){this.disconnected=true;}}
  const window={addEventListener:(name,fn)=>events.set(name,fn),dispatchEvent(){}};
- const context=vm.createContext({document,window,location:{origin:'http://127.0.0.1:9999',hash:''},history:{replaceState(){}},navigator:{},WebSocket:Socket,AudioContext:Audio,AudioWorkletNode:Node,SharedArrayBuffer,Event:class{constructor(type){this.type=type;}},CustomEvent:class{},URL,requestAnimationFrame(){},fetch:async()=>({ok:true,json:async()=>({identity,launch})}),installedIdentity,canonicalLaunch,console});
- const source=(await readFile(new URL('../runtime/web/netplay/lobby-client.mjs',import.meta.url),'utf8')).replace(/^import .*\n/m,'');
+ const context=vm.createContext({document,window,location:{origin:'http://127.0.0.1:9999',hash:''},history:{replaceState(){}},navigator:{},URLSearchParams,neutralTouchPad:()=>({}),mountTouchDeck:()=>({reset(){}}),typingTarget:()=>false,validateDebug:()=>undefined,WebSocket:Socket,AudioContext:Audio,AudioWorkletNode:Node,SharedArrayBuffer,Event:class{constructor(type){this.type=type;}},CustomEvent:class{},URL,requestAnimationFrame(){},fetch:async()=>({ok:true,json:async()=>({identity,launch})}),installedIdentity,canonicalLaunch,console});
+ const source=(await readFile(new URL('../runtime/web/netplay/lobby-client.mjs',import.meta.url),'utf8')).replace(/^import .*\n/gm,'');
  await new vm.Script('(async()=>{'+source+'})()').runInContext(context);
  const create=async n=>{element('create').onclick();const socket=sockets.at(-1);socket.onopen();await socket.joined(n);return socket;};
  const choose=()=>{element('disc').files=[{name:'local.iso'}];return element('disc').onchange();};
