@@ -328,8 +328,11 @@ shared pointer logic, deterministic debug input and async acquisition timeout.
 The real Chrome touch UI fixture uses a mocked runtime surface at 390×844 and
 844×390; it establishes UI behavior, not iOS or mobile gameplay support. Run
 `engines/melee/tools/prove_touch_ui.mjs` with `MELEE_PC_ROOT`, existing
-`PLAYWRIGHT_MODULE` and private outside-repository `TEST_OUTPUT`. Type checking
-could not run because this checkout has no installed `tsc`; no package was installed.
+`PLAYWRIGHT_MODULE` and private outside-repository `TEST_OUTPUT`. The intended `npm run typecheck` now passes with lockfile-pinned TypeScript
+5.9.3. Dependencies were installed using `npm ci --ignore-scripts --no-audit
+--no-fund` into ignored project-local `build/melee-web-deps`; the existing tracked
+dependency symlink was restored after the check. No lockfile, package version or
+global tooling changed.
 
 Phone gameplay remains unverified. A proposed private Tailscale Serve route is
 `https://<approved-tailnet-host>:8450/` to loopback
@@ -342,3 +345,17 @@ The iPhone needs approved tailnet access, current Safari with WebGPU, a successf
 adapter/cross-origin-isolation check, its own legal USA 1.02 ISO in Files, sufficient
 memory/storage, and a trusted Ready tap for audio. Foreground touch, audio, Stop
 and a fresh session must pass on the actual phone before claiming compatibility.
+
+After explicit HTTPS approval and successful phone preflight, start the loopback
+relay with `node engines/melee/tools/netplay/server.mjs --engine-root
+/path/to/isolated/melee-pc --port 8787`. The approved exact HTTPS origin allowance
+must be implemented before connecting through that proxy. The relay does not
+start a second engine automatically. On the phone, open the approved HTTPS base
+URL and create a room (player 1). On the Mac, open a separate Chrome window at
+the same HTTPS URL with `?debug=1`, paste the phone's room link/code and join
+(player 2). Select the local ISO independently on each device. On the Mac, enable
+**Script this peer's owned player 2 input**, choose a profile, and press Ready
+on both. Keep Safari foreground and the Mac awake with its engine window visible;
+background tabs/minimization are unsupported. Leave room closes both sessions;
+create a fresh room for another test. This is a future run recipe, not a deployed
+phone service or verified phone result.

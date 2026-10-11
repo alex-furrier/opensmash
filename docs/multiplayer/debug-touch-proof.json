@@ -675,7 +675,15 @@
     "javascriptPassed": 28,
     "extractedC": 2,
     "extractedCPassed": 2,
-    "typecheck": "unavailable: tsc not installed; no installation performed",
+    "typecheck": {
+      "status": "passed",
+      "command": "npm run typecheck",
+      "typescript": "5.9.3",
+      "installation": "Existing npm lockfile, official registry, ignored project-local build/melee-web-deps, lifecycle scripts disabled; original tracked dependency symlink restored",
+      "packageLockSha256": "7f9190fcb568efd695540713eab66211f78e0d1d4fa77a2ede0b71203c072c18",
+      "globalToolingChanged": false,
+      "lockfileChanged": false
+    },
     "independentSourceReview": "no blocking defect found"
   },
   "interpretation": [
