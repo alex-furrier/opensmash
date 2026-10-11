@@ -22,7 +22,8 @@ test('real loopback HTTP/WebSocket create, join, verify, Ready, relay, disconnec
  await mkdir(source,{recursive:true});await mkdir(binary,{recursive:true});
  for(const name of ['runtime.mjs','runtime.html','gpu-preflight.mjs','disc-cache.mjs','save-migration.mjs','initial_pipeline_cache.db'])await writeFile(join(source,name),'fixture '+name);
  for(const name of ['melee_browser.js','melee_browser.wasm'])await writeFile(join(binary,name),'fixture '+name);
- const relay=await startRelay({engineRoot:root}),clients=[];
+ const approved='https://approved.invalid:8450';
+ const relay=await startRelay({engineRoot:root,httpsOrigin:approved}),clients=[];
  try{
   assert.ok(relay.manifest);const response=await fetch(relay.origin+'/manifest');assert.equal(response.status,200);
   assert.equal(response.headers.get('cross-origin-embedder-policy'),'require-corp');
@@ -30,6 +31,9 @@ test('real loopback HTTP/WebSocket create, join, verify, Ready, relay, disconnec
   assert.equal((await fetch(relay.origin+'/private.iso')).status,404);
   const rejectedHost=await new Promise((accept,reject)=>{get(relay.origin+'/',{headers:{Host:'other.invalid'}},response=>{response.resume();accept(response.statusCode);}).on('error',reject);});
   assert.equal(rejectedHost,403);
+  const approvedHost=await new Promise((accept,reject)=>{get(relay.origin+'/',{headers:{Host:new URL(approved).host}},response=>{response.resume();accept(response.statusCode);}).on('error',reject);});assert.equal(approvedHost,200);
+  const proxied=new WebSocket(relay.origin.replace('http','ws')+'/room',{origin:approved,headers:{Host:new URL(approved).host}});await new Promise((resolve,reject)=>{proxied.once('open',resolve);proxied.once('error',reject);});proxied.terminate();
+  for(const [host,origin] of [[new URL(approved).host,relay.origin],[new URL(relay.origin).host,approved]])await assert.rejects(new Promise((resolve,reject)=>{const bad=new WebSocket(relay.origin.replace('http','ws')+'/room',{origin,headers:{Host:host}});bad.on('open',()=>{bad.close();resolve();});bad.on('error',reject);}),/403/);
   assert.equal((await fetch(relay.origin+'/',{method:'POST',body:'asset'})).status,405);
   const a=await socket(relay.origin),b=await socket(relay.origin);clients.push(a,b);
   a.send({type:'create'});const first=await a.next('joined');b.send({type:'join',room:first.room});await b.next('joined');
@@ -40,3 +44,5 @@ test('real loopback HTTP/WebSocket create, join, verify, Ready, relay, disconnec
   await assert.rejects(new Promise((resolve,reject)=>{const bad=new WebSocket(relay.origin.replace('http','ws')+'/room',{origin:'http://wrong.invalid'});bad.on('open',()=>{bad.close();resolve();});bad.on('error',reject);}),/403/);
  }finally{clients.forEach(c=>c.ws.terminate());await relay.close();await rm(root,{recursive:true,force:true});}
 });
+
+test('HTTPS allowance rejects paths, credentials and non-HTTPS configuration',async()=>{for(const httpsOrigin of ['http://approved.invalid','https://approved.invalid/','https://name:password@approved.invalid','https://approved.invalid/?query'])await assert.rejects(startRelay({httpsOrigin}));});

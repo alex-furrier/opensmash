@@ -334,22 +334,22 @@ The real Chrome touch UI fixture uses a mocked runtime surface at 390×844 and
 dependency symlink was restored after the check. No lockfile, package version or
 global tooling changed.
 
-Phone gameplay remains unverified. A proposed private Tailscale Serve route is
+Phone gameplay remains unverified. The approved temporary private Tailscale Serve route is
 `https://<approved-tailnet-host>:8450/` to loopback
-`http://127.0.0.1:8787`, after explicit approval. Read-only inspection found port
+`http://127.0.0.1:8787`, with explicit approval. Read-only inspection found port
 8450 unused; existing routes must be preserved. This would require an explicit
 exact host/origin allowance in the relay as well as temporary HTTPS/WSS proxying.
-Neither change has been activated. No Funnel, public ingress, ACL or OS setting
-change is proposed. Existing tailnet access policy controls who can reach it.
+Both changes are active for this temporary private test. No Funnel, public ingress,
+ACL or OS setting change was made. Existing tailnet access policy controls who can reach it.
 The iPhone needs approved tailnet access, current Safari with WebGPU, a successful
 adapter/cross-origin-isolation check, its own legal USA 1.02 ISO in Files, sufficient
 memory/storage, and a trusted Ready tap for audio. Foreground touch, audio, Stop
 and a fresh session must pass on the actual phone before claiming compatibility.
 
-After explicit HTTPS approval and successful phone preflight, start the loopback
+After successful phone preflight, the approved loopback relay command is
 relay with `node engines/melee/tools/netplay/server.mjs --engine-root
-/path/to/isolated/melee-pc --port 8787`. The approved exact HTTPS origin allowance
-must be implemented before connecting through that proxy. The relay does not
+/path/to/isolated/melee-pc --port 8787 --https-origin https://<approved-tailnet-host>:8450`. The exact HTTPS
+origin allowance is implemented and tested. The relay does not
 start a second engine automatically. On the phone, open the approved HTTPS base
 URL and create a room (player 1). On the Mac, open a separate Chrome window at
 the same HTTPS URL with `?debug=1`, paste the phone's room link/code and join
@@ -357,5 +357,18 @@ the same HTTPS URL with `?debug=1`, paste the phone's room link/code and join
 **Script this peer's owned player 2 input**, choose a profile, and press Ready
 on both. Keep Safari foreground and the Mac awake with its engine window visible;
 background tabs/minimization are unsupported. Leave room closes both sessions;
-create a fresh room for another test. This is a future run recipe, not a deployed
-phone service or verified phone result.
+create a fresh room for another test. The temporary private route is active; this is still an unverified phone run recipe.
+
+## Approved temporary HTTPS proxy
+
+The relay accepts an optional `--https-origin https://<approved-host>:8450`
+argument. It still binds only `127.0.0.1`; HTTP Host must match either that exact
+configured host or the local listener, and a WebSocket Origin must match the
+request's own host/origin pair. Cross-pairs, other origins, credentials, paths and
+non-HTTPS allowances are rejected. This enables an explicitly approved private
+proxy without broadening the asset allowlist or serving a disc. The HTTPS/WSS
+proxy was tested on the Mac, including all 19 runtime hashes and secure-context,
+COOP/COEP, SharedArrayBuffer and WebGPU checks. Actual iPhone execution is pending.
+The foreground Serve route lasts only while its command runs; Ctrl+C stops that
+route. Stop its relay/browser processes separately. Never use `tailscale serve
+reset` for cleanup because existing routes belong to other tasks.

@@ -1,0 +1,22 @@
+{
+  "status": "private-https-proxy-verified-on-mac",
+  "temporaryForegroundServe": true,
+  "existingRoutesPreserved": true,
+  "discServed": false,
+  "runtimeEngineIdentity": "9674d3e1c9d3402b001ebcab66ffa065aff4eb4887882d5d58c15aed3d0104db",
+  "runtimeAssetsVerified": 19,
+  "https": true,
+  "wssCreateJoinReady": true,
+  "wrongOriginRejected": true,
+  "hostOriginCrossPairsRejected": true,
+  "sharedArrayBuffer": true,
+  "crossOriginIsolated": true,
+  "webgpuAdapter": true,
+  "focusedRelayTestsPassed": 2,
+  "sourceSha256": {
+    "engines/melee/tools/netplay/server.mjs": "2f143d4a32f24d75d20eb358c4155656aa2ee402f580aa8300a7130869f16baf",
+    "engines/melee/tools/netplay/server.test.mjs": "b53c3f6148818d375845f077da312bb0f5d51843d080c3cac2864f71227a7d2d"
+  },
+  "phoneGameplay": "unverified; awaiting human phone run",
+  "preloading": "not implemented or activated; no asset endpoint"
+}
