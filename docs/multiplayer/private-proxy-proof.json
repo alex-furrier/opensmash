@@ -14,9 +14,10 @@
   "webgpuAdapter": true,
   "focusedRelayTestsPassed": 2,
   "sourceSha256": {
-    "engines/melee/tools/netplay/server.mjs": "2f143d4a32f24d75d20eb358c4155656aa2ee402f580aa8300a7130869f16baf",
-    "engines/melee/tools/netplay/server.test.mjs": "b53c3f6148818d375845f077da312bb0f5d51843d080c3cac2864f71227a7d2d"
+    "engines/melee/tools/netplay/server.mjs": "ec08326a0847681b4352269c33381be744dbac30a2fc903373f3dbc7cfe5b4ff",
+    "engines/melee/tools/netplay/server.test.mjs": "5eb2bc95a0f21b68c1cd5268424ff1412dd6f6622e952b552ce9c7dd4c47f9ae"
   },
   "phoneGameplay": "unverified; awaiting human phone run",
-  "preloading": "not implemented or activated; no asset endpoint"
+  "preloading": "not implemented or activated; no asset endpoint",
+  "missingOriginAndWrongHostRejected": true
 }

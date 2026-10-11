@@ -41,7 +41,7 @@ export async function startRelay({engineRoot,port=0,httpsOrigin}={}) {
  });
  const wss=new WebSocketServer({noServer:true,maxPayload:16384,perMessageDeflate:false});
  server.on('upgrade',(req,socket,head)=>{
-  if(!rooms||req.url!=='/room'||allowed.get(req.headers.host)!==req.headers.origin){socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');return;}
+  if(!rooms||req.url!=='/room'||!allowed.has(req.headers.host)||allowed.get(req.headers.host)!==req.headers.origin){socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');return;}
   wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws));
  });
  wss.on('connection',socket=>{socket.on('message',data=>{try{rooms.receive(socket,JSON.parse(data.toString()));}catch{rooms.disconnected(socket);socket.close(1008,'Invalid request');}});socket.on('close',()=>rooms.disconnected(socket));socket.on('error',()=>rooms.disconnected(socket));});

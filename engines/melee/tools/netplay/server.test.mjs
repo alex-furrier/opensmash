@@ -35,6 +35,7 @@ test('real loopback HTTP/WebSocket create, join, verify, Ready, relay, disconnec
   const proxied=new WebSocket(relay.origin.replace('http','ws')+'/room',{origin:approved,headers:{Host:new URL(approved).host}});await new Promise((resolve,reject)=>{proxied.once('open',resolve);proxied.once('error',reject);});proxied.terminate();
   for(const [host,origin] of [[new URL(approved).host,relay.origin],[new URL(relay.origin).host,approved]])await assert.rejects(new Promise((resolve,reject)=>{const bad=new WebSocket(relay.origin.replace('http','ws')+'/room',{origin,headers:{Host:host}});bad.on('open',()=>{bad.close();resolve();});bad.on('error',reject);}),/403/);
   assert.equal((await fetch(relay.origin+'/',{method:'POST',body:'asset'})).status,405);
+  await assert.rejects(new Promise((resolve,reject)=>{const bad=new WebSocket(relay.origin.replace('http','ws')+'/room',{headers:{Host:'other.invalid'}});bad.on('open',()=>{bad.close();resolve();});bad.on('error',reject);}),/403/);
   const a=await socket(relay.origin),b=await socket(relay.origin);clients.push(a,b);
   a.send({type:'create'});const first=await a.next('joined');b.send({type:'join',room:first.room});await b.next('joined');
   a.send({type:'ready',identity:relay.manifest.identity});b.send({type:'ready',identity:relay.manifest.identity});await Promise.all([a.next('start'),b.next('start')]);
