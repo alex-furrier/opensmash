@@ -1,0 +1,169 @@
+{
+  "browser": "155.0.8059.39",
+  "moduleSha256": "46386485d6db00d08d42f0f6cabec6da2d8aae00bc6a9a08e1cb169fcd870854",
+  "scope": "Protocol fixture only; no Melee runtime or game assets",
+  "results": [
+    {
+      "scenario": "ordered-hold",
+      "passed": true,
+      "equalAppliedTraces": true,
+      "holdsMs": [
+        80.58312500000011
+      ],
+      "sentInput": [
+        601,
+        601
+      ],
+      "peers": [
+        {
+          "progress": 600,
+          "state": [
+            21880,
+            17960
+          ],
+          "acquired": 601,
+          "error": null,
+          "appliedTraceSha256": "7b4196a1d391d0348b86831b4f6c6217743b60326cb92806a769b9b1528c1d70"
+        },
+        {
+          "progress": 600,
+          "state": [
+            21880,
+            17960
+          ],
+          "acquired": 601,
+          "error": null,
+          "appliedTraceSha256": "7b4196a1d391d0348b86831b4f6c6217743b60326cb92806a769b9b1528c1d70"
+        }
+      ]
+    },
+    {
+      "scenario": "input-mutation",
+      "passed": true,
+      "equalAppliedTraces": false,
+      "holdsMs": [],
+      "sentInput": [
+        32,
+        32
+      ],
+      "peers": [
+        {
+          "progress": 31,
+          "state": [
+            1171,
+            1265
+          ],
+          "acquired": 32,
+          "error": "Selected state mismatch",
+          "appliedTraceSha256": "6d7d960ba357c868649f15441429eb89b61bcf334fdf77410a6c8b3ce9f3443e"
+        },
+        {
+          "progress": 31,
+          "state": [
+            1171,
+            1009
+          ],
+          "acquired": 32,
+          "error": "Selected state mismatch",
+          "appliedTraceSha256": "9e7e690067f437ddb6cc1abb1c3b6aa6e380cf1bb7204bdce5c828fa4607e521"
+        }
+      ]
+    },
+    {
+      "scenario": "state-mutation",
+      "passed": true,
+      "equalAppliedTraces": true,
+      "holdsMs": [],
+      "sentInput": [
+        31,
+        31
+      ],
+      "peers": [
+        {
+          "progress": 30,
+          "state": [
+            1158,
+            1026
+          ],
+          "acquired": 31,
+          "error": "Selected state mismatch",
+          "appliedTraceSha256": "1e5674858d492a178e9206f133b62a76de18d8b5a8fd2bdfdf8707dbc5c33f76"
+        },
+        {
+          "progress": 30,
+          "state": [
+            1158,
+            1026
+          ],
+          "acquired": 31,
+          "error": "Selected state mismatch",
+          "appliedTraceSha256": "1e5674858d492a178e9206f133b62a76de18d8b5a8fd2bdfdf8707dbc5c33f76"
+        }
+      ]
+    },
+    {
+      "scenario": "disconnect",
+      "passed": true,
+      "equalAppliedTraces": true,
+      "holdsMs": [],
+      "sentInput": [
+        31,
+        31
+      ],
+      "peers": [
+        {
+          "progress": 30,
+          "state": [
+            1158,
+            1026
+          ],
+          "acquired": 31,
+          "error": "Peer disconnected",
+          "appliedTraceSha256": "1e5674858d492a178e9206f133b62a76de18d8b5a8fd2bdfdf8707dbc5c33f76"
+        },
+        {
+          "progress": 30,
+          "state": [
+            1158,
+            1026
+          ],
+          "acquired": 31,
+          "error": "Peer disconnected",
+          "appliedTraceSha256": "1e5674858d492a178e9206f133b62a76de18d8b5a8fd2bdfdf8707dbc5c33f76"
+        }
+      ]
+    },
+    {
+      "scenario": "fresh-neutral",
+      "passed": true,
+      "equalAppliedTraces": true,
+      "holdsMs": [],
+      "sentInput": [
+        601,
+        601
+      ],
+      "peers": [
+        {
+          "progress": 600,
+          "state": [
+            0,
+            0
+          ],
+          "acquired": 601,
+          "error": null,
+          "appliedTraceSha256": "6fa59cc0020c0050a1d3fe831eb68c6769a63e63d64e2f36dd730270ebff49f9"
+        },
+        {
+          "progress": 600,
+          "state": [
+            0,
+            0
+          ],
+          "acquired": 601,
+          "error": null,
+          "appliedTraceSha256": "6fa59cc0020c0050a1d3fe831eb68c6769a63e63d64e2f36dd730270ebff49f9"
+        }
+      ]
+    }
+  ]
+}
