@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {applyLauncherSelection} from '../launcher/launch-plan.mjs';
+import {applyLauncherSelection,friendMatchSettings} from '../launcher/launch-plan.mjs';
 import schema from '../runtime/launch-options.json' with {type:'json'};
 import {planLaunch} from '../runtime/web/launch-options.mjs';
 const roster=[{slug:'one',target:'fox'},{slug:'two',target:'mario'}];
@@ -46,4 +46,16 @@ test('shared-link joining translates unified devices without choosing unrelated 
  const settings=applyLauncherSelection(before,{type:'friend-room',portPlan:[{kind:'cpu'},{kind:'gamepad',index:2},{kind:'none'},{kind:'none'}]});
  assert.deepEqual(settings.ports.map(p=>p.device),['cpu','gamepad2','off','off']);
  for(const key of ['mode','stage','level','stocks','minutes'])assert.equal(settings[key],before[key]);
+});
+
+test('friend slots retain human fighter choices from later local ports and moveset overrides',()=>{
+ const before={...structuredClone(schema.defaults),ports:[{device:'off',character:'vanilla:2'},{device:'off',character:'vanilla:2'},{device:'keyboard',character:'one',target:'marth'},{device:'gamepad2',character:'two',target:'mario'}]};
+ const normalized=friendMatchSettings(before);assert.deepEqual(normalized.ports.slice(0,2).map(p=>[p.character,p.target,p.device]),[['one','marth','keyboard'],['two','mario','gamepad0']]);
+ assert.deepEqual(planLaunch(schema,normalized,roster[0],roster,()=>0).costumes.map(c=>c.character),['one','two']);
+ assert.equal(before.ports[2].device,'keyboard');assert.equal(before.ports[3].device,'gamepad2');
+});
+test('one local human keeps their chosen fighter first and uses the configured CPU opponent',()=>{
+ const before={...structuredClone(schema.defaults),ports:[{device:'cpu',character:'two'},{device:'keyboard',character:'one'},{device:'off',character:'vanilla:2'},{device:'off',character:'vanilla:2'}]};
+ assert.deepEqual(friendMatchSettings(before).ports.slice(0,2).map(p=>p.character),['one','two']);
+ assert.throws(()=>friendMatchSettings({...before,ports:before.ports.map(p=>({...p,device:p.device==='cpu'?'off':p.device}))}),/Choose two active fighters/);
 });

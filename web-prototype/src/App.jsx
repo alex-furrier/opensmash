@@ -482,14 +482,18 @@ export default function App() {
       if (!match) return;
       setPendingAction(null);
       setEngine(current => current?.action?.roomCode === match[1] ? current : {
-        experience: 'melee', id: crypto.randomUUID(), action: {type: 'friend-room', roomCode: match[1], portPlan: controllerPlan(advancedOptions, gamepads)},
+        experience: 'melee', id: crypto.randomUUID(), action: {type: 'friend-room', roomCode: match[1]},
       });
     };
     joinFromLink();
     window.addEventListener('hashchange', joinFromLink);
     return () => window.removeEventListener('hashchange', joinFromLink);
-  }, [isMelee, advancedOptions, gamepads]);
+  }, [isMelee]);
 
+  function closeMeleeExperience(){
+    if(/^#room=[a-f0-9]{32}$/.test(window.location.hash))window.history.replaceState({},'',window.location.pathname+window.location.search);
+    setEngine(null);
+  }
   const [advancedOpen, setAdvancedOpen] = useState(false);
   useEffect(() => window.meleeDesktop?.onOpenSettings(() => setAdvancedOpen(true)), []);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -1677,7 +1681,7 @@ export default function App() {
             onBoot={setTrailerSetup} />
         )}
         <RetroHome
-          engineContent={engine?.experience==='melee'?<Suspense fallback={<p>Loading Melee…</p>}><MeleeExperience key={engine.id} action={engine.action} onClose={()=>setEngine(null)} soundOn={soundOn}/></Suspense>:nativeSsb64&&engine?<Suspense fallback={<p>Loading Smash 64…</p>}><NativeSsb64 key={engine.src} src={engine.src} onClose={()=>setEngine(null)} soundOn={soundOn}/></Suspense>:null}
+          engineContent={engine?.experience==='melee'?<Suspense fallback={<p>Loading Melee…</p>}><MeleeExperience key={engine.id} action={engine.action} localPortPlan={controllerPlan(advancedOptions,gamepads)} onClose={closeMeleeExperience} soundOn={soundOn}/></Suspense>:nativeSsb64&&engine?<Suspense fallback={<p>Loading Smash 64…</p>}><NativeSsb64 key={engine.src} src={engine.src} onClose={()=>setEngine(null)} soundOn={soundOn}/></Suspense>:null}
           aboutOpen={aboutOpen}
           advancedActive={hasAdvancedOverrides(advancedOptions)}
           authorized={authorized}

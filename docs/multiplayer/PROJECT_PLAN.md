@@ -142,3 +142,14 @@ both Stop roles, pre-tick asset mismatch rejection and a fresh100neutral ticks p
 These compare applied pads and50selected state words; no full-state/rollback,
 physical-controller or WAN assertion is made. Focused15test subset and intended
 TypeScript/build pass. A fresh clean-candidate review remains required.
+
+
+Review b724021 completed with three narrower edges: hidden gamepad exposure before
+Join, controller updates replaying a stale link after leaving, and selected fighters
+on later local ports being dropped. Link navigation now reacts only to navigation;
+leaving removes the consumed room hash. FriendMatch uses the current unified device
+plan at connection, then keeps the physical device/settings and runtime stable for
+that room. Creating a room orders selected humans first, then their configured
+opponent, into two game slots without changing local assignments. Focused later-port
+selection regressions and actual root browser evidence cover these edges. The
+browser uses a synthetic standard gamepad, not physical-controller proof.

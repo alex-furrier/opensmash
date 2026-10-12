@@ -12,7 +12,7 @@ import catalog from '../web/public/catalog.json';
 import type {Fighter} from '../web/lib/fighter';
 import './launcher.css';
 export const roster=catalog as Fighter[];
-export default function MeleeExperience({action,onClose,soundOn=true,trailerReveal=false,onTrailerReady,onTrailerStatus}:{action:any;onClose:()=>void;soundOn?:boolean;trailerReveal?:boolean;onTrailerReady?:()=>void;onTrailerStatus?:(status:string)=>void}){
+export default function MeleeExperience({action,localPortPlan,onClose,soundOn=true,trailerReveal=false,onTrailerReady,onTrailerStatus}:{action:any;localPortPlan?:any;onClose:()=>void;soundOn?:boolean;trailerReveal?:boolean;onTrailerReady?:()=>void;onTrailerStatus?:(status:string)=>void}){
  const joiningFriend=action.type==='friend-room';
  const [friendAvailable,setFriendAvailable]=useState<boolean|undefined>();
  useEffect(()=>{const abort=new AbortController();fetch('/melee/api/netplay/config',{signal:abort.signal}).then(r=>r.ok?r.json():null).then(value=>{if(!abort.signal.aborted)setFriendAvailable(value?.enabled===true);}).catch(()=>{if(!abort.signal.aborted)setFriendAvailable(false);});return()=>abort.abort();},[]);
@@ -56,13 +56,13 @@ export default function MeleeExperience({action,onClose,soundOn=true,trailerReve
  if(!desktop()&&joiningFriend&&ready){
   if(friendAvailable===undefined)return <section className="melee-setup"><p>Checking friend rooms…</p></section>;
   if(!friendAvailable)return <section className="melee-setup"><p>Friend rooms are not configured on this host.</p><button onClick={onClose}>Return to roster</button></section>;
-  return <FriendMatch fighter={roster[0]} settings={settings} roster={roster} onClose={onClose} soundOn={soundOn}/>;
+  return <FriendMatch fighter={roster[0]} settings={settings} localPortPlan={localPortPlan} roster={roster} onClose={onClose} soundOn={soundOn}/>;
  }
  if(ready&&!resolved)return <section className="melee-setup"><h2>Preparing fighters</h2><p role={error?'alert':'status'}>{error||preparationStatus}</p></section>;
  if(!fighter)return <section className="melee-setup" role="alert"><p>This character has not been prepared for Melee yet.</p><button onClick={onClose}>Return to roster</button></section>;
  if(!ready)return <section className="melee-setup"><h2>Play Melee</h2><p role="status">{status}</p><small>Your disc is never uploaded. A local copy is saved in this browser for future visits.</small>{(error||setupError)&&<p role="alert">{error||setupError}</p>}{desktop()?<button onClick={()=>void choose()}>Choose disc</button>:<label>Choose disc<input type="file" accept=".iso,.gcm" onChange={e=>void choose(e.target.files?.[0])}/></label>}<button onClick={onClose}>Return to roster</button></section>;
  if(!desktop()&&friendAvailable===undefined)return <section className="melee-setup"><p>Checking friend rooms…</p></section>;
  if(!desktop()&&friendAvailable&&!launchMode)return <section className="melee-setup"><h2>Play Melee</h2><p>Use your selected fighters and match settings.</p><button onClick={()=>setLaunchMode('solo')}>Play solo</button><button onClick={()=>setLaunchMode('friend')}>Play with a friend</button><button onClick={onClose}>Return to roster</button></section>;
- if(!desktop()&&friendAvailable&&launchMode==='friend')return <FriendMatch fighter={fighter} settings={settings} roster={fighters} onClose={onClose} soundOn={soundOn}/>;
+ if(!desktop()&&friendAvailable&&launchMode==='friend')return <FriendMatch fighter={fighter} settings={settings} localPortPlan={localPortPlan} roster={fighters} onClose={onClose} soundOn={soundOn}/>;
  return desktop()?<NativeGame fighter={fighter} settings={settings} roster={fighters} onClose={onClose}/>:<Game fighter={fighter} settings={settings} roster={fighters} onClose={onClose} soundOn={soundOn} chrome={false} holdForTrailer={!!action.meleeTrailer} trailerReveal={trailerReveal} onTrailerReady={onTrailerReady} onTrailerStatus={onTrailerStatus}/>;
 }
