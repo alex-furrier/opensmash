@@ -829,6 +829,7 @@ async function handleRequest(req, res, vite) {
   res.setHeader('Cross-Origin-Opener-Policy','same-origin');
   res.setHeader('Cross-Origin-Embedder-Policy','require-corp');
 
+  if(pathname==='/melee/api/netplay/config'&&req.method==='GET')return json(res,200,{enabled:!!friendRuntime});
   if(friendRuntime?.handle(req,res))return;
 
   // Firebase's hosted sign-in helper, served from our origin (see auth.js).
@@ -1386,8 +1387,10 @@ if (!IS_PRODUCTION && process.env.SERVE_BUILT_FRONTEND !== '1') {
     appType: "spa",
     server: {
       middlewareMode: true,
+      host: HOST,
+      ws: {host: HOST},
       // A gameplay validation session must survive unrelated workspace edits.
-      ...(process.env.VITE_HMR === '0' ? { hmr: false, ws: { port: PORT + 1 } } : {}),
+      ...(process.env.VITE_HMR === '0' ? { hmr: false, ws: { port: PORT + 1, host: HOST } } : {}),
       // Dev only: extra hostnames allowed to reach the Vite middleware, e.g.
       // an ngrok tunnel for phone testing (VITE_ALLOWED_HOSTS=.ngrok-free.app).
       ...(process.env.VITE_ALLOWED_HOSTS
