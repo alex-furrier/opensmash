@@ -43,3 +43,12 @@ test('loopback Host cannot exempt restricted routes when private-origin mode is 
  assert.equal(privateMeleeRequestAllowed(r,privateOrigin),true);
  assert.equal(privateMeleeRequestAllowed({...r,url:'/melee/api/game'},undefined),true);
 });
+
+test('private-origin mode denies the outer native sprite studio before any renderer/cache action',()=>{
+ for(const host of ['approved-device.example.ts.net:8450','localhost:4196','127.0.0.1:4196']){
+  const req={headers:{host},socket:{remoteAddress:'127.0.0.1'},method:'GET',url:'/api/og-sprite?slug=existingfighter&fkind=0&force=1'};
+  assert.equal(privateMeleeRequestAllowed(req,privateOrigin),false);
+  assert.equal(privateMeleeRequestAllowed(req,undefined),true);
+ }
+ assert.equal(privateMeleeRequestAllowed({url:'/melee',method:'GET',headers:{},socket:{}},privateOrigin),true);
+});

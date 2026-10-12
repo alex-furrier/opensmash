@@ -29,3 +29,16 @@ test('disconnected cached Chrome is replaced on the next fresh room',async()=>{
  await assert.rejects(bot.start({room:'b'.repeat(32),session:'after-crash'}),/context boundary/);
  assert.equal(launches,2);assert.equal(contexts,2);await bot.close();
 });
+
+test('Stop cancels a standalone opponent waiting for cancelled predecessor cleanup',async()=>{
+ let releaseCleanup,enteredCleanup,contexts=0,launches=0;
+ const cleanup=new Promise(resolve=>releaseCleanup=resolve),entered=new Promise(resolve=>enteredCleanup=resolve);
+ const page=new EventEmitter();page.addInitScript=async()=>{};page.goto=async()=>{throw Error('old fixture');};page.evaluate=async()=>{};
+ const context={route:async()=>{},newPage:async()=>page,close:()=>{enteredCleanup();return cleanup;}};
+ const browser={newContext:async()=>{if(++contexts===1)return context;throw Error('fresh fixture');},close:async()=>{}};
+ const bot=createTestBot({chromium:{launch:async()=>{launches++;return browser;}},origin:'http://127.0.0.1:1',iso:'local'});
+ const old=bot.start({room:'a'.repeat(32),session:'old'}),oldRejected=assert.rejects(old,/old fixture/);await entered;bot.stop('old');
+ const cancelled=bot.start({room:'b'.repeat(32),session:'cancelled-waiter'}),cancelledRejected=assert.rejects(cancelled,/stopped/);bot.stop('cancelled-waiter');
+ const fresh=bot.start({room:'c'.repeat(32),session:'fresh'}),freshRejected=assert.rejects(fresh,/fresh fixture/);releaseCleanup();
+ await Promise.all([oldRejected,cancelledRejected,freshRejected]);assert.equal(contexts,2);assert.equal(launches,1);assert.equal(bot.activeSession,undefined);await bot.close();
+});

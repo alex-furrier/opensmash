@@ -2,7 +2,7 @@
 // One fixed local browser peer, using the ordinary lobby, owned input and Ready barrier.
 export function createTestBot({chromium,origin,iso,onObservation}){
  const emit=value=>onObservation?.(value);
- let browserPromise,active,closed=false;
+ let browserPromise,active,closed=false;const waiting=new Map();
  function browserForRun(){
   if(!browserPromise){
    const pending=Promise.resolve().then(()=>chromium.launch({channel:'chrome',headless:false})).then(browser=>{
@@ -15,12 +15,16 @@ export function createTestBot({chromium,origin,iso,onObservation}){
   return browserPromise;
  }
  async function start({room,session,scenario='reference'}){
-  if(active?.cancelled)await active.done;
-  if(closed||active)throw Error('Test opponent is busy. Leave the previous room first.');
+  if(closed)throw Error('Test opponent stopped.');
+  if(active?.session===session||waiting.has(session))throw Error('Duplicate test opponent session.');
   if(!/^[a-f0-9]{32}$/.test(room)||!['reference','delay','jitter','hold'].includes(scenario))throw Error('Invalid test opponent preset.');
-  const run={session,cancelled:false};run.done=new Promise(resolve=>{run.finished=resolve;});active=run;
+  const run={session,cancelled:false};run.done=new Promise(resolve=>{run.finished=resolve;});waiting.set(session,run);
   const current=()=>{if(closed||run.cancelled||active!==run)throw Error('Test opponent stopped.');};
   try{
+   if(active?.cancelled)await active.done;
+   if(closed||run.cancelled)throw Error('Test opponent stopped.');
+   if(active)throw Error('Test opponent is busy. Leave the previous room first.');
+   waiting.delete(session);active=run;
    const browser=await browserForRun();current();
    run.context=await browser.newContext({viewport:{width:1050,height:1050}});current();
    await run.context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
@@ -48,10 +52,10 @@ export function createTestBot({chromium,origin,iso,onObservation}){
     await run.context?.close().catch(()=>{});
     if(run.workers?.size)await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Test engine workers did not close.')),5000);run.workerClosed.push(()=>{clearTimeout(timer);resolve();});});
    }catch(error){cleanupError=error;await(await browserPromise)?.close().catch(()=>{});browserPromise=undefined;}
-   finally{emit({session,type:'closed',workers:run.workers?.size||0});if(active===run)active=undefined;run.finished();}
+   finally{emit({session,type:'closed',workers:run.workers?.size||0});if(active===run)active=undefined;waiting.delete(session);run.finished();}
    if(cleanupError)throw cleanupError;
   }
  }
- function stop(session){if(active?.session!==session)return;active.cancelled=true;const run=active;void Promise.resolve(run.page?.evaluate(()=>window.dispatchEvent(new Event('pagehide')))).catch(()=>{}).finally(()=>run.context?.close().catch(()=>{}));}
- return{start,stop,get activeSession(){return active?.session;},async close(){closed=true;if(active){active.cancelled=true;await active.context?.close().catch(()=>{});}const browser=await browserPromise?.catch(()=>undefined);await browser?.close();}};
+ function stop(session){const run=active?.session===session?active:waiting.get(session);if(!run)return;run.cancelled=true;void Promise.resolve(run.page?.evaluate(()=>window.dispatchEvent(new Event('pagehide')))).catch(()=>{}).finally(()=>run.context?.close().catch(()=>{}));}
+ return{start,stop,get activeSession(){return active?.session;},async close(){closed=true;const runs=[...(active?[active]:[]),...waiting.values()];for(const run of runs)stop(run.session);await Promise.all(runs.map(run=>run.done));const browser=await browserPromise?.catch(()=>undefined);await browser?.close();}};
 }
