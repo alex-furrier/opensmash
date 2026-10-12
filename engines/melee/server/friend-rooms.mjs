@@ -20,14 +20,27 @@ export function validateFriendProposal(value){
  return {...rules,ports,costumes};
 }
 /** One local website owns its ephemeral room registry; browsers own prepared assets/game. */
-export function attachFriendRooms(server,{engine,host='127.0.0.1',simulatedPeer}){
+export function privateFriendOrigin(value){
+ if(!value)return undefined;
+ const url=new URL(value);
+ if(url.protocol!=='https:'||!url.hostname.endsWith('.ts.net')||url.username||url.password||url.pathname!=='/'||url.search||url.hash||url.origin!==value)throw Error('MELEE_PRIVATE_ORIGIN must be one exact HTTPS tailnet origin.');
+ return url.origin;
+}
+export function friendOriginAllowed(req,{host='127.0.0.1',privateOrigin}={}){
+ if(!['127.0.0.1','localhost','::1'].includes(host)||!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress))return false;
+ const origin=req.headers.origin,authority=req.headers.host;
+ if(privateOrigin&&origin===privateOrigin&&authority===new URL(privateOrigin).host)return true;
+ try{const url=new URL(`http://${authority}`);return ['127.0.0.1','localhost','[::1]'].includes(url.hostname)&&origin===url.origin;}catch{return false;}
+}
+export function attachFriendRooms(server,{engine,host='127.0.0.1',simulatedPeer,privateOrigin}){
+ privateOrigin=privateFriendOrigin(privateOrigin);
  const rooms=createRooms({identity:{},launch:{},maxRooms:8,ttlMs:60*60*1000,permitTestBot:()=>!!simulatedPeer,startTestBot:request=>simulatedPeer.start(request),stopTestBot:session=>simulatedPeer?.stop(session),permitTestBotJoin:()=>!!simulatedPeer,resolveMatch:value=>{const proposal=validateFriendProposal(value);return {identity:null,launch:resolvedRules(proposal),proposal};},validateReady:(identity,room)=>{
   if(identity?.engine!==engine||identity.disc!==disc||identity.seed!==seed||identity.rules!==digest(resolvedRules(room.launch))||!/^[a-f0-9]{64}$/.test(identity.costumes))throw Error('Installed friend match identity mismatch.');
  }});
  const wss=new WebSocketServer({noServer:true,maxPayload:16384,perMessageDeflate:false});
  const upgrade=(req,socket,head)=>{
   if(req.url!=='/melee/room')return;
-  if(!['127.0.0.1','localhost','::1'].includes(host)||!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress)||req.headers.origin!==`http://${req.headers.host}`){socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');return;}
+  if(!friendOriginAllowed(req,{host,privateOrigin})){socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');return;}
   wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws));
  };
  server.on('upgrade',upgrade);
