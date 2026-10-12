@@ -40,3 +40,10 @@ test('Melee trailer fixes the cast, stage and CPU slots regardless of saved sett
  assert.deepEqual(settings.ports.map(p=>p.target),['mario','sheik','young-link','auto']);
  assert.equal(new Set(result.ports.map(p=>p.fighter)).size,4);
 });
+
+test('shared-link joining translates unified devices without choosing unrelated fighters',()=>{
+ const before=structuredClone(schema.defaults);before.minutes=0;
+ const settings=applyLauncherSelection(before,{type:'friend-room',portPlan:[{kind:'cpu'},{kind:'gamepad',index:2},{kind:'none'},{kind:'none'}]});
+ assert.deepEqual(settings.ports.map(p=>p.device),['cpu','gamepad2','off','off']);
+ for(const key of ['mode','stage','level','stocks','minutes'])assert.equal(settings[key],before[key]);
+});

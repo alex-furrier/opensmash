@@ -20,7 +20,7 @@ export default function MeleeExperience({action,onClose,soundOn=true,trailerReve
  const [ready,setReady]=useState(false),[status,setStatus]=useState('Choose your unmodified Melee USA 1.02 ISO or GCM.'),[error,setError]=useState('');
  const [setupError,setSetupError]=useState(''),[preparationStatus,setPreparationStatus]=useState('Preparing fighters…');
  const [resolved,setResolved]=useState<{action:any;roster:Fighter[]}|null>(null);
- const [settings,setSettings]=useState(()=>joiningFriend?loadSettings():applyLauncherSelection(loadSettings(),action));
+ const [settings,setSettings]=useState(()=>applyLauncherSelection(loadSettings(),action));
  useEffect(()=>{if(!ready||!resolved)onTrailerStatus?.(error||setupError||(!ready?status:preparationStatus));},[ready,resolved,error,setupError,status,preparationStatus,onTrailerStatus]);
  const fighters=resolved?.roster||roster;
  const fighter=resolved?.action.character?fighters.find(f=>f.slug===resolved.action.character.slug):fighters[0];

@@ -128,3 +128,17 @@ baked website assets matched the pinned manifest. Both sources converted through
 upstream `bake_native_sources.py`. No generation, paid action, private export
 workaround, or character/ROM publication occurred. Earlier missing-source notes
 above describe historical checkpoints, not the current blocker.
+
+
+The next full review completed against 0bc4c26 and identified three further
+compatibility gaps: direct-link guests bypassed unified controller preferences,
+unlimited (zero-minute) matches were rejected, and configured runtime activation
+could use a non-loopback outer listener. Follow-up fixes translate the guest's
+unified controller plan without resolving fighters, preserve zero in canonical
+rules/identity, and reject non-loopback HOST before runtime imports/listeners.
+Actual root browser regression now also proves the unified guest gamepad overrides
+stale Melee keyboard preferences. Two custom matches reached results at596/611ticks;
+both Stop roles, pre-tick asset mismatch rejection and a fresh100neutral ticks passed.
+These compare applied pads and50selected state words; no full-state/rollback,
+physical-controller or WAN assertion is made. Focused15test subset and intended
+TypeScript/build pass. A fresh clean-candidate review remains required.

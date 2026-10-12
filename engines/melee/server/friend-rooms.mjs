@@ -27,7 +27,7 @@ export function attachFriendRooms(server,{engine,host='127.0.0.1'}){
  const wss=new WebSocketServer({noServer:true,maxPayload:16384,perMessageDeflate:false});
  const upgrade=(req,socket,head)=>{
   if(req.url!=='/melee/room')return;
-  if(!['127.0.0.1','localhost','[::1]'].includes(host)||!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress)||req.headers.origin!==`http://${req.headers.host}`){socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');return;}
+  if(!['127.0.0.1','localhost','::1'].includes(host)||!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress)||req.headers.origin!==`http://${req.headers.host}`){socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');return;}
   wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws));
  };
  server.on('upgrade',upgrade);

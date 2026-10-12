@@ -34,6 +34,9 @@ import { bakedRosterEntries } from "../shared/baked-roster.js";
 import { ROMS_BY_SHA1, UNSUPPORTED_ROMS_BY_SHA1 } from "../shared/rom-catalog.js";
 import { ACTIVE_JOB_STATUSES } from "./job-protocol.js";
 
+const PORT = Number(process.env.PORT || 4174);
+const HOST = process.env.HOST || (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
+if(process.env.MELEE_NETPLAY_ENGINE_ROOT&&!['127.0.0.1','localhost','::1'].includes(HOST))throw Error('Friend runtime requires a loopback HOST.');
 const handleMelee = createEmbeddedMeleeHandler();
 let friendRuntime=null,attachFriendRooms;
 if(process.env.MELEE_NETPLAY_ENGINE_ROOT){
@@ -152,8 +155,6 @@ const fighterJobs = createFighterJobs({
   reservedSlugs: async () => (await bakedRoster()).slugs,
 });
 
-const PORT = Number(process.env.PORT || 4174);
-const HOST = process.env.HOST || (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const authService = createAuthService({ isProduction: IS_PRODUCTION });
 // Bump the cookie name whenever the validation contract changes. This also

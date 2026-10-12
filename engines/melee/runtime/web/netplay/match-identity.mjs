@@ -3,7 +3,7 @@ import {disc,seed,sha256} from './identity.mjs';
 /** Hash only resolved rules and installed bytes, never mutable character names or URLs. */
 export function resolvedRules(value){
  const keys=['mode','stage','level','stocks','minutes'];
- if(!value||value.mode!==0||!Number.isInteger(value.stage)||value.stage<0||value.stage>100||!Number.isInteger(value.level)||value.level<1||value.level>9||!Number.isInteger(value.stocks)||value.stocks<1||value.stocks>99||!Number.isInteger(value.minutes)||value.minutes<1||value.minutes>99||!Array.isArray(value.packedPorts)||value.packedPorts.length!==4||value.packedPorts.some(n=>!Number.isInteger(n)||n<0||n>0xffffff))throw Error('Invalid resolved friend match.');
+ if(!value||value.mode!==0||!Number.isInteger(value.stage)||value.stage<0||value.stage>100||!Number.isInteger(value.level)||value.level<1||value.level>9||!Number.isInteger(value.stocks)||value.stocks<1||value.stocks>99||!Number.isInteger(value.minutes)||value.minutes<0||value.minutes>99||!Array.isArray(value.packedPorts)||value.packedPorts.length!==4||value.packedPorts.some(n=>!Number.isInteger(n)||n<0||n>0xffffff))throw Error('Invalid resolved friend match.');
  if(value.packedPorts.some((n,i)=>((n>>>8)&255)!==(i<2?0:3)))throw Error('Friend match needs exactly two human ports.');
  return Object.fromEntries([...keys.map(key=>[key,value[key]]),['packedPorts',value.packedPorts.slice()]]);
 }

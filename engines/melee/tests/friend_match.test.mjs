@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'node:http';import {createRequire} from 'node:module';
-import {installedMatchIdentity} from '../runtime/web/netplay/match-identity.mjs';
+import {resolvedRules,installedMatchIdentity} from '../runtime/web/netplay/match-identity.mjs';
 import {disc,seed} from '../runtime/web/netplay/identity.mjs';
 import {attachFriendRooms} from '../server/friend-rooms.mjs';
 import {connectFriendRoom} from '../web/lib/friend-room.mjs';
@@ -59,4 +59,10 @@ test('friend proposal retains validated Ice Climbers and Zelda companion metadat
  assert.equal(validateFriendProposal({...launch,costumes:[companion]}).costumes[0].companion,true);
  assert.equal(validateFriendProposal({...launch,costumes:[{...companion,target:'sheik',fighter:19,filename:'PlSkNr.dat'}]}).costumes[0].companion,true);
  assert.throws(()=>validateFriendProposal({...launch,costumes:[{...companion,target:'fox',fighter:2}]}),/companion/);
+});
+
+test('ordinary friend rules preserve upstream unlimited time and bind it into identity',async()=>{
+ const unlimited={...launch,minutes:0};assert.equal(resolvedRules(unlimited).minutes,0);
+ assert.notEqual((await installedMatchIdentity(engine,unlimited,options)).rules,(await installedMatchIdentity(engine,launch,options)).rules);
+ for(const minutes of [-1,100,0.5])assert.throws(()=>resolvedRules({...launch,minutes}),/Invalid/);
 });
