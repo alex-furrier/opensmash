@@ -29,5 +29,5 @@ export function connectFriendRoom(request,onChange,{WebSocketImpl=WebSocket,orig
    onChange?.(message);
   }catch(error){stop(error.message);}
  };
- return {assignment,stop,async ready(identity){await assignment;send({type:'ready',identity});return {...await started,identity};}};
+ return {assignment,stop,get closed(){return closed;},async ready(identity){await assignment;send({type:'ready',identity});return {...await started,identity};}};
 }
