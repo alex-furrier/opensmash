@@ -27,12 +27,19 @@ test('tailnet cannot access operator disc setup, raw game, native process or sys
  for(const path of ['/api/netplay/config','/api/netplay/manifest','/api/imports','/api/imports/portraits/import-'+ 'a'.repeat(24)+'-tile.webp','/engine/upstream/runtime.mjs'])assert.equal(allowedPrivateMeleeRoute('GET',path),true,path);
  assert.equal(allowedPrivateMeleeRoute('POST','/api/character-select'),true);
 });
-test('private gateway limits the proxy authority and origin without changing local operator routes',()=>{
+test('private gateway route limits also hold with spoofed loopback Host and no Origin',()=>{
  const r={...request(privateOrigin,'approved-device.example.ts.net:8450'),method:'GET',url:'/melee/api/imports?roster=active'};
  assert.equal(privateMeleeRequestAllowed(r,privateOrigin),true);
  assert.equal(privateMeleeRequestAllowed({...r,url:'/melee/api/game'},privateOrigin),false);
  assert.equal(privateMeleeRequestAllowed({...r,headers:{...r.headers,origin:'https://other.example.ts.net:8450'}},privateOrigin),false);
  assert.equal(privateMeleeRequestAllowed({...r,headers:{host:'other.example.ts.net:8450'}},privateOrigin),false);
- assert.equal(privateMeleeRequestAllowed({...r,headers:{host:'127.0.0.1:4196'},url:'/melee/api/game'},privateOrigin),true);
+ assert.equal(privateMeleeRequestAllowed({...r,headers:{host:'127.0.0.1:4196'},url:'/melee/api/game'},privateOrigin),false);
  assert.equal(privateMeleeRequestAllowed({...r,headers:{host:r.headers.host}},privateOrigin),true);
+});
+
+test('loopback Host cannot exempt restricted routes when private-origin mode is active',()=>{
+ for(const host of ['localhost:4196','127.0.0.1:4196','[::1]:4196'])for(const path of ['/api/game/PlMr.dat','/api/setup/disc','/engine/sys/main.dol'])assert.equal(privateMeleeRequestAllowed({headers:{host},socket:{remoteAddress:'127.0.0.1'},method:'GET',url:'/melee'+path},privateOrigin),false);
+ const r={headers:{host:'127.0.0.1:4196'},socket:{remoteAddress:'127.0.0.1'},method:'GET',url:'/melee/api/imports'};
+ assert.equal(privateMeleeRequestAllowed(r,privateOrigin),true);
+ assert.equal(privateMeleeRequestAllowed({...r,url:'/melee/api/game'},undefined),true);
 });

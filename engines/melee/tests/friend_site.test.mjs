@@ -18,3 +18,12 @@ test('friend runtime rejects a non-loopback listener before importing or serving
  const code=await new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',resolve);});
  assert.equal(code,1);assert.match(errors,/Friend runtime requires a loopback HOST/);assert.doesNotMatch(output,/OpenSmash web:/);
 });
+
+test('private-origin-only configuration rejects a direct remote listener before startup',async()=>{
+ const env={...process.env,PORT:'0',HOST:'0.0.0.0',NODE_ENV:'development',MELEE_PRIVATE_ORIGIN:'https://approved.example.ts.net:8450'};
+ for(const name of ['MELEE_NETPLAY_ENGINE_ROOT','MELEE_SIMULATED_PEER_ISO'])delete env[name];
+ const child=spawn(process.execPath,[fileURLToPath(new URL('../../../web-prototype/server/index.js',import.meta.url))],{env,cwd:fileURLToPath(new URL('../../../',import.meta.url)),stdio:['ignore','pipe','pipe']});
+ let output='',errors='';child.stdout.on('data',c=>output+=c);child.stderr.on('data',c=>errors+=c);
+ const code=await new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',resolve);});
+ assert.equal(code,1);assert.match(errors,/Friend runtime requires a loopback HOST/);assert.doesNotMatch(output,/OpenSmash web:/);
+});

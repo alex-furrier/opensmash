@@ -109,5 +109,6 @@ ROM download endpoint or a phone hardware compatibility guarantee.
 Private-origin requests use the existing hosted gateway's asset/preparation route
 allowlist, plus netplay metadata and private portrait derivatives. Operator disc
 setup, raw game files, native-process APIs and engine system bundles remain
-unavailable through that proxy; loopback operator requests retain their existing
-behavior.
+unavailable through the website, including requests claiming a loopback Host.
+The separate loopback conversion helper retains its operator behavior. With
+private-origin mode unset, existing local website routes remain unchanged.

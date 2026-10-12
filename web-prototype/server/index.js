@@ -37,7 +37,8 @@ import { ACTIVE_JOB_STATUSES } from "./job-protocol.js";
 
 const PORT = Number(process.env.PORT || 4174);
 const HOST = process.env.HOST || (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
-if((process.env.MELEE_NETPLAY_ENGINE_ROOT||process.env.MELEE_SIMULATED_PEER_ISO)&&!['127.0.0.1','localhost','::1'].includes(HOST))throw Error('Friend runtime requires a loopback HOST.');
+if((process.env.MELEE_NETPLAY_ENGINE_ROOT||process.env.MELEE_SIMULATED_PEER_ISO||process.env.MELEE_PRIVATE_ORIGIN)&&!['127.0.0.1','localhost','::1'].includes(HOST))throw Error('Friend runtime requires a loopback HOST.');
+if(process.env.MELEE_PRIVATE_ORIGIN){const {privateFriendOrigin}=await import('../../engines/melee/server/friend-rooms.mjs');privateFriendOrigin(process.env.MELEE_PRIVATE_ORIGIN);}
 const handleMelee = createEmbeddedMeleeHandler();
 let friendRuntime=null,attachFriendRooms;
 if(process.env.MELEE_NETPLAY_ENGINE_ROOT){
