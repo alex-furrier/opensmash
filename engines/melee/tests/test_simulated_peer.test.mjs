@@ -55,3 +55,15 @@ test('owned controller pulses down toward a lower opponent, releases between pul
   deliver(5);pad=navigator.getGamepads()[0];assert.deepEqual(pad.axes,[0,0,0,0]);assert.ok(pad.buttons.every(b=>!b.pressed));
  }finally{for(const name of names){const descriptor=saved.get(name);if(descriptor)Object.defineProperty(globalThis,name,descriptor);else delete globalThis[name];}}
 });
+
+test('Stop cancels a session waiting for predecessor teardown before it acquires browser resources',async()=>{
+ let releaseCleanup,cleanupStarted,contexts=0,launches=0;
+ const cleanup=new Promise(resolve=>releaseCleanup=resolve),entered=new Promise(resolve=>cleanupStarted=resolve);
+ const context={route:async()=>{},newPage:async()=>({addInitScript:async()=>{},goto:async()=>{throw Error('old fixture');},locator:()=>({allTextContents:async()=>[]})}),close:()=>{cleanupStarted();return cleanup;}};
+ const browser={newContext:async()=>{if(++contexts===1)return context;throw Error('fresh fixture');},close:async()=>{}};
+ const peer=createSimulatedPeer({chromium:{launch:async()=>{launches++;return browser;}},origin:'http://127.0.0.1:1',iso:'local'});
+ const old=peer.start({room:'a'.repeat(32),session:'old'});const oldRejected=assert.rejects(old,/could not prepare/);await entered;peer.stop('old');
+ const cancelled=peer.start({room:'b'.repeat(32),session:'cancelled-waiter'});const waiterRejected=assert.rejects(cancelled,/stopped/);peer.stop('cancelled-waiter');
+ const fresh=peer.start({room:'c'.repeat(32),session:'fresh'});const freshRejected=assert.rejects(fresh,/could not prepare/);releaseCleanup();
+ await Promise.all([oldRejected,waiterRejected,freshRejected]);assert.equal(contexts,2);assert.equal(launches,1);await peer.close();
+});

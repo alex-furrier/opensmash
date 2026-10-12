@@ -58,3 +58,14 @@ class PrivateRosterTests(unittest.TestCase):
    finally:manager.pool.shutdown()
 
 if __name__=='__main__':unittest.main()
+
+class HostedPortraitCompatibilityTests(unittest.TestCase):
+ def test_ordinary_import_portrait_keeps_the_existing_hosted_url_contract(self):
+  with tempfile.TemporaryDirectory() as temp:
+   root=Path(temp).resolve();source=root/'source';source.mkdir();Image.new('RGB',(180,172),'red').save(source/'portrait_raw.png')
+   manager=ImportManager({},threading.Lock(),workspace=root/'workspace')
+   try:
+    slug='import-'+'a'*24;row=manager.portraits(source,slug)
+    self.assertEqual(row,{'portrait':f'/api/imports/portraits/{slug}.webp'})
+    self.assertEqual(list(manager.root.glob('*.webp')),[manager.root/(slug+'.webp')])
+   finally:manager.pool.shutdown()

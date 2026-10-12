@@ -59,3 +59,12 @@ test('one local human keeps their chosen fighter first and uses the configured C
  assert.deepEqual(friendMatchSettings(before).ports.slice(0,2).map(p=>p.character),['one','two']);
  assert.throws(()=>friendMatchSettings({...before,ports:before.ports.map(p=>({...p,device:p.device==='cpu'?'off':p.device}))}),/Choose two active fighters/);
 });
+
+test('room drafts freeze both selected fighters before converting any saved solo mode',()=>{
+ for(const mode of [1,2,3,4]){
+  const saved={...structuredClone(schema.defaults),mode};saved.ports[1].character='vanilla:2';
+  const selected=applyLauncherSelection(saved,{type:'character',roomMode:'computer',selectionMode:'full-roster',character:roster[0],picks:[roster[1]],portPlan:[{kind:'keyboard'},{kind:'cpu'},{kind:'none'},{kind:'none'}]});
+  const frozen=friendMatchSettings(selected);
+  assert.equal(selected.mode,0);assert.deepEqual(frozen.ports.slice(0,2).map(p=>p.character),['one','two']);assert.equal(frozen.stage,saved.stage);
+ }
+});

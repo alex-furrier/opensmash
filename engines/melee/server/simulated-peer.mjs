@@ -23,7 +23,7 @@ export function installSimulatedController(){
 }
 
 export function createSimulatedPeer({chromium,origin,iso,onObservation}){
- let browserPromise,active,closed=false;
+ let browserPromise,active,closed=false;const waiting=new Map();
  const emit=value=>onObservation?.(value);
  function browserForRun(){
   if(!browserPromise){
@@ -34,11 +34,15 @@ export function createSimulatedPeer({chromium,origin,iso,onObservation}){
  }
  async function start({room,session}){
   if(!/^[a-f0-9]{32}$/.test(room))throw Error('Invalid local opponent room.');
-  if(active?.cancelled)await active.done;
-  if(closed||active)throw Error('Local opponent is busy. Stop its previous room first.');
-  const run={session,cancelled:false};run.done=new Promise(resolve=>{run.closed=resolve;});active=run;
+  if(closed)throw Error('Local opponent stopped.');
+  if(active?.session===session||waiting.has(session))throw Error('Duplicate local opponent session.');
+  const run={session,cancelled:false};run.done=new Promise(resolve=>{run.closed=resolve;});waiting.set(session,run);
   const current=()=>{if(closed||run.cancelled||active!==run)throw Error('Local opponent stopped.');};
   try{
+   if(active?.cancelled)await active.done;
+   if(closed||run.cancelled)throw Error('Local opponent stopped.');
+   if(active)throw Error('Local opponent is busy. Stop its previous room first.');
+   waiting.delete(session);active=run;
    const browser=await browserForRun();current();
    run.context=await browser.newContext({viewport:{width:1200,height:950}});current();
    await run.context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
@@ -61,9 +65,9 @@ export function createSimulatedPeer({chromium,origin,iso,onObservation}){
    const detail=await run.page?.locator('.game-message[role=alert],.melee-setup [role=alert]').allTextContents().catch(()=>[]);
    throw Error(detail?.join(' ').slice(0,300)||'Local browser opponent could not prepare. Stop the room and retry.');
   }finally{
-   try{await run.context?.close();}finally{emit({session,type:'closed'});if(active===run)active=undefined;run.closed();}
+   try{await run.context?.close();}finally{emit({session,type:'closed'});if(active===run)active=undefined;waiting.delete(session);run.closed();}
   }
  }
- function stop(session){if(active?.session!==session)return;const run=active;run.cancelled=true;run.finished?.();void run.context?.close().catch(()=>{});}
- return {start,stop,async close(){closed=true;const run=active;if(run){stop(run.session);await run.done;}await(await browserPromise?.catch(()=>undefined))?.close();}};
+ function stop(session){const run=active?.session===session?active:waiting.get(session);if(!run)return;run.cancelled=true;run.finished?.();void run.context?.close().catch(()=>{});}
+ return {start,stop,async close(){closed=true;const runs=[...(active?[active]:[]),...waiting.values()];for(const run of runs)stop(run.session);await Promise.all(runs.map(run=>run.done));await(await browserPromise?.catch(()=>undefined))?.close();}};
 }

@@ -136,9 +136,11 @@ class ImportManager:
             (self.root/(slug+'.webp')).unlink(missing_ok=True)
             for variant in ['tile','medium']:(self.root/(slug+'-'+variant+'.webp')).unlink(missing_ok=True)
         return row
-    def portraits(self,source,slug):
+    def portraits(self,source,slug,derivatives=False):
         result={}
-        for variant,size,key in [('raw',(180,172),'portrait'),('tile',(90,86),'portraitTile'),('medium',(256,256),'portraitMedium')]:
+        variants=[('raw',(180,172),'portrait')]
+        if derivatives:variants.extend([('tile',(90,86),'portraitTile'),('medium',(256,256),'portraitMedium')])
+        for variant,size,key in variants:
             portrait=source/('portrait_'+variant+'.png')
             filename=slug+('' if variant=='raw' else '-'+variant)+'.webp'
             with Image.open(portrait if portrait.exists() else source/'portrait_raw.png') as im:
@@ -179,7 +181,7 @@ class ImportManager:
                     retained=self.workspace/'assets/characters'/ident
                     if existing and all((retained/name).is_file() for name in [*FILES,'character.json']):
                         if source_loader:
-                            existing.update(self.portraits(source,slug))
+                            existing.update(self.portraits(source,slug,derivatives=True))
                             atomic_write(self.index,(json.dumps(self.rows,indent=2)+'\n').encode())
                         if source_only and existing['target']!=target:
                             existing['target']=target
@@ -200,7 +202,7 @@ class ImportManager:
                     except Exception:
                         shutil.copytree(source,self.root/('failed-source-'+job['id']),dirs_exist_ok=True)
                         raise
-                    row={'slug':slug,'name':info['name'],'short':info['short'],'target':target,'imported':True,**self.portraits(source,slug)}
+                    row={'slug':slug,'name':info['name'],'short':info['short'],'target':target,'imported':True,**self.portraits(source,slug,derivatives=source_loader is not None)}
                     self.rows=[r for r in self.rows if r['slug']!=slug]
                     self.rows.append(row);atomic_write(self.index,(json.dumps(self.rows,indent=2)+'\n').encode());self.catalog[slug]=row
                 job.update(state='complete',message='Character is ready.',fighter=row)

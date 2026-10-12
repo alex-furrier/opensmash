@@ -14,7 +14,7 @@ export function applyLauncherSelection(settings, action) {
   if (!action.portPlan) return settings;
   if (action.portPlan.length !== 4) throw Error('Four player assignments are required.');
   const picks=[action.character,...(action.picks||[])].filter(Boolean);
-  const mode=action.type==='start'?4:action.type==='select'?2:settings.mode;
+  const mode=action.roomMode==='computer'||action.roomMode==='friend'?0:action.type==='start'?4:action.type==='select'?2:settings.mode;
   const selectedPorts=selectionPorts(action.portPlan,action.selectionMode,mode);
   return {...settings,mode,ports:settings.ports.map((port,index)=>{
     const slot=action.portPlan[index];
