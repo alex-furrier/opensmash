@@ -13,7 +13,7 @@ test('failed Chrome launch permits a fresh-room retry and failed-launch shutdown
  const browser={async newContext(){contexts++;throw Error('successful launch reached context');},async close(){closes++;}};
  const bot=createSimulatedPeer({chromium:{async launch(){if(++launches===1)throw Error('transient Chrome launch failure');return browser;}},origin:'http://127.0.0.1:1',iso:'fixed-private-path'});
  await assert.rejects(bot.start({room:'a'.repeat(32),session:'failed'}),/could not prepare/);
- 
+
  await assert.rejects(bot.start({room:'b'.repeat(32),session:'retry'}),/could not prepare/);
  assert.equal(launches,2);assert.equal(contexts,1);
  await bot.close();assert.equal(closes,1);
