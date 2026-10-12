@@ -13,7 +13,7 @@ import type {Fighter} from '../web/lib/fighter';
 import './launcher.css';
 export const roster=catalog as Fighter[];
 export default function MeleeExperience({action,onClose,soundOn=true,trailerReveal=false,onTrailerReady,onTrailerStatus}:{action:any;onClose:()=>void;soundOn?:boolean;trailerReveal?:boolean;onTrailerReady?:()=>void;onTrailerStatus?:(status:string)=>void}){
- const [friendMode,setFriendMode]=useState(()=>location.hash.startsWith('#room='));
+ const [launchMode,setLaunchMode]=useState<'solo'|'friend'|undefined>(()=>action.meleeTrailer?'solo':location.hash.startsWith('#room=')?'friend':undefined);
  const [ready,setReady]=useState(false),[status,setStatus]=useState('Choose your unmodified Melee USA 1.02 ISO or GCM.'),[error,setError]=useState('');
  const [setupError,setSetupError]=useState(''),[preparationStatus,setPreparationStatus]=useState('Preparing fighters…');
  const [resolved,setResolved]=useState<{action:any;roster:Fighter[]}|null>(null);
@@ -53,6 +53,7 @@ export default function MeleeExperience({action,onClose,soundOn=true,trailerReve
  if(ready&&!resolved)return <section className="melee-setup"><h2>Preparing fighters</h2><p role={error?'alert':'status'}>{error||preparationStatus}</p></section>;
  if(!fighter)return <section className="melee-setup" role="alert"><p>This character has not been prepared for Melee yet.</p><button onClick={onClose}>Return to roster</button></section>;
  if(!ready)return <section className="melee-setup"><h2>Play Melee</h2><p role="status">{status}</p><small>Your disc is never uploaded. A local copy is saved in this browser for future visits.</small>{(error||setupError)&&<p role="alert">{error||setupError}</p>}{desktop()?<button onClick={()=>void choose()}>Choose disc</button>:<label>Choose disc<input type="file" accept=".iso,.gcm" onChange={e=>void choose(e.target.files?.[0])}/></label>}<button onClick={onClose}>Return to roster</button></section>;
- if(!desktop()&&friendMode)return <FriendMatch fighter={fighter} settings={settings} roster={fighters} onClose={()=>setFriendMode(false)} soundOn={soundOn}/>;
- return <><button onClick={()=>setFriendMode(true)}>Play with a friend</button>{desktop()?<NativeGame fighter={fighter} settings={settings} roster={fighters} onClose={onClose}/>:<Game fighter={fighter} settings={settings} roster={fighters} onClose={onClose} soundOn={soundOn} chrome={false} holdForTrailer={!!action.meleeTrailer} trailerReveal={trailerReveal} onTrailerReady={onTrailerReady} onTrailerStatus={onTrailerStatus}/>}</>;
+ if(!desktop()&&!launchMode)return <section className="melee-setup"><h2>Play Melee</h2><p>Use your selected fighters and match settings.</p><button onClick={()=>setLaunchMode('solo')}>Play solo</button><button onClick={()=>setLaunchMode('friend')}>Play with a friend</button><button onClick={onClose}>Return to roster</button></section>;
+ if(!desktop()&&launchMode==='friend')return <FriendMatch fighter={fighter} settings={settings} roster={fighters} onClose={onClose} soundOn={soundOn}/>;
+ return desktop()?<NativeGame fighter={fighter} settings={settings} roster={fighters} onClose={onClose}/>:<Game fighter={fighter} settings={settings} roster={fighters} onClose={onClose} soundOn={soundOn} chrome={false} holdForTrailer={!!action.meleeTrailer} trailerReveal={trailerReveal} onTrailerReady={onTrailerReady} onTrailerStatus={onTrailerStatus}/>;
 }
