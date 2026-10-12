@@ -1,8 +1,13 @@
 # OpenSmash friend multiplayer: implementation and validation plan
 
-Updated 2026-10-12. Owner intent: a literal fork of the existing smash.fun UI, existing/offline prepared custom characters, two-player Melee on desktop/controllers, initially hosted locally on Alex’s Mac. Preserve upstream character conversion and solo play. No in-app roster platform, generation calls, new accounts, paid resources, public hosting, mobile-polish gate or rollback claim.
+Historical planning record from 2026-10-12. Current implemented flow and validation
+are documented in [README.md](README.md#current-validation-and-historical-evidence).
+The staging directories, publication status, gaps and task order below describe
+that earlier checkpoint; they are not current launch instructions.
 
-## Current state and evidence boundaries
+Owner intent: a literal fork of the existing smash.fun UI, existing/offline prepared custom characters, two-player Melee on desktop/controllers, initially hosted locally on Alex’s Mac. Preserve upstream character conversion and solo play. No in-app roster platform, generation calls, new accounts, paid resources, public hosting, mobile-polish gate or rollback claim.
+
+## Historical planning checkpoint and evidence boundaries
 
 - Original checkout `../opensmash` and its playable private test route remain separate. The approved ISO deadline remains 2026-10-12T22:08:21.287Z; never renew it implicitly. Source work is isolated in `opensmash-integrated`, branch `multiplayer/upstream-launcher`, based on committed HEAD 08b77516dde7f748468e2495481908eb98675357 plus preserved uncommitted loader/bot/cache fixes. Local source-only checkpoints are authorized; no push. Earlier private loading/bot recovery is preserved in local commit49063e4; the integration checkpoint is reviewed separately.
 - Earlier standalone real-engine input/state parity, gameplay milestones, mutation/disconnect/fresh-session proofs remain useful ancestor evidence. Three automatic second-engine sessions passed 3600 matching applied-input/selected-state ticks; 71 focused checks passed after the launch-retry fix. Those tests do not establish the new integrated launcher, complete rollback state, or WAN quality.

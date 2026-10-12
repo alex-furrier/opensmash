@@ -1,14 +1,60 @@
-# Melee multiplayer: local confirmed-input prototype
+# Melee multiplayer in the OpenSmash launcher
 
-This branch contains an opt-in engine source patch, a two-player confirmed-input
-session, and a standalone loopback browser lobby. The candidate WASM builds and
-focused tests pass. The actual lobby runs two local Melee clients with independently
-owned inputs: the preceding candidate's reference, ordered hold and seeded jitter each passed 4,000 matching
-logical ticks with attacks, movement, stock loss and respawn. Mutation, disconnect
-and fresh-session recovery checks also passed. This remains a local prototype.
+The current entrypoint is the normal website at `/melee`. **Create room** uses
+its roster to choose and freeze two fighters. First-time players select their
+own unmodified USA 1.02 ISO/GCM and complete or skip the controls check. Both
+browsers independently prepare and verify runtime, disc, costume/CSS bytes,
+rules and seed before **Ready** starts confirmed-input play in the original
+Melee game loop. **Stop** ends the room; **Rematch** creates a fresh session with
+the assigned lineup; **Return to roster** leaves the experience. Shared
+`/melee#room=<code>` links enter disc setup and joining directly.
 
-The ordinary launcher and clean engine pin remain unchanged. No hosting,
-deployment, ROM transfer, reconnect into an old match, or rollback is included.
+An explicitly configured local scripted browser opponent uses that same input
+path. Explicit private roster exports reuse the existing character validator
+and conversion pipeline; source assets remain outside Git. The ordinary solo
+launcher remains available. Browser-local disc storage and the main launcher's
+**Settings → Share with another device** peer handoff remain wired. The older
+standalone prototype's temporary one-tap download grant is not part of this
+flow. A saved copy from the same HTTPS origin/browser can still be restored.
+
+Private development remains loopback-bound. Optional `MELEE_PRIVATE_ORIGIN`
+admits one exact HTTPS tailnet origin, without Funnel. The website denies raw
+game files, disc-management/native-process APIs and system bundles, including
+requests claiming a loopback Host. No public deployment, native CPU AI, complete
+rollback snapshot or reconnect into an old match is included.
+
+## Current validation and historical evidence
+
+Production source at `185ea0c7` passed a private HTTPS Chrome flow through
+selection, verified Ready, rendered combat, actual results, Stop and return,
+with 1,959 matching applied-input/selected-state ticks. Twenty-four real HTTPS
+raw-route/Host-spoof controls, three wrong-origin WebSocket controls, and nine
+boundary/startup tests passed. An earlier private roster run exercised all nine
+retained packages through the main launcher, totaling 17,498 matching ticks.
+Those traces, screenshots, models and disc files remain private; they are not
+repository fixtures or hardware certification.
+
+At source/test checkpoint `d8e549ac`, the website suite passed 333 tests; Melee
+Python ran 196 cases with 12 skips and no failures. TypeScript and the production
+build passed. The Melee JS/relay suite had 130 passes, two skips and three failures
+reproduced from exact upstream main (audio startup, legacy session fixture and
+root-path expectation). Root Python had three emblem-fallback errors because
+optional OpenCV was absent. Broader suites are not reported green. Independent
+four-lane source reviews passed the roster repairs, final routing delta and
+test-only teardown fixture cleanup at their recorded scopes.
+
+Physical Bluetooth controller, actual iPhone gameplay/handoff, WAN behavior and
+complete-state equivalence remain unverified. Selected-state digests do not
+establish rollback; application-message faults over WebSocket/TCP are not
+transport packet loss. Existing paired file-transfer browser proof belongs to
+the historical standalone adapter, not an iPhone or current main-flow test.
+
+The standalone lobby and fixed stock preset described below are retained
+research adapters and historical evidence. Their reference, ordered-hold and
+seeded-jitter predecessors each passed 4,000 ticks with movement, attacks, stock
+loss and respawn, plus mutation/disconnect/fresh-session controls. Those results
+retain their original candidate identities; they do not certify every later
+launcher or runtime revision.
 
 ## Ancestry and game selection
 
@@ -190,8 +236,10 @@ the input session. A netplay launch independently verifies the local disc and
 served runtime bytes, derives rules/stock-costume/seed identity, and uses a fresh
 memory card. Fail/Stop closes the room; recovery destroys the whole iframe and
 worker pool. Stale socket, audio and Ready continuations cannot act on a new room.
-The personalized-character pipeline is preserved; this prototype accepts stock
-Donkey Kong versus Fox on Battlefield only. These values use upstream CharacterKind IDs 1/2 and
+The historical standalone adapter uses stock Donkey Kong versus Fox on
+Battlefield. The current main launcher instead resolves its selected fighters,
+custom assets and match settings into the room proposal. The historical preset
+uses upstream CharacterKind IDs 1/2 and
 external StageKind 31, as defined in [fighter enums](https://github.com/turtlesoupy/opensmash-melee-pc/blob/5bc531aafcc941866f2c916afebc38ee75543222/src/melee/ft/forward.h#L130)
 and [stage enums](https://github.com/turtlesoupy/opensmash-melee-pc/blob/5bc531aafcc941866f2c916afebc38ee75543222/src/melee/gr/forward.h#L175).
 
@@ -426,7 +474,10 @@ command verifies an existing composed checkout. Build using the pinned toolchain
 The local website takes its private asset/conversion service from
 `MELEE_LOCAL_ORIGIN=http://127.0.0.1:<service-port>` and its verified runtime from
 `MELEE_NETPLAY_ENGINE_ROOT=/path/to/isolated/melee-pc`. Bind `HOST=127.0.0.1`;
-this slice supports loopback room connections only.
+ordinary room requests remain loopback-only. For an explicitly approved private
+HTTPS proxy, set the one exact `MELEE_PRIVATE_ORIGIN`; see
+[`engines/melee/server/README.md`](../../engines/melee/server/README.md#private-tailnet-development)
+for route restrictions. This does not restore the historical download grant.
 
 A shared `/melee#room=<code>` link opens disc setup and joining directly. The guest
 uses the host's frozen launch proposal, without preparing an unrelated roster
