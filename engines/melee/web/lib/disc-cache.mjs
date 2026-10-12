@@ -33,6 +33,7 @@ export async function cacheDisc(file,signal,progress){
    await navigator.locks.request(`opensmash-disc:${entry}`,{ifAvailable:true},async lock=>{if(lock)await dir.removeEntry(entry).catch(()=>{});});
   }
   const name=receipt?.name||`disc-${crypto.randomUUID()}.iso`;
+  if(receipt){if(!/^incoming-[a-z0-9-]+\.iso$/.test(name))throw Error('Invalid incoming disc receipt.');const staged=await(await dir.getFileHandle(name)).getFile();if(staged.size!==file.size)throw Error('Incoming disc is no longer complete.');}
   let committed=false;
   try{
    if(!receipt){
@@ -58,5 +59,12 @@ export async function cacheDisc(file,signal,progress){
 }
 export async function removeCachedDisc(){
  if(!globalThis.navigator?.storage?.getDirectory)return;
- await locked(async()=>{try{await (await root()).removeEntry(DIRECTORY,{recursive:true});}catch(e){if(e.name!=='NotFoundError')throw e;}});
+ await locked(async()=>{
+  let dir;try{dir=await(await root()).getDirectoryHandle(DIRECTORY);}catch(e){if(e.name==='NotFoundError')return;throw e;}
+  // Forget the committed copy, but never erase another tab's transfer/validation.
+  for await(const entry of dir.keys()){
+   if(entry==='current'||/^disc-[a-z0-9-]+\.iso$/.test(entry))await dir.removeEntry(entry);
+   else if(/^incoming-[a-z0-9-]+\.iso$/.test(entry)&&navigator.locks)await navigator.locks.request(`opensmash-disc:${entry}`,{ifAvailable:true},async lock=>{if(lock)await dir.removeEntry(entry);});
+  }
+ });
 }

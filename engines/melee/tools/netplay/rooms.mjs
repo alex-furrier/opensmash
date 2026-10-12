@@ -3,14 +3,14 @@ import {randomBytes, randomUUID} from 'node:crypto';
 
 /** One ephemeral registry per relay server. Every room owns exactly two sockets.
  * No game inputs are synthesized here and no game/asset state is persisted. */
-export function createRooms({identity, launch, maxRooms = 32, now = Date.now, ttlMs = 15 * 60 * 1000}) {
+export function createRooms({identity, launch, maxRooms = 32, now = Date.now, ttlMs = 15 * 60 * 1000,permitTestBot=()=>false,startTestBot,stopTestBot,permitTestBotJoin=()=>false}) {
   identity = Object.freeze({...identity});
   launch = Object.freeze({...launch, packedPorts: Object.freeze([...(launch.packedPorts || [])])});
   const rooms = new Map(), memberships = new Map();
   const send = (socket, message) => socket.send(JSON.stringify(message));
   function finish(room, reason) {
     if (!rooms.has(room.code)) return;
-    rooms.delete(room.code);
+    rooms.delete(room.code);if(room.testBot)stopTestBot?.(room.session);
     for (const member of room.members) if (member) {
       memberships.delete(member.socket);
       try { send(member.socket, {type:'stopped', reason}); } catch {}
@@ -19,7 +19,7 @@ export function createRooms({identity, launch, maxRooms = 32, now = Date.now, tt
   }
   function sweep() { for (const room of rooms.values()) if (now() >= room.expires) finish(room, 'Room expired. Create a fresh room.'); }
   function welcome(room, member) {
-    send(member.socket, {type:'joined', room:room.code, session:room.session, player:member.player, identity, launch});
+    send(member.socket, {type:'joined', room:room.code, session:room.session, player:member.player, identity, launch,testBot:room.testBot});
     status(room);
   }
   function status(room) {
@@ -34,14 +34,16 @@ export function createRooms({identity, launch, maxRooms = 32, now = Date.now, tt
         if (!message || typeof message.type !== 'string') throw Error('Invalid room request.');
         let member = memberships.get(socket), room = member?.room;
         if (message.type === 'create') {
+          if(message.testBot&&(!permitTestBot(socket)||!startTestBot||!['reference','delay','jitter','hold'].includes(message.scenario||'reference')))throw Error('Test opponent is unavailable for this request.');
           if (member || rooms.size >= maxRooms) throw Error('Cannot create another room.');
-          room = {code:randomBytes(16).toString('hex'),session:randomUUID(),members:[null,null],started:false,expires:now()+ttlMs};
+          room = {code:randomBytes(16).toString('hex'),session:randomUUID(),members:[null,null],started:false,expires:now()+ttlMs,testBot:!!message.testBot};
           member = {socket,player:0,ready:false,room};room.members[0]=member;
-          rooms.set(room.code,room);memberships.set(socket,member);welcome(room,member);return;
+          rooms.set(room.code,room);memberships.set(socket,member);welcome(room,member);if(room.testBot)Promise.resolve().then(()=>{if(rooms.has(room.code))return startTestBot({room:room.code,session:room.session,scenario:message.scenario||'reference'});}).catch(error=>finish(room,'Test opponent: '+error.message));return;
         }
         if (message.type === 'join') {
           if (member || !/^[a-f0-9]{32}$/.test(message.room || '')) throw Error('Invalid room link.');
           room = rooms.get(message.room);
+          if(room?.testBot&&!permitTestBotJoin(socket))throw Error('This room has its own local test opponent.');
           if (!room || room.started || room.members[1]) throw Error('Room unavailable. Create a fresh room.');
           member = {socket,player:1,ready:false,room};room.members[1]=member;
           memberships.set(socket,member);welcome(room,member);return;

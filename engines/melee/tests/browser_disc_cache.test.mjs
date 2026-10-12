@@ -62,3 +62,18 @@ test('verified handoff disc is adopted without copying and active incoming trans
   assert.equal(dir.entries.has('incoming-456.iso'),true);
  }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
 });
+test('another tab Forget preserves locked incoming verification and adoption checks the staging file',async()=>{
+ const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator'),root=new Directory();
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{storage:{getDirectory:async()=>root,persist:async()=>false}}});
+ try{
+  await cacheDisc(new File(['old'],'old.iso'),new AbortController().signal,()=>{});
+  const dir=root.entries.get('opensmash-melee-disc-v1'),receipt={name:'incoming-active.iso',adopted:false},file=new File(['verified completed transfer'],'melee.iso');
+  dir.entries.set(receipt.name,file);Object.defineProperty(file,Symbol.for('opensmash.received-disc'),{value:receipt});
+  navigator.locks={request:async(name,options,callback)=>typeof options==='function'?options():callback(name===`opensmash-disc:${receipt.name}`?null:{})};
+  await removeCachedDisc();assert.equal(await restoreCachedDisc(),undefined);assert.equal(dir.entries.has(receipt.name),true,'other tab must retain active validation file');
+  await cacheDisc(file,new AbortController().signal,()=>{});assert.equal(receipt.adopted,true);assert.equal(await(await restoreCachedDisc()).text(),'verified completed transfer');
+  await removeCachedDisc();dir.entries.delete(receipt.name);receipt.adopted=false;
+  await assert.rejects(cacheDisc(file,new AbortController().signal,()=>{}),{name:'NotFoundError'});assert.equal(receipt.adopted,false);assert.equal(await restoreCachedDisc(),undefined);
+  dir.entries.set(receipt.name,new File(['truncated'],receipt.name));await assert.rejects(cacheDisc(file,new AbortController().signal,()=>{}),/no longer complete/);assert.equal(receipt.adopted,false);
+ }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
+});

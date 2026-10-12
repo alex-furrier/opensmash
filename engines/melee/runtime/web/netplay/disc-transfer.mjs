@@ -2,25 +2,26 @@
 // File handoff and OPFS reuse are independent of gameplay room/tick ownership.
 import {startRomHandoffHost,receiveRomHandoff,holdScreenAwake} from '/transfer/rom-handoff-client.js';
 import {restoreCachedDisc,cacheDisc,removeCachedDisc} from '/transfer/disc-cache.mjs';
+import {receiveDiscResponse} from '/shared/handoff-transfer.js';
 import {verifyDisc} from '/engine/verify-disc.mjs';
 import {ISO_SIZE} from '/engine/disc.mjs';
 
-export function mountDiscTransfer({getFile,acceptFile,canChange,onBusy=()=>{}}){
+export function mountDiscTransfer({getFile,acceptFile,canChange,canDownload=()=>true,onBusy=()=>{},onSetup=()=>{}}){
  const $=id=>document.getElementById(id),report=text=>{$('transfer-status').textContent=text;};
- let operation,generation=0,confirmation;
+ let operation,generation=0,confirmation,dev=false,settings,initialized=false,verifiedSaved;
  const supported=()=>typeof RTCPeerConnection==='function'&&!!navigator.storage?.getDirectory;
  function controls(){
   const busy=!!operation,enabled=canChange();
   $('disc-send').disabled=busy||!enabled||!getFile()||!supported();
   $('disc-receive').disabled=busy||!enabled||!supported();
-  $('disc-forget').disabled=busy||!enabled;$('transfer-code').disabled=busy||!enabled;
+  $('dev-load').disabled=busy||!enabled||!canDownload()||settings?.available===false||!!getFile()||!navigator.storage?.getDirectory;$('transfer-cancel').hidden=dev&&!busy;$('disc-forget').disabled=busy||!enabled;$('transfer-code').disabled=busy||!enabled;
   $('transfer-cancel').disabled=!busy;
  }
  function cancel(){generation++;operation?.controller.abort();operation?.handle?.cancel();confirmation?.reject(new DOMException('Cancelled','AbortError'));confirmation=undefined;$('transfer-confirm').hidden=true;}
  async function run(work){
   if(operation||!canChange())return;
   const current={controller:new AbortController()},revision=++generation;operation=current;onBusy(true);controls();
-  const release=holdScreenAwake(),timeout=setTimeout(()=>current.controller.abort(new Error('Transfer expired. Start a new pairing.')),20*60*1000);
+  const release=holdScreenAwake(),timeout=setTimeout(()=>current.controller.abort(new Error('Download timed out. Try again.')),20*60*1000);
   const active=()=>{current.controller.signal.throwIfAborted();if(revision!==generation)throw new DOMException('Cancelled','AbortError');};
   const timerAbort=()=>{current.handle?.cancel();confirmation?.reject(current.controller.signal.reason);};current.controller.signal.addEventListener('abort',timerAbort,{once:true});
   try{await work(current,active);}
@@ -58,17 +59,41 @@ export function mountDiscTransfer({getFile,acceptFile,canChange,onBusy=()=>{}}){
   current.handle=receiveRomHandoff({code:$('transfer-code').value,game:'melee',iceServers:[],expectedSize:ISO_SIZE,privatePolling:true,transferTimeoutMs:20*60*1000,signal:current.controller.signal,onState:progress});
   const file=await current.handle.promise;active();
   await verifyDisc(file,bytes=>{active();report('Verifying the received disc: '+Math.floor(bytes/file.size*100)+'%.');});active();
-  const message=await cacheDisc(file,current.controller.signal,()=>{});active();await acceptFile(file);active();report('Verified and ready. '+message);
+  const message=await cacheDisc(file,current.controller.signal,()=>{});active();verifiedSaved=file;await acceptFile(file);active();report('Verified and ready. '+message);
  });
  $('transfer-cancel').onclick=cancel;
  $('disc-forget').onclick=()=>run(async(current,active)=>{await removeCachedDisc();active();await acceptFile(undefined);report('Saved browser copy removed. Choose a file or pair again.');});
  window.addEventListener('pagehide',cancel);
- async function restore(){
-  if(!navigator.storage?.getDirectory){report('Browser storage is unavailable. Use the local file picker.');controls();return;}
-  await run(async(current,active)=>{
-   const file=await restoreCachedDisc();active();if(!file){report('Receive your disc from the Mac, or choose a local file.');return;}
-   report('Checking the saved copy on this device…');await verifyDisc(file,()=>active());active();await acceptFile(file);report('Verified saved copy restored.');
-  });
+ async function loadDev(current,active){
+  const config=await fetch('/dev-disc/config',{signal:current.controller.signal});active();
+  if(!config.ok)throw Error('This temporary dev load is unavailable on this device.');
+  settings=await config.json();if(settings.available===false)throw Error('Download access expired. Your saved game remains on this device.');if(settings.size!==ISO_SIZE)throw Error('Invalid dev disc size.');
+  const estimate=await navigator.storage.estimate?.();active();
+  if(estimate&&estimate.quota-estimate.usage<ISO_SIZE)throw Error('Not enough browser storage for the 1.46 GB disc.');
+  report('Downloading your game…');
+  const response=await fetch('/dev-disc/load',{method:'POST',signal:current.controller.signal});active();
+  let cleanup;current.handle={dispose:async()=>cleanup?.()};
+  const file=await receiveDiscResponse(response,ISO_SIZE,current.controller.signal,bytes=>{active();report('Downloading your game: '+Math.floor(bytes/ISO_SIZE*100)+'%. Keep this page open.');},fn=>{cleanup=fn;});active();
+  await verifyDisc(file,bytes=>{active();report('Verifying your game: '+Math.floor(bytes/ISO_SIZE*100)+'%.');});active();
+  await cacheDisc(file,current.controller.signal,()=>{});active();verifiedSaved=file;await acceptFile(file);active();report('Game saved and verified. Press Ready when game preparation finishes.');
  }
- controls();return{refresh:controls,cancel,restore,get busy(){return!!operation;}};
+ async function configureDev(current,active){
+  try{const response=await fetch('/dev-disc/config',{signal:current.controller.signal});active();if(!response.ok)return;settings=await response.json();if(settings.size!==ISO_SIZE)throw Error('Invalid download source.');dev=true;}catch(error){active();return;}
+  onSetup({testBot:!!settings.testBot});
+  $('disc-transfer').querySelector('h2').textContent='Download your game';
+  $('disc-transfer').querySelector('p').textContent='First download: 1.46 GB of browser storage. Keep Safari open. Your verified copy is saved for next time.';
+  $('disc-transfer').querySelector('label[for=transfer-code]').hidden=true;
+  for(const id of ['pair-code','pair-fingerprint'])$(id).closest('p').hidden=true;
+  for(const id of ['disc-send','transfer-code','disc-receive','pair-code','pair-fingerprint','transfer-confirm','disc-forget'])$(id).hidden=true;
+  $('disc-fallback').open=false;$('ready').before($('dev-load'));$('dev-load').hidden=false;
+  controls();
+ }
+ $('dev-load').onclick=()=>run(loadDev);
+ async function restore(){
+  try{await run(async(current,active)=>{
+   await configureDev(current,active);active();if(!navigator.storage?.getDirectory)throw Error('Browser storage is unavailable. Choose a local file instead.');const file=await restoreCachedDisc();active();if(!file){if(dev){report(settings.available?'Create a room, then tap Download game.':'Download access expired. Use a saved game or choose a local file.');return;}report('Receive your disc from the Mac, or choose a local file.');return;}
+   report('Checking the saved copy on this device…');await verifyDisc(file,()=>active());active();verifiedSaved=file;await acceptFile(file);report(dev?'Saved game verified. Create a room and press Ready after preparation.':'Verified saved copy restored.');
+  });}finally{initialized=true;onBusy(false);controls();}
+ }
+ controls();return{refresh:controls,cancel,restore,get busy(){return!!operation;},get loading(){return!initialized;},get savedFile(){return verifiedSaved;}};
 }

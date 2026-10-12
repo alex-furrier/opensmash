@@ -6,17 +6,18 @@ import {mountDiscTransfer} from '/transfer/disc-transfer.mjs';
 import {validateDebug} from '/engine/netplay/debug-opponent.mjs';
 const $=id=>document.getElementById(id),status=message=>{$('status').textContent=message;};
 let manifest,room,socket,frame,port,audioContext,audioNode,audioRing,iso,warm=false,starting=false,leaving=false;
-let runtimeGeneration=0,discTransfer;
+let runtimeGeneration=0,discTransfer,privateTestBot=false,humanMode=false;
 const held=new Set(),touch={current:neutralTouchPad()},touchController=mountTouchDeck($('touch-root'),touch);
 const debugging=new URLSearchParams(location.search).get('debug')==='1';$('debug-controls').hidden=!debugging;
 const keys={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down',KeyZ:'attack',KeyX:'special',KeyC:'jump',KeyQ:'shield',Enter:'start'};
 function send(message){if(socket?.readyState!==WebSocket.OPEN)throw Error('Room connection unavailable.');socket.send(JSON.stringify(message));}
 function post(data,transfer=[]){frame?.contentWindow.postMessage(data,location.origin,transfer);}
 function controls(){
- $('create').disabled=!!room||!manifest;$('join').disabled=!!room||!manifest;
+ $('create').disabled=!!room||!manifest||!!discTransfer?.loading;$('join').disabled=!!room||!manifest;
  $('ready').disabled=!room||!warm||starting||leaving||!!room.ready||!!discTransfer?.busy;
  $('stop').disabled=!room;$('disc').disabled=starting||!!room?.ready||!!discTransfer?.busy;
  discTransfer?.refresh();
+ $('bot-scenario').disabled=!!room||humanMode;$('human-mode').disabled=!!room;
  $('debug-scripted').disabled=room?.player!==1||starting||!!room?.ready;$('debug-scenario').disabled=starting||!!room?.ready;
 }
 function release(){held.clear();touchController.reset();post({type:'input',values:[0,0,0,0,0,0,0,0,1]});}
@@ -31,9 +32,9 @@ function destroyRuntime(){
  warm=false;starting=false;$('debug-measured').textContent='Stopped. Create a fresh room.';$('screen').replaceChildren();$('game').hidden=true;
 }
 function leave(reason='Room closed. Create a fresh room.'){
- if(leaving)return;leaving=true;discTransfer?.cancel();
+ if(leaving)return;const retained=discTransfer?.savedFile===iso?iso:undefined;leaving=true;discTransfer?.cancel();
  try{if(room&&socket?.readyState===WebSocket.OPEN)send({type:'stop'});}catch{}
- destroyRuntime();iso=undefined;$('disc').value='';socket?.close();socket=undefined;room=undefined;$('share').hidden=true;$('players').textContent='Create or join a fresh room.';
+ destroyRuntime();iso=retained;$('disc').value='';socket?.close();socket=undefined;room=undefined;$('share').hidden=true;$('players').textContent='Create or join a fresh room.';
  status(reason);leaving=false;controls();
 }
 async function sound(resume=true){
@@ -63,7 +64,7 @@ async function begin(){
  post({type:'surface',direct:true});
  post({type:'select',launch:manifest.launch,costumes:[],cssAssets:[],renderWidth:960,requestedAt:Date.now(),
   netplay:{session:room.session,player:room.player,identity:room.localIdentity,port:channel.port2,...(room.debug?{debug:room.debug}:{})}},[channel.port2]);
- $('game').hidden=false;status('Both players ready. Opening Melee…');controls();
+ $('game').hidden=false;$('game').scrollIntoView?.({block:'start'});status('Both players ready. Opening Melee…');controls();
 }
 function connect(request){
  if(!manifest||socket)return;
@@ -77,17 +78,18 @@ function connect(request){
   if(message.type==='joined'){
    if(room)throw Error('Duplicate room assignment.');canonicalLaunch(message.launch);
    if(!Object.keys(manifest.identity).every(key=>message.identity?.[key]===manifest.identity[key]))throw Error('Room runtime mismatch.');
-   room={...message,ready:false};$('share').hidden=false;$('room-link').value=location.origin+'/#'+room.room;
-   history.replaceState(null,'','#'+room.room);status('You are player '+(room.player+1)+'. Choose your local game, then Ready.');warmRuntime();controls();
+   room={...message,ready:false};$('share').hidden=!!room.testBot;$('room-link').value=location.origin+'/#'+room.room;
+   history.replaceState(null,'','#'+room.room);status(room.testBot?'Your test opponent is preparing. Download your game if needed, then press Ready.':'You are player '+(room.player+1)+'. Choose your local game, then Ready.');const joinedRoom=room;if(iso){if(!await sound(false)||room!==joinedRoom||socket!==connection)return;}warmRuntime();controls();
   }else if(message.type==='room'){
-   $('players').textContent=message.players.map((p,i)=>p?'Player '+(i+1)+': '+(p.ready?'Ready':'Preparing'):'Waiting for player '+(i+1)).join(' · ');
+   window.dispatchEvent(new CustomEvent('opensmash-room',{detail:message}));
+   $('players').textContent=message.players.map((p,i)=>p?(room?.testBot&&i===1?'Test bot':'Player '+(i+1))+': '+(p.ready?'Ready':'Preparing'):'Waiting for player '+(i+1)).join(' · ');
   }else if(message.type==='start'){
    if(!room||message.session!==room.session||!room.ready)throw Error('Unexpected start.');await begin();
   }else if(message.type==='peer'){
    if(!starting||!port)throw Error('Input arrived outside a match.');port.postMessage(message.packet);
   }else if(message.type==='stopped'||message.type==='rejected')leave(message.reason);
   else throw Error('Invalid room response.');
- }catch(error){leave(error.message);}};
+ }catch(error){if(socket===connection)leave(error.message);}};
 }
 window.addEventListener('message',async event=>{
  if(!frame||event.source!==frame.contentWindow||event.origin!==location.origin)return;
@@ -108,7 +110,8 @@ window.addEventListener('message',async event=>{
   window.dispatchEvent(new CustomEvent('opensmash-runtime',{detail:data}));
  }catch(error){if(room===currentRoom&&frame===currentFrame)leave(error.message);}
 });
-$('create').onclick=()=>connect({type:'create'});
+$('create').onclick=()=>connect({type:'create',...(privateTestBot&&!humanMode?{testBot:true,scenario:$('bot-scenario').value}:{})});
+$('human-mode').onclick=()=>{if(room)return;humanMode=!humanMode;$('create').textContent=humanMode?'Create room':'Play against test bot';$('human-mode').textContent=humanMode?'Use test bot':'Play with another person';$('bot-scenario').disabled=humanMode;};
 $('join-form').onsubmit=event=>{event.preventDefault();let code=$('room-code').value.trim();try{if(code.includes('://'))code=new URL(code).hash.slice(1);}catch{}if(!/^[a-f0-9]{32}$/.test(code)){status('Paste a valid room link or code.');return;}connect({type:'join',room:code});};
 $('copy').onclick=async()=>{try{await navigator.clipboard.writeText($('room-link').value);status('Room link copied.');}catch{status('Select the room link and copy it.');}};
 async function chooseDisc(selected,automatic=false){
@@ -122,7 +125,7 @@ async function chooseDisc(selected,automatic=false){
  }catch(error){if(generation===runtimeGeneration)leave(error.message);}
 }
 $('disc').onchange=()=>chooseDisc($('disc').files[0]);
-discTransfer=mountDiscTransfer({getFile:()=>iso,acceptFile:file=>chooseDisc(file,true),canChange:()=>!starting&&!room?.ready&&!leaving,onBusy:()=>controls()});
+discTransfer=mountDiscTransfer({getFile:()=>iso,acceptFile:file=>chooseDisc(file,true),canChange:()=>!starting&&!room?.ready&&!leaving,canDownload:()=>!!room&&!room.ready&&!starting,onBusy:()=>controls(),onSetup:settings=>{privateTestBot=settings.testBot;$('bot-options').hidden=!privateTestBot;if(privateTestBot)$('create').textContent='Play against test bot';controls();}});
 void discTransfer.restore();
 $('ready').onclick=async()=>{
  const currentRoom=room,currentContext=audioContext,generation=runtimeGeneration;
@@ -131,7 +134,7 @@ $('ready').onclick=async()=>{
   if(room!==currentRoom||audioContext!==currentContext||generation!==runtimeGeneration)return;
   if(!room?.localIdentity)throw Error('Verify your local game first.');
   room.debug=debugging?validateDebug({scripted:room.player===1&&$('debug-scripted').checked,scenario:$('debug-scenario').value,seed:17}):undefined;
-  release();room.ready=true;send({type:'ready',identity:room.localIdentity});status('Ready. Waiting for the other player…');controls();
+  release();room.ready=true;send({type:'ready',identity:room.localIdentity});status(room.testBot?'Ready. Your scripted opponent will join the match automatically.':'Ready. Waiting for the other player…');controls();
  }catch(error){if(room===currentRoom&&generation===runtimeGeneration)leave(error.message);}
 };
 $('stop').onclick=()=>leave('You left the room. Create a fresh room to play again.');

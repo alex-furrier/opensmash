@@ -68,28 +68,13 @@ export async function receiveGameFile(channel, inbox, game, onState, setCleanup,
   const header = await frame(inbox);
   validateTransferHeader(header,game);
   if(expectedSize!==undefined&&header.size!==expectedSize)throw new Error('The sending device offered the wrong disc size.');
-  let writer, handle, directory, temporaryName;
-  const receipt = {name: "", adopted: false};
+  let writer, handle;
+  let receipt = {name: "", adopted: false};
   const chunks=[];
   if (game === 'melee') {
     if (!globalThis.navigator?.storage?.getDirectory) throw new Error('This browser cannot save a disc transfer. Use a browser with local file storage support.');
-    directory=await (await navigator.storage.getDirectory()).getDirectoryHandle("opensmash-melee-disc-v1",{create:true});
-    temporaryName=`incoming-${crypto.randomUUID()}.iso`;
-    receipt.name=temporaryName;
-    let releaseLock=()=>{};
-    if(navigator.locks) {
-      const held=new Promise(resolve=>{releaseLock=resolve;});
-      await new Promise((resolve,reject)=>{navigator.locks.request(`opensmash-disc:${temporaryName}`,async()=>{resolve();await held;}).catch(reject);});
-    }
-    setCleanup(async()=>{
-      try {
-        if(receipt.adopted)return;
-        try {await writer?.abort();} catch {}
-        try {await directory.removeEntry(temporaryName);} catch {}
-      } finally {releaseLock();}
-    });
-    handle=await directory.getFileHandle(temporaryName,{create:true});
-    writer=await handle.createWritable();
+    const staging=await incomingDisc(setCleanup);
+    writer=staging.writer;handle=staging.handle;receipt=staging.receipt;
   }
   channel.send(JSON.stringify({type:'ready'}));
   let received=0;
@@ -118,4 +103,43 @@ export async function receiveGameFile(channel, inbox, game, onState, setCleanup,
       received+=data.byteLength;
     }
   }
+}
+
+async function incomingDisc(setCleanup){
+ let writer;
+ const directory=await (await navigator.storage.getDirectory()).getDirectoryHandle("opensmash-melee-disc-v1",{create:true});
+ const temporaryName=`incoming-${crypto.randomUUID()}.iso`;
+ const receipt={name:temporaryName,adopted:false};
+ let releaseLock=()=>{};
+ if(navigator.locks) {
+   const held=new Promise(resolve=>{releaseLock=resolve;});
+   await new Promise((resolve,reject)=>{navigator.locks.request(`opensmash-disc:${temporaryName}`,async()=>{resolve();await held;}).catch(reject);});
+ }
+ setCleanup(async()=>{
+   try {
+     if(receipt.adopted)return;
+     try {await writer?.abort();} catch {}
+     try {await directory.removeEntry(temporaryName);} catch {}
+   } finally {releaseLock();}
+ });
+ const handle=await directory.getFileHandle(temporaryName,{create:true});
+ writer=await handle.createWritable();
+ return{writer,handle,receipt};
+}
+
+/** Save a bounded HTTP stream using the same incoming-disc receipt as handoff. */
+export async function receiveDiscResponse(response,size,signal,onProgress,setCleanup){
+ if(!response.ok||Number(response.headers.get('content-length'))!==size)throw Error('The temporary dev disc could not be loaded completely.');
+ signal.throwIfAborted();const stage=await incomingDisc(setCleanup),reader=response.body.getReader();let received=0;
+ const abort=()=>{void reader.cancel(signal.reason).catch(()=>{});};signal.addEventListener('abort',abort,{once:true});
+ try{
+  for(;;){signal.throwIfAborted();const{done,value}=await reader.read();signal.throwIfAborted();if(done)break;
+   if(received+value.byteLength>size)throw Error('Invalid dev disc byte count.');
+   await stage.writer.write(value);received+=value.byteLength;onProgress(received);
+  }
+  if(received!==size)throw Error('The dev disc load ended before the whole file arrived.');
+  signal.throwIfAborted();await stage.writer.close();
+  const file=new File([await stage.handle.getFile()],'melee-usa-1.02.iso',{type:'application/octet-stream'});
+  Object.defineProperty(file,Symbol.for('opensmash.received-disc'),{value:stage.receipt});return file;
+ }finally{signal.removeEventListener('abort',abort);await reader.cancel().catch(()=>{});reader.releaseLock();}
 }

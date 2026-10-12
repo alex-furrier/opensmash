@@ -33,3 +33,10 @@ test('room lifetime and stalled peer queues are bounded',()=>{
  const p=pair();p.rooms.receive(p.a,{type:'ready',identity});p.rooms.receive(p.b,{type:'ready',identity});p.b.bufferedAmount=65537;
  p.rooms.receive(p.a,{type:'peer',packet:{type:'accepted',player:0,session:p.joined.session,tick:0}});assert.ok(p.a.closed&&p.b.closed);
 });
+test('only authorized creator starts one fixed test peer; Stop cancels it and a fresh room gets a new session',async()=>{
+ const started=[],stopped=[],rooms=createRooms({identity,launch:{mode:0},permitTestBot:socket=>socket.authorized===true,startTestBot:request=>{started.push(request);return new Promise(()=>{});},stopTestBot:session=>stopped.push(session)});
+ const denied=socket();rooms.receive(denied,{type:'create',testBot:true});assert.equal(started.length,0);assert.equal(denied.messages.at(-1).type,'rejected');
+ const human=socket();human.authorized=true;rooms.receive(human,{type:'create',testBot:true,scenario:'delay'});await Promise.resolve();assert.equal(started.length,1);assert.equal(started[0].scenario,'delay');
+ const first=started[0];rooms.receive(human,{type:'stop'});assert.deepEqual(stopped,[first.session]);
+ const fresh=socket();fresh.authorized=true;rooms.receive(fresh,{type:'create',testBot:true});await Promise.resolve();assert.equal(started.length,2);assert.notEqual(started[1].session,first.session);rooms.close();
+});
