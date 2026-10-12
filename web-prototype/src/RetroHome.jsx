@@ -243,6 +243,7 @@ export default function RetroHome({
   launchFlowOpen,
   onAboutChange,
   onCreateRoom,
+  onToggleRoomOpponent,
   roomDraft=false,
   onAdvanced,
   onCreate,
@@ -605,7 +606,7 @@ export default function RetroHome({
             </div>
           </nav>
         </header>
-        {roomDraft&&<p className="retro-room-selection" role="status">Choose your fighter, then an opponent</p>}
+        {roomDraft&&<p className="retro-room-selection" role="status">Choose your fighter, then an opponent{onToggleRoomOpponent&&<button className="retro-room-opponent" type="button" aria-pressed={roomDraft==='computer'} onClick={onToggleRoomOpponent}>{roomDraft==='computer'?'Play with a friend':'Use local opponent'}</button>}</p>}
         <section className="intro-video-stage" aria-label="Intro video">
           <div
             ref={gameSurfaceRef}

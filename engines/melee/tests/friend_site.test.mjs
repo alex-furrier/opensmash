@@ -36,6 +36,7 @@ test('private website rejects outer sprite renderer requests with a spoofed loop
  try{
   const origin=await new Promise((resolve,reject)=>{timer=setTimeout(()=>reject(Error('Website startup timed out')),5000);child.once('error',reject);child.stdout.on('data',chunk=>{output+=chunk;const match=/OpenSmash web: (http:\/\/127\.0\.0\.1:\d+)/.exec(output);if(match){clearTimeout(timer);resolve(match[1]);}});});
   const response=await fetch(origin+'/api/og-sprite?slug=invalid_slug&fkind=-1&force=1');assert.equal(response.status,404);
+  const capture=await fetch(origin+'/api/dev/trailer-capture',{method:'POST',headers:{Origin:origin,'Content-Type':'video/webm'},body:'invalid fixture'});assert.equal(capture.status,404);
   child.kill('SIGINT');await exit;
  }finally{clearTimeout(timer);if(child.exitCode===null&&child.signalCode===null){child.kill('SIGTERM');await exit;}}
 });

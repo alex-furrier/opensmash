@@ -114,5 +114,6 @@ The separate loopback conversion helper retains its operator behavior. With
 private-origin mode unset, existing local website routes remain unchanged.
 
 Private-origin mode also denies the outer development-only `/api/og-sprite`
-endpoint before cache invalidation or native rendering. That studio remains
-available in ordinary local development when private-origin mode is unset.
+and `/api/dev/trailer-capture` endpoints before cache invalidation, upload or
+native rendering/transcoding. Those tools remain available in ordinary local
+development when private-origin mode is unset.

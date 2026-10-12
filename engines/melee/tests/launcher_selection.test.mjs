@@ -68,3 +68,11 @@ test('room drafts freeze both selected fighters before converting any saved solo
   assert.equal(selected.mode,0);assert.deepEqual(frozen.ports.slice(0,2).map(p=>p.character),['one','two']);assert.equal(frozen.stage,saved.stage);
  }
 });
+
+test('human friend drafts preserve both selected fighters across saved solo modes',()=>{
+ for(const mode of [0,1,2,3,4]){
+  const before={...structuredClone(schema.defaults),mode};
+  const selected=applyLauncherSelection(before,{type:'character',roomMode:'friend',selectionMode:'full-roster',portPlan:[{kind:'gamepad',index:0},{kind:'cpu'},{kind:'none'},{kind:'none'}],character:{slug:'one'},picks:[{slug:'two'}]});
+  const match=friendMatchSettings(selected);assert.equal(match.mode,0);assert.deepEqual(match.ports.slice(0,2).map(p=>p.character),['one','two']);
+ }
+});

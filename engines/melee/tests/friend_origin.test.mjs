@@ -52,3 +52,7 @@ test('private-origin mode denies the outer native sprite studio before any rende
  }
  assert.equal(privateMeleeRequestAllowed({url:'/melee',method:'GET',headers:{},socket:{}},privateOrigin),true);
 });
+
+test('private-origin mode denies outer trailer upload/rendering before body handling',()=>{
+ for(const host of ['approved-device.example.ts.net:8450','localhost:4196','127.0.0.1:4196'])assert.equal(privateMeleeRequestAllowed({headers:{host},socket:{remoteAddress:'127.0.0.1'},method:'POST',url:'/api/dev/trailer-capture'},privateOrigin),false);
+});

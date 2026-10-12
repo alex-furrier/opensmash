@@ -9,8 +9,10 @@ Melee game loop. **Stop** ends the room; **Rematch** creates a fresh session wit
 the assigned lineup; **Return to roster** leaves the experience. Shared
 `/melee#room=<code>` links enter disc setup and joining directly.
 
-An explicitly configured local scripted browser opponent uses that same input
-path. Explicit private roster exports reuse the existing character validator
+When an explicitly configured local scripted browser opponent is available,
+**Use local opponent** in the draft selects that practice flow. **Create room**
+defaults to a shareable human match and remains available without that helper.
+The local opponent uses the same input path. Explicit private roster exports reuse the existing character validator
 and conversion pipeline; source assets remain outside Git. The ordinary solo
 launcher remains available. Browser-local disc storage and the main launcher's
 **Settings → Share with another device** peer handoff remain wired. The older

@@ -88,7 +88,7 @@ export function allowedPrivateMeleeRoute(method,path){
 export function privateMeleeRequestAllowed(req,privateOrigin){
  const path=new URL(req.url,'http://localhost').pathname;
  if(!privateOrigin)return true;
- if(path==='/api/og-sprite')return false;
+ if(path==='/api/og-sprite'||path==='/api/dev/trailer-capture')return false;
  if(!/^\/melee\/(?:api|engine)\//.test(path))return true;
  if(!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress)||!allowedPrivateMeleeRoute(req.method,path.slice('/melee'.length)))return false;
  try{const authority=new URL(`http://${req.headers.host}`);if(['127.0.0.1','localhost','[::1]'].includes(authority.hostname))return true;}catch{return false;}
