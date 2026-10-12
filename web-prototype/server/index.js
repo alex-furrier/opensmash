@@ -1,3 +1,4 @@
+import {privateMeleeRequestAllowed} from '../../engines/melee/server/handler.mjs';
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
@@ -832,6 +833,7 @@ async function handleRequest(req, res, vite) {
   res.setHeader('Cross-Origin-Opener-Policy','same-origin');
   res.setHeader('Cross-Origin-Embedder-Policy','require-corp');
 
+  if(!privateMeleeRequestAllowed(req,process.env.MELEE_PRIVATE_ORIGIN))return json(res,404,{error:'Not found'});
   if(pathname==='/melee/api/netplay/config'&&req.method==='GET')return json(res,200,{enabled:!!friendRuntime,...(simulatedPeer?{simulatedOpponent:true}:{})});
   if(friendRuntime?.handle(req,res))return;
 

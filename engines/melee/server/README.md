@@ -105,3 +105,9 @@ other origins and direct network listeners remain denied. Configure Serve for
 that port only; do not enable Funnel. Browser disc setup still requires the
 player's own local ISO/GCM, which stays in that browser. This does not add a
 ROM download endpoint or a phone hardware compatibility guarantee.
+
+Private-origin requests use the existing hosted gateway's asset/preparation route
+allowlist, plus netplay metadata and private portrait derivatives. Operator disc
+setup, raw game files, native-process APIs and engine system bundles remain
+unavailable through that proxy; loopback operator requests retain their existing
+behavior.
