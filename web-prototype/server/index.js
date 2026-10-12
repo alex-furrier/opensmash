@@ -1418,7 +1418,7 @@ const server = http.createServer((req, res) => {
   });
 });
 const friendRooms=friendRuntime&&attachFriendRooms(server,{engine:friendRuntime.engine,host:HOST});
-process.once('SIGINT',()=>{friendRooms?.close();void friendRuntime?.close().then(()=>process.exit());});
+if(friendRuntime)process.once('SIGINT',()=>{friendRooms?.close();void friendRuntime.close().then(()=>process.exit());});
 server.keepAliveTimeout = 65_000;
 server.headersTimeout = 66_000;
 
@@ -1429,5 +1429,5 @@ await authService.init();
 await fighterJobs.init();
 await bakedRoster().catch((error) => console.warn(`Baked roster unavailable at boot: ${error.message}`));
 server.listen(PORT, HOST, () => {
-  console.log(`OpenSmash web: http://${HOST}:${PORT}`);
+  console.log(`OpenSmash web: http://${HOST}:${server.address().port}`);
 });
