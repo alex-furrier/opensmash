@@ -1432,7 +1432,7 @@ if(process.env.MELEE_SIMULATED_PEER_ISO){
  simulatedPeer=createSimulatedPeer({chromium:createRequire(import.meta.url)(process.env.MELEE_PLAYWRIGHT_MODULE).chromium,origin:`http://${HOST.includes(':')?'['+HOST+']':HOST}:${PORT}`,iso:process.env.MELEE_SIMULATED_PEER_ISO,onObservation:event=>{if(event.type==='phase')console.info('[local opponent]',event.phase);}});
 }
 const friendRooms=friendRuntime&&attachFriendRooms(server,{engine:friendRuntime.engine,host:HOST,simulatedPeer,privateOrigin:process.env.MELEE_PRIVATE_ORIGIN});
-if(friendRuntime)process.once('SIGINT',()=>{friendRooms?.close();void Promise.all([friendRuntime.close(),simulatedPeer?.close()]).then(()=>process.exit());});
+if(friendRuntime)process.once('SIGINT',()=>{friendRooms?.close();void Promise.all([simulatedPeer?.close()]).then(()=>process.exit());});
 server.keepAliveTimeout = 65_000;
 server.headersTimeout = 66_000;
 

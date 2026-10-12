@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 import {createServer} from 'node:http';
 import {createReadStream} from 'node:fs';
-import {readFile,stat} from 'node:fs/promises';
+import {stat} from 'node:fs/promises';
 import {resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {WebSocketServer} from 'ws';
@@ -9,33 +9,22 @@ import {createTestBot} from './test-bot.mjs';
 import {createDevDisc} from './dev-disc.mjs';
 import {createRooms} from './rooms.mjs';
 import {createPrivateHandoff,pairingBody} from './handoff-api.mjs';
-import {launch,seed,disc,sha256,installedIdentity} from '../../runtime/web/netplay/identity.mjs';
+import {launch} from '../../runtime/web/netplay/identity.mjs';
+import {createRuntimeAssets,runtimeAssetHeaders} from '../../server/runtime-assets.mjs';
 const here=dirname(fileURLToPath(import.meta.url)),web=resolve(here,'../../runtime/web');
 /** Loopback listener, optionally behind one approved HTTPS proxy. Never serves a disc. */
 export async function startRelay({engineRoot,port=0,httpsOrigin,devDisc,testBot}={}) {
  if(httpsOrigin){const url=new URL(httpsOrigin);if(url.protocol!=='https:'||url.origin!==httpsOrigin||url.username||url.password)throw Error('Pass one exact HTTPS origin without path or credentials.');}
- const source=engineRoot&&resolve(engineRoot,'platforms/browser'),binary=engineRoot&&resolve(engineRoot,'build/browser/runtime/platforms/browser');
+ const runtimeAssets=await createRuntimeAssets(engineRoot);
+ const {manifest,unavailable}=runtimeAssets;
  const files=new Map([['/',resolve(web,'netplay/lobby.html')],['/lobby-client.mjs',resolve(web,'netplay/lobby-client.mjs')],['/lobby.css',resolve(web,'netplay/lobby.css')]]);
- for(const name of ['verify-disc.mjs','disc.mjs','disc-chunks.mjs','local-files.mjs','audio-worklet.js'])files.set('/engine/'+name,resolve(web,name));
- for(const name of ['confirmed-input.mjs','browser-bridge.mjs','identity.mjs','debug-opponent.mjs','lobby-input.mjs','match-identity.mjs'])files.set('/engine/netplay/'+name,resolve(web,'netplay',name));
- files.set('/engine/touch-pad.mjs',resolve(here,'../../web/lib/touch-pad.mjs'));
  files.set('/touch-controls.css',resolve(here,'../../web/app/MeleeTouchControls.css'));
- if(source)for(const name of ['runtime.mjs','runtime.html','gpu-preflight.mjs','disc-cache.mjs','save-migration.mjs','initial_pipeline_cache.db'])files.set('/engine/upstream/'+name,resolve(source,name));
- if(binary)for(const name of ['melee_browser.js','melee_browser.wasm','melee_browser.worker.js'])files.set('/engine/upstream/'+name,resolve(binary,name));
  for(const [url,path] of [['/transfer/disc-transfer.mjs',resolve(web,'netplay/disc-transfer.mjs')],['/transfer/disc-cache.mjs',resolve(here,'../../web/lib/disc-cache.mjs')],['/transfer/rom-handoff-client.js',resolve(here,'../../../../web-prototype/src/rom-handoff-client.js')],['/shared/handoff-transfer.js',resolve(here,'../../../../web-prototype/shared/handoff-transfer.js')],['/shared/rom-handoff.js',resolve(here,'../../../../web-prototype/shared/rom-handoff.js')]])files.set(url,path);
- const required=[...files.keys()].filter(url=>url.startsWith('/engine/')&&!url.endsWith('melee_browser.worker.js'));
- let manifest,unavailable;
- try {
-  if(!engineRoot)throw Error('Pass --engine-root with a built candidate checkout.');
-  const pinned=[];for(const url of required)pinned.push({url,sha256:await sha256(await readFile(files.get(url)))});
-  const engine=await sha256(new TextEncoder().encode(JSON.stringify(pinned)));
-  manifest={files:pinned,launch,identity:await installedIdentity(engine,launch,{verifiedDisc:disc,installedSeed:seed,freshSaves:true})};
- }catch(error){unavailable=error.message;}
  const dev=devDisc&&await createDevDisc({...devDisc,httpsOrigin});
  const handoff=createPrivateHandoff();
  if(testBot&&(!dev||!manifest)){await dev?.close();throw Error('Test opponent requires the configured private dev disc/runtime.');}
  let bot;const rooms=manifest&&createRooms({identity:manifest.identity,launch,permitTestBot:socket=>!!bot&&socket.privateOwner===true,startTestBot:request=>bot.start(request),stopTestBot:session=>bot?.stop(session),permitTestBotJoin:socket=>socket.localHelper===true});
- const headers={'Cross-Origin-Opener-Policy':'same-origin','Cross-Origin-Embedder-Policy':'require-corp','Cross-Origin-Resource-Policy':'same-origin','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};
+ const headers=runtimeAssetHeaders;
  let origin;const allowed=new Map();
  const server=createServer(async(req,res)=>{
   const reply=(code,type,body)=>{res.writeHead(code,{...headers,'Content-Type':type});res.end(body);};
@@ -49,6 +38,7 @@ export async function startRelay({engineRoot,port=0,httpsOrigin,devDisc,testBot}
   }
   if(req.method!=='GET')return reply(405,'text/plain','GET only.');
   if(url.pathname==='/manifest')return reply(manifest?200:503,'application/json',JSON.stringify(manifest||{error:unavailable}));
+  if(await runtimeAssets.handle(req,res,url.pathname))return;
   const path=files.get(url.pathname);if(!path)return reply(404,'text/plain','Not found.');
   try{const info=await stat(path);const ext=path.split('.').at(-1),type={html:'text/html',mjs:'text/javascript',js:'text/javascript',css:'text/css',wasm:'application/wasm'}[ext]||'application/octet-stream';res.writeHead(200,{...headers,'Content-Type':type,'Content-Length':info.size});createReadStream(path).on('error',()=>res.destroy()).pipe(res);}catch{reply(404,'text/plain','Runtime file unavailable.');}
  });

@@ -484,3 +484,16 @@ uses the host's frozen launch proposal, without preparing an unrelated roster
 selection. Each browser samples its own configured human controller independently
 of the two shared game slots; choose a keyboard or gamepad before joining. Neither
 CPU nor Off is a local input source.
+
+
+## Runtime asset ownership
+
+The normal launcher and standalone relay share the content-hashed runtime
+manifest and engine-file responses in
+[`runtime-assets.mjs`](../../engines/melee/server/runtime-assets.mjs). The
+launcher serves those files directly on its existing listener; it does not start
+a second room/handoff server or proxy an internal HTTP hop. The standalone
+relay retains its own lobby, room and handoff lifetime. Fixture characterization
+verified all 23 launcher asset hashes, manifest identity, response headers/statuses
+and cleanup before this extraction. The main website owns its room sockets and
+shutdown; the asset module has no separate lifetime to close.
