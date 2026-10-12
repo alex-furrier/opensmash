@@ -1,3 +1,5 @@
+import {createLauncherRuntime} from '../../engines/melee/server/launcher-runtime.mjs';
+import {attachFriendRooms} from '../../engines/melee/server/friend-rooms.mjs';
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
@@ -35,6 +37,7 @@ import { ROMS_BY_SHA1, UNSUPPORTED_ROMS_BY_SHA1 } from "../shared/rom-catalog.js
 import { ACTIVE_JOB_STATUSES } from "./job-protocol.js";
 
 const handleMelee = createEmbeddedMeleeHandler();
+const friendRuntime=process.env.MELEE_NETPLAY_ENGINE_ROOT?await createLauncherRuntime(process.env.MELEE_NETPLAY_ENGINE_ROOT):null;
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const {
   pipelineProjectRoot: PIPELINE_PROJECT_ROOT,
@@ -826,6 +829,8 @@ async function handleRequest(req, res, vite) {
   res.setHeader('Cross-Origin-Opener-Policy','same-origin');
   res.setHeader('Cross-Origin-Embedder-Policy','require-corp');
 
+  if(friendRuntime?.handle(req,res))return;
+
   // Firebase's hosted sign-in helper, served from our origin (see auth.js).
   // It carries no cookies either way and is never edge-cached.
   if (isAuthHandlerPath(pathname)) {
@@ -1409,6 +1414,8 @@ const server = http.createServer((req, res) => {
     else res.destroy();
   });
 });
+const friendRooms=friendRuntime&&attachFriendRooms(server,{engine:friendRuntime.engine,host:HOST});
+process.once('SIGINT',()=>{friendRooms?.close();void friendRuntime?.close().then(()=>process.exit());});
 server.keepAliveTimeout = 65_000;
 server.headersTimeout = 66_000;
 

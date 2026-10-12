@@ -23,7 +23,7 @@ export async function verifyRuntime(manifest, read = async url => {
  if(!manifest || !Array.isArray(manifest.files) || !manifest.files.length || manifest.files.length>32)
   throw Error('Build the confirmed-input Melee runtime first.');
  for(const file of manifest.files){
-  if(!file || !/^\/engine\/[a-zA-Z0-9_./-]+$/.test(file.url) || file.url.includes('..') || !/^[a-f0-9]{64}$/.test(file.sha256) ||
+  if(!file || !/^\/(?:melee\/)?engine\/[a-zA-Z0-9_./-]+$/.test(file.url) || file.url.includes('..') || !/^[a-f0-9]{64}$/.test(file.sha256) ||
    await sha256(await read(file.url))!==file.sha256)throw Error('Runtime verification failed. Restart the relay after building.');
  }
  const engine=await sha256(new TextEncoder().encode(JSON.stringify(manifest.files)));

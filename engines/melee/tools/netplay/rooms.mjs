@@ -3,7 +3,7 @@ import {randomBytes, randomUUID} from 'node:crypto';
 
 /** One ephemeral registry per relay server. Every room owns exactly two sockets.
  * No game inputs are synthesized here and no game/asset state is persisted. */
-export function createRooms({identity, launch, maxRooms = 32, now = Date.now, ttlMs = 15 * 60 * 1000,permitTestBot=()=>false,startTestBot,stopTestBot,permitTestBotJoin=()=>false}) {
+export function createRooms({identity, launch, maxRooms = 32, now = Date.now, ttlMs = 15 * 60 * 1000,permitTestBot=()=>false,startTestBot,stopTestBot,permitTestBotJoin=()=>false,resolveMatch,validateReady}) {
   identity = Object.freeze({...identity});
   launch = Object.freeze({...launch, packedPorts: Object.freeze([...(launch.packedPorts || [])])});
   const rooms = new Map(), memberships = new Map();
@@ -19,7 +19,7 @@ export function createRooms({identity, launch, maxRooms = 32, now = Date.now, tt
   }
   function sweep() { for (const room of rooms.values()) if (now() >= room.expires) finish(room, 'Room expired. Create a fresh room.'); }
   function welcome(room, member) {
-    send(member.socket, {type:'joined', room:room.code, session:room.session, player:member.player, identity, launch,testBot:room.testBot});
+    send(member.socket, {type:'joined', room:room.code, session:room.session, player:member.player, identity:room.identity, launch:room.launch,testBot:room.testBot,match:room.match});
     status(room);
   }
   function status(room) {
@@ -36,7 +36,8 @@ export function createRooms({identity, launch, maxRooms = 32, now = Date.now, tt
         if (message.type === 'create') {
           if(message.testBot&&(!permitTestBot(socket)||!startTestBot||!['reference','delay','jitter','hold'].includes(message.scenario||'reference')))throw Error('Test opponent is unavailable for this request.');
           if (member || rooms.size >= maxRooms) throw Error('Cannot create another room.');
-          room = {code:randomBytes(16).toString('hex'),session:randomUUID(),members:[null,null],started:false,expires:now()+ttlMs,testBot:!!message.testBot};
+          const match=resolveMatch?resolveMatch(message.match):{identity,launch};
+          room = {identity:match.identity,launch:match.launch,match:match.proposal,code:randomBytes(16).toString('hex'),session:randomUUID(),members:[null,null],started:false,expires:now()+ttlMs,testBot:!!message.testBot};
           member = {socket,player:0,ready:false,room};room.members[0]=member;
           rooms.set(room.code,room);memberships.set(socket,member);welcome(room,member);if(room.testBot)Promise.resolve().then(()=>{if(rooms.has(room.code))return startTestBot({room:room.code,session:room.session,scenario:message.scenario||'reference'});}).catch(error=>finish(room,'Test opponent: '+error.message));return;
         }
@@ -51,8 +52,9 @@ export function createRooms({identity, launch, maxRooms = 32, now = Date.now, tt
         if (!member || !rooms.has(room.code)) throw Error('Join a room first.');
         if (message.type === 'stop') { finish(room,'Match stopped. Create a fresh room.');return; }
         if (message.type === 'ready') {
+          if(validateReady){validateReady(message.identity,room);if(!room.identity)room.identity=Object.freeze({...message.identity});}
           if (room.started || member.ready || !message.identity ||
-              Object.keys(identity).some(key=>message.identity[key]!==identity[key])) throw Error('Local game or settings are incompatible.');
+              Object.keys(room.identity).some(key=>message.identity[key]!==room.identity[key])) throw Error('Local game or settings are incompatible.');
           member.ready=true;status(room);
           if (room.members.every(m=>m?.ready)) {
             room.started=true;

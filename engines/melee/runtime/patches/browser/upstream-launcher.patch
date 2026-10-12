@@ -1,0 +1,21 @@
+--- a/platforms/browser/runtime.mjs
++++ b/platforms/browser/runtime.mjs
+@@ -149,7 +149,8 @@
+  const c=data.launch;
+  if(data.netplay){
+   const {installedIdentity}=await import(base+'netplay/identity.mjs');
+-  const actual=await installedIdentity(verifiedEngine,c,{verifiedDisc:verifiedDiscHash,installedSeed:Module.ENV.MELEE_SEED,freshSaves:options.freshNetplay,costumes:data.costumes||[],cssAssets:data.cssAssets||[]});
++  const {installedMatchIdentity}=await import(base+'netplay/match-identity.mjs');
++  const actual=await (data.netplay.friendMatch?installedMatchIdentity:installedIdentity)(verifiedEngine,c,{verifiedDisc:verifiedDiscHash,installedSeed:Module.ENV.MELEE_SEED,freshSaves:options.freshNetplay,costumes:data.costumes||[],cssAssets:data.cssAssets||[]});
+   if(!Object.keys(actual).every(key=>data.netplay.identity?.[key]===actual[key]))throw Error('Match identity does not describe this installed game.');
+  }
+  if(!c||!Module._direct_configure(c.mode,c.stage,c.level,c.stocks,c.minutes,...c.packedPorts))throw Error('Invalid match configuration.');
+@@ -192,7 +193,7 @@
+   const {ISO_SHA256}=await import(base+'disc.mjs');verifiedDiscHash=ISO_SHA256;
+   report('disc-verified');await runtimeReady;
+   if(data.freshNetplay){
+-   const response=await fetch('/manifest');if(!response.ok)throw Error('Confirmed-input runtime manifest unavailable.');
++   const response=await fetch(prefix?prefix+'/api/netplay/manifest':'/manifest');if(!response.ok)throw Error('Confirmed-input runtime manifest unavailable.');
+    const {verifyRuntime}=await import(base+'netplay/identity.mjs');
+    verifiedEngine=await verifyRuntime(await response.json());
+    if(Module._opensmash_confirmed_input_version?.()!==1)throw Error('Runtime lacks confirmed input.');
