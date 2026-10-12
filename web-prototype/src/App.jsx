@@ -444,6 +444,20 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
   const [engine, setEngine] = useState(null);
+  useEffect(() => {
+    if (!isMelee) return;
+    const joinFromLink = () => {
+      const match = /^#room=([a-f0-9]{32})$/.exec(window.location.hash);
+      if (!match) return;
+      setPendingAction(null);
+      setEngine(current => current?.action?.roomCode === match[1] ? current : {
+        experience: 'melee', id: crypto.randomUUID(), action: {type: 'friend-room', roomCode: match[1]},
+      });
+    };
+    joinFromLink();
+    window.addEventListener('hashchange', joinFromLink);
+    return () => window.removeEventListener('hashchange', joinFromLink);
+  }, [isMelee]);
   const [pageErrorToast, setPageErrorToast] = useState(null);
   const [fighterSearch, setFighterSearch] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);

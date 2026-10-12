@@ -1,3 +1,4 @@
+export const localFriendDevice=ports=>ports?.find(p=>p.device==='keyboard'||/^gamepad[0-3]$/.test(p.device))?.device;
 // SPDX-License-Identifier: MIT
 /** One room connection for one Game instance. The engine owns tick/input synchronization. */
 export function connectFriendRoom(request,onChange,{WebSocketImpl=WebSocket,origin=location.origin}={}){

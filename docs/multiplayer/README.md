@@ -406,3 +406,30 @@ routes. All 65 focused checks and the intended TypeScript check pass. Run
 `MELEE_ISO`, `PLAYWRIGHT_MODULE`, outside-repository `TEST_OUTPUT`, and optional
 approved `PROOF_ORIGIN`. No assets enter the repository or proof metadata.
 Actual iPhone transfer and gameplay remain unverified.
+
+
+## Local upstream launcher preparation
+
+The normal website keeps friend rooms disabled unless `MELEE_NETPLAY_ENGINE_ROOT`
+is supplied. Its ordinary startup does not load the optional relay dependencies.
+For a configured local host, first run `npm ci --ignore-scripts` in
+`engines/melee/tools/netplay`; the website image installs this pinned package.
+Prepare a separate engine checkout at the exact pinned revision with:
+
+```sh
+python3 engines/melee/tools/prepare_confirmed_input.py /path/to/isolated/melee-pc --apply --launcher
+```
+
+This composes the confirmed-input patch and normal-launcher patch, verifies their
+ancestry and every changed file, and rejects unrelated edits. Repeating the
+command verifies an existing composed checkout. Build using the pinned toolchain.
+The local website takes its private asset/conversion service from
+`MELEE_LOCAL_ORIGIN=http://127.0.0.1:<service-port>` and its verified runtime from
+`MELEE_NETPLAY_ENGINE_ROOT=/path/to/isolated/melee-pc`. Bind `HOST=127.0.0.1`;
+this slice supports loopback room connections only.
+
+A shared `/melee#room=<code>` link opens disc setup and joining directly. The guest
+uses the host's frozen launch proposal, without preparing an unrelated roster
+selection. Each browser samples its own configured human controller independently
+of the two shared game slots; choose a keyboard or gamepad before joining. Neither
+CPU nor Off is a local input source.

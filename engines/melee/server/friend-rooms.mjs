@@ -1,17 +1,20 @@
 // SPDX-License-Identifier: MIT
+import schema from '../runtime/launch-options.json' with {type:'json'};
 import {createRequire} from 'node:module';
 const {WebSocketServer}=createRequire(new URL('../tools/netplay/package.json',import.meta.url))('ws');
 import {createHash} from 'node:crypto';
 import {createRooms} from '../tools/netplay/rooms.mjs';
 import {resolvedRules} from '../runtime/web/netplay/match-identity.mjs';
 import {disc,seed} from '../runtime/web/netplay/identity.mjs';
+const companionKinds=new Map(Object.values(schema.companions).map(row=>[row.slug,row.fighter]));
 const digest=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export function validateFriendProposal(value){
  if(!value||!Array.isArray(value.costumes)||value.costumes.length>4||!Array.isArray(value.ports)||value.ports.length!==4)throw Error('Invalid friend match proposal.');
  const rules=resolvedRules(value);
  const costumes=value.costumes.map(c=>{
   if(!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(c.character)||!/^[a-z][a-z-]{0,31}$/.test(c.target)||!Number.isInteger(c.fighter)||c.fighter<0||c.fighter>26||!Number.isInteger(c.color)||c.color<0||c.color>5||!/^Pl[A-Za-z0-9]+\.dat$/.test(c.filename))throw Error('Invalid proposed costume.');
-  return {character:c.character,target:c.target,fighter:c.fighter,color:c.color,filename:c.filename};
+  if(c.companion!==undefined&&(c.companion!==true||companionKinds.get(c.target)!==c.fighter))throw Error('Invalid companion costume.');
+  return {character:c.character,target:c.target,fighter:c.fighter,color:c.color,filename:c.filename,...(c.companion?{companion:true}:{})};
  });
  const ports=value.ports.map((p,i)=>({device:i<2?'keyboard':'off',character:String(p.character).slice(0,64),target:p.target,fighter:rules.packedPorts[i]&255,color:(rules.packedPorts[i]>>>16)&255,custom:!!p.custom}));
  return {...rules,ports,costumes};

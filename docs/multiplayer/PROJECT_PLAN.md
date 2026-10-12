@@ -109,3 +109,22 @@ Review execution update: personal subscription context is explicitly user-approv
 Core entry refinement: Experience offers a visible Play solo /Play with a friend choice before mounting the full-screen Game, rather than putting the friend button underneath that screen. Trailer capture retains its automatic solo path. Exact Experience/Game/FriendMatch stock-component smoke passed300matching ticks, ordinary pointer mode selection/Ready, keyboard blur/refocus, browser gamepad fixture and Stop. Whole RetroHome/custom-character onboarding remains unproven.
 
 Optional runtime capability is now reported by the local website. Friend mode is offered only when configured; otherwise normal solo/trailer behavior is retained. Exact Experience smoke passed with configured capability; disposable unconfigured server reports enabled=false. Vite auxiliary listener binds HOST rather than wildcard in development. The temporary wildcard proof listener was closed; existing private Serve/relay unchanged. Formal core review now uses the approved personal profile, exact committed integration range and private completion marker; no formal result claimed before completion.
+
+
+Core review disposition (2026-10-12): the full independent review completed against
+030b1a5 and found six distinct defects. Source fixes conditionally load optional
+netplay modules, include identity build inputs and configured relay dependencies,
+retain schema-validated companion metadata, select the configured local human
+controller, compose the launcher patch through the preparation helper, and route
+shared links directly into joining. Focused regressions and a Docker build-input
+simulation passed; a complete container image has not been built. A fresh review
+must bind the subsequent clean candidate before claiming acceptance.
+
+Existing-character source discovery is resolved: upstream documents its public
+`desktop-characters-v1` release in `engines/melee/docs/DESKTOP_RELEASE.md`.
+The downloaded archive matched its published SHA-256. Only Donald Trump and Barack
+Obama source folders were extracted into ignored local assets, and their existing
+baked website assets matched the pinned manifest. Both sources converted through
+upstream `bake_native_sources.py`. No generation, paid action, private export
+workaround, or character/ROM publication occurred. Earlier missing-source notes
+above describe historical checkpoints, not the current blocker.

@@ -39,7 +39,7 @@ export default function Game({fighter,settings,roster,onClose,soundOn=true,chrom
     const blocked=gameInputBlocked()||(holdForTrailer&&!trailerVisible.current);
     for(let port=0;port<4;port++){
     if(room&&port!==0)continue;
-    const device=room?settings.ports[0].device:launchPlan?.ports[port]?.device;
+    const device=room?room.localDevice:launchPlan?.ports[port]?.device;
     if(device==='off'||device==='cpu') {worker.postMessage({type:'pad',values:[port,0,0x80808080,0,0]});continue;}
     // A port assigned to a gamepad the browser does not currently expose
     // (Chrome hides pads until a button press) would otherwise be dead. Let

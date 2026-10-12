@@ -1,5 +1,3 @@
-import {createLauncherRuntime} from '../../engines/melee/server/launcher-runtime.mjs';
-import {attachFriendRooms} from '../../engines/melee/server/friend-rooms.mjs';
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
@@ -37,7 +35,11 @@ import { ROMS_BY_SHA1, UNSUPPORTED_ROMS_BY_SHA1 } from "../shared/rom-catalog.js
 import { ACTIVE_JOB_STATUSES } from "./job-protocol.js";
 
 const handleMelee = createEmbeddedMeleeHandler();
-const friendRuntime=process.env.MELEE_NETPLAY_ENGINE_ROOT?await createLauncherRuntime(process.env.MELEE_NETPLAY_ENGINE_ROOT):null;
+let friendRuntime=null,attachFriendRooms;
+if(process.env.MELEE_NETPLAY_ENGINE_ROOT){
+  const [runtime,rooms]=await Promise.all([import('../../engines/melee/server/launcher-runtime.mjs'),import('../../engines/melee/server/friend-rooms.mjs')]);
+  friendRuntime=await runtime.createLauncherRuntime(process.env.MELEE_NETPLAY_ENGINE_ROOT);attachFriendRooms=rooms.attachFriendRooms;
+}
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const {
   pipelineProjectRoot: PIPELINE_PROJECT_ROOT,

@@ -13,18 +13,19 @@ import type {Fighter} from '../web/lib/fighter';
 import './launcher.css';
 export const roster=catalog as Fighter[];
 export default function MeleeExperience({action,onClose,soundOn=true,trailerReveal=false,onTrailerReady,onTrailerStatus}:{action:any;onClose:()=>void;soundOn?:boolean;trailerReveal?:boolean;onTrailerReady?:()=>void;onTrailerStatus?:(status:string)=>void}){
+ const joiningFriend=action.type==='friend-room';
  const [friendAvailable,setFriendAvailable]=useState<boolean|undefined>();
  useEffect(()=>{const abort=new AbortController();fetch('/melee/api/netplay/config',{signal:abort.signal}).then(r=>r.ok?r.json():null).then(value=>{if(!abort.signal.aborted)setFriendAvailable(value?.enabled===true);}).catch(()=>{if(!abort.signal.aborted)setFriendAvailable(false);});return()=>abort.abort();},[]);
  const [launchMode,setLaunchMode]=useState<'solo'|'friend'|undefined>(()=>action.meleeTrailer?'solo':location.hash.startsWith('#room=')?'friend':undefined);
  const [ready,setReady]=useState(false),[status,setStatus]=useState('Choose your unmodified Melee USA 1.02 ISO or GCM.'),[error,setError]=useState('');
  const [setupError,setSetupError]=useState(''),[preparationStatus,setPreparationStatus]=useState('Preparing fighters…');
  const [resolved,setResolved]=useState<{action:any;roster:Fighter[]}|null>(null);
- const [settings,setSettings]=useState(()=>applyLauncherSelection(loadSettings(),action));
+ const [settings,setSettings]=useState(()=>joiningFriend?loadSettings():applyLauncherSelection(loadSettings(),action));
  useEffect(()=>{if(!ready||!resolved)onTrailerStatus?.(error||setupError||(!ready?status:preparationStatus));},[ready,resolved,error,setupError,status,preparationStatus,onTrailerStatus]);
  const fighters=resolved?.roster||roster;
  const fighter=resolved?.action.character?fighters.find(f=>f.slug===resolved.action.character.slug):fighters[0];
  useEffect(()=>{
-  if(!ready)return;
+  if(!ready||joiningFriend)return;
   const abort=new AbortController();
   setResolved(null);setError('');
   const saved=loadSettings();
@@ -32,7 +33,7 @@ export default function MeleeExperience({action,onClose,soundOn=true,trailerReve
    if(!abort.signal.aborted){setSettings(applyLauncherSelection(saved,result.action));setResolved(result);}
   }).catch(e=>{if(!abort.signal.aborted)setError(e.message);});
   return()=>abort.abort();
- },[ready,action]);
+ },[ready,action,joiningFriend]);
  useEffect(()=>{
   if(desktop()){
    return pollService<{ready:boolean;message:string}>('/melee/api/setup',s=>{
@@ -51,6 +52,11 @@ export default function MeleeExperience({action,onClose,soundOn=true,trailerReve
     if(result.accepted)setStatus('Preparing disc…');
    }else if(file)await selectLocalDisc(file);
   }catch(e){setError((e as Error).message);}
+ }
+ if(!desktop()&&joiningFriend&&ready){
+  if(friendAvailable===undefined)return <section className="melee-setup"><p>Checking friend rooms…</p></section>;
+  if(!friendAvailable)return <section className="melee-setup"><p>Friend rooms are not configured on this host.</p><button onClick={onClose}>Return to roster</button></section>;
+  return <FriendMatch fighter={roster[0]} settings={settings} roster={roster} onClose={onClose} soundOn={soundOn}/>;
  }
  if(ready&&!resolved)return <section className="melee-setup"><h2>Preparing fighters</h2><p role={error?'alert':'status'}>{error||preparationStatus}</p></section>;
  if(!fighter)return <section className="melee-setup" role="alert"><p>This character has not been prepared for Melee yet.</p><button onClick={onClose}>Return to roster</button></section>;

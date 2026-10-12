@@ -46,3 +46,17 @@ test('unverified runtime and invalid human-port layout cannot ready/start a frie
  try{await assert.rejects(bad.assignment,/two human/);await owner.assignment;const good=await installedMatchIdentity(engine,launch,options);await assert.rejects(owner.ready({...good,engine:'c'.repeat(64)}),/identity mismatch/);}
  finally{bad.stop();owner.stop();rooms.close();await new Promise(r=>server.close(r));}
 });
+
+test('local friend input selects the configured human device independently of game slot zero',async()=>{
+ const {localFriendDevice}=await import('../web/lib/friend-room.mjs');
+ assert.equal(localFriendDevice([{device:'cpu'},{device:'keyboard'},{device:'off'}]),'keyboard');
+ assert.equal(localFriendDevice([{device:'off'},{device:'cpu'},{device:'gamepad2'}]),'gamepad2');
+ assert.equal(localFriendDevice([{device:'cpu'},{device:'off'}]),undefined);
+});
+test('friend proposal retains validated Ice Climbers and Zelda companion metadata',async()=>{
+ const {validateFriendProposal}=await import('../server/friend-rooms.mjs');
+ const companion={character:'existing',target:'nana',fighter:14,color:0,filename:'PlNnNr.dat',companion:true};
+ assert.equal(validateFriendProposal({...launch,costumes:[companion]}).costumes[0].companion,true);
+ assert.equal(validateFriendProposal({...launch,costumes:[{...companion,target:'sheik',fighter:19,filename:'PlSkNr.dat'}]}).costumes[0].companion,true);
+ assert.throws(()=>validateFriendProposal({...launch,costumes:[{...companion,target:'fox',fighter:2}]}),/companion/);
+});
