@@ -711,7 +711,7 @@ export default function App() {
   useEffect(()=>{
     if(!isMelee){setLocalMeleeRoster([]);return;}
     const abort=new AbortController();
-    fetch('/melee/api/imports',{signal:abort.signal,cache:'no-store'}).then(r=>r.ok?r.json():[]).then(rows=>{
+    fetch('/melee/api/imports?roster=active',{signal:abort.signal,cache:'no-store'}).then(r=>r.ok?r.json():[]).then(rows=>{
       if(!abort.signal.aborted&&Array.isArray(rows))setLocalMeleeRoster(rows.map(row=>({...row,visibility:'private',portrait:row.portrait&&'/melee'+row.portrait,portraitTile:row.portraitTile&&'/melee'+row.portraitTile,portraitMedium:row.portraitMedium&&'/melee'+row.portraitMedium})));
     }).catch(()=>{});
     return()=>abort.abort();
@@ -722,7 +722,7 @@ export default function App() {
   // (engine boot, pin, Esc) repaint 1000 caption bitmaps in one task.
   const gridCharacters = useMemo(() => (demoMode
     ? (isMelee ? meleeDemoGridOrder : demoGridOrder)(characters.filter((character) => character.visibility !== "private" && !character.mine))
-    : [...localMeleeRoster,...characters.filter(character=>!localMeleeRoster.some(local=>local.slug===character.slug))]), [characters, demoMode, isMelee,localMeleeRoster]);
+    : (isMelee?[...localMeleeRoster,...characters.filter(character=>!localMeleeRoster.some(local=>local.slug===character.slug))]:characters)), [characters, demoMode, isMelee,localMeleeRoster]);
   const gridJobs = demoMode ? [] : fighterJobs;
 
   useEffect(() => {

@@ -36,3 +36,22 @@ test('shutdown during pending launch closes the owned browser after launch resol
  const start=peer.start({room:'a'.repeat(32),session:'pending'});const stopped=assert.rejects(start,/stopped/);const close=peer.close();
  release({close:async()=>{closes++;}});await stopped;await close;assert.equal(closes,1);
 });
+
+test('owned controller pulses down toward a lower opponent, releases between pulses, and returns neutral outside combat',async()=>{
+ const {installSimulatedController}=await import('../server/simulated-peer.mjs');
+ const names=['window','navigator','localStorage','sessionStorage'],saved=new Map(names.map(n=>[n,Object.getOwnPropertyDescriptor(globalThis,n)]));let receive;
+ try{
+  const store={setItem(){}};
+  Object.defineProperty(globalThis,'window',{configurable:true,value:{WebSocket:class{},addEventListener(type,callback){if(type==='message')receive=callback;}}});
+  Object.defineProperty(globalThis,'navigator',{configurable:true,value:{}});
+  Object.defineProperty(globalThis,'localStorage',{configurable:true,value:store});Object.defineProperty(globalThis,'sessionStorage',{configurable:true,value:store});
+  installSimulatedController();
+  const state=new Float32Array(48);state[3]=30;state[4]=0;state[15]=0;state[16]=50;
+  const deliver=(scene,tick=5)=>receive({data:{type:'confirmed-tick',tick,selectedState:[0,scene,...new Uint32Array(state.buffer)]}});
+  deliver(2,8);let pad=navigator.getGamepads()[0];assert.equal(pad.axes[0],.45);assert.equal(pad.axes[1],1);assert.ok(pad.buttons.every(b=>!b.pressed));
+  deliver(2,10);assert.equal(navigator.getGamepads()[0].axes[1],0);
+  state[16]=0;deliver(2,8);assert.equal(navigator.getGamepads()[0].axes[0],.45);
+  state[16]=50;deliver(2,30);assert.equal(navigator.getGamepads()[0].axes[1],0);
+  deliver(5);pad=navigator.getGamepads()[0];assert.deepEqual(pad.axes,[0,0,0,0]);assert.ok(pad.buttons.every(b=>!b.pressed));
+ }finally{for(const name of names){const descriptor=saved.get(name);if(descriptor)Object.defineProperty(globalThis,name,descriptor);else delete globalThis[name];}}
+});

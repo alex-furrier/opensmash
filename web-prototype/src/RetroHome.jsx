@@ -505,7 +505,7 @@ export default function RetroHome({
             <canvas id="hero-logo-canvas" className="hero-logo-canvas" aria-hidden="true" />
           </div>
           <nav
-            className={`retro-site-nav ${keepSingleTouchActionVisible ? "has-single-collapsible-action" : ""}`}
+            className={`retro-site-nav ${onCreateRoom?"has-room-action":""} ${keepSingleTouchActionVisible ? "has-single-collapsible-action" : ""}`}
             aria-label="Site information and settings"
           >
             {gamepadCount > 0 && (
@@ -535,8 +535,8 @@ export default function RetroHome({
             >
               About
             </button>
-            {onCreateRoom&&<button className="retro-site-link" type="button" onClick={onCreateRoom}>{roomDraft?'Cancel room':'Create room'}</button>}
-            {roomDraft&&<span className="retro-room-selection" role="status">Choose your fighter, then an opponent</span>}
+            {onCreateRoom&&<button className="retro-site-link retro-room-button" type="button" onClick={onCreateRoom}>{roomDraft?'Cancel room':'Create room'}</button>}
+
             {!mobileLayout && (
               <button
                 id="controls-menu-button"
@@ -552,6 +552,10 @@ export default function RetroHome({
             <details className="retro-site-more" ref={moreMenuRef}>
               <summary className="retro-site-link">More</summary>
               <div className="retro-site-more-menu" role="menu">
+                {mobileLayout&&onCreateRoom&&<>
+                  <a className="retro-site-link" role="menuitem" href="https://github.com/turtlesoupy/opensmash" target="_blank" rel="noreferrer">Github</a>
+                  <a className="retro-site-link" role="menuitem" href="https://discord.gg/qYBbGmwBhr" target="_blank" rel="noreferrer">Discord</a>
+                </>}
                 {!mobileLayout && (
                   <button className="retro-site-link" type="button" role="menuitem" onClick={openControlsFromMore}>Controls</button>
                 )}
@@ -601,6 +605,7 @@ export default function RetroHome({
             </div>
           </nav>
         </header>
+        {roomDraft&&<p className="retro-room-selection" role="status">Choose your fighter, then an opponent</p>}
         <section className="intro-video-stage" aria-label="Intro video">
           <div
             ref={gameSurfaceRef}

@@ -107,3 +107,9 @@ entries are omitted; successful source import alone does not prove gameplay.
 An empty, otherwise valid 16-bit PCM announcer WAV is treated as an unvoiced
 character. The character-select builder encodes one silent DSP block without
 modifying the retained source or creating a voice.
+
+With a configured private roster, `/api/imports?roster=active` returns the
+currently validated manifest entries, so updated art or voice packages replace
+earlier versions in the main lobby. The ordinary imports endpoint and catalog
+retain older content identities for existing frozen match proposals; refreshing
+the manifest does not delete those retained sources.

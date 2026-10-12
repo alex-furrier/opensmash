@@ -106,6 +106,7 @@ class ImportManager:
         self.workspace=Path(workspace);self.root=self.workspace/'build/character-imports';self.root.mkdir(parents=True,exist_ok=True)
         self.index=self.root/'roster.json';self.jobs={};self.pool=ThreadPoolExecutor(max_workers=1);self.state_lock=threading.Lock()
         self.rows=json.loads(self.index.read_text()) if self.index.exists() else []
+        self.private_rows=None
         self.catalog.update({r['slug']:r for r in self.rows})
     def start(self,url,target,source_only=False):
         url=source_url(url,self.origins)
@@ -122,6 +123,7 @@ class ImportManager:
             row=self.catalog.get(slug)
             if not isinstance(slug,str) or not row or not row.get('imported'):raise ValueError('Only characters you imported can be removed.')
             self.rows=[r for r in self.rows if r['slug']!=slug]
+            if self.private_rows is not None:self.private_rows=[r for r in self.private_rows if r['slug']!=slug]
             atomic_write(self.index,(json.dumps(self.rows,indent=2)+'\n').encode());del self.catalog[slug]
             ident='web-v1-'+hashlib.sha256(slug.encode()).hexdigest()[:16]
             for folder in [self.workspace/'build/characters'/ident,self.workspace/'assets/characters'/ident]:
@@ -153,13 +155,16 @@ class ImportManager:
         if len(rows)>64:raise ValueError('Private roster exceeds the character limit.')
         ready=[r for r in rows if r.get('status')=='validated_local_source']
         if len({r.get('slug') for r in ready})!=len(ready):raise ValueError('Duplicate private roster slug.')
+        active=[]
         for entry in ready:
             target=entry.get('target')
             if target not in TARGETS:raise ValueError('Unsupported private roster moveset.')
             job={'id':uuid.uuid4().hex}
             self.work(job,None,target,True,lambda destination:import_local_source(entry,path,destination))
             if job['state']!='complete':raise ValueError(f"Private roster import failed for {entry['slug']}: {job['message']}")
-        return list(self.rows)
+            active.append(job['fighter'])
+        self.private_rows=active
+        return list(active)
 
     def work(self,job,url,target,source_only=False,source_loader=None):
         def progress(message):job.update(state='working',message=message)

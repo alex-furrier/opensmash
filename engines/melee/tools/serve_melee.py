@@ -211,7 +211,8 @@ class Handler(BaseHTTPRequestHandler):
                 imported = ROOT / 'assets/characters' / ident / 'announcer.wav'
                 return self.file(imported if imported.is_file() else descendant(CHARACTERS, slug + '/announcer.wav'))
             if route == '/api/imports':
-                return self.json(list(IMPORTS.rows))
+                active=parse_qs(urlsplit(self.path).query).get('roster')==['active']
+                return self.json(list(IMPORTS.private_rows if active and IMPORTS.private_rows is not None else IMPORTS.rows))
             if NATIVE and route == '/catalog.json':return self.file(ROOT/'web/public/catalog.json')
             if route.startswith('/api/imports/portraits/'):
                 name=route.removeprefix('/api/imports/portraits/')

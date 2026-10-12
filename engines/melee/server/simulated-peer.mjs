@@ -14,9 +14,11 @@ export function installSimulatedController(){
   const tick=row?.tick||0,combat=row?.selectedState?.[1]===2;
   const values=row&&new Float32Array(new Uint32Array(row.selectedState.slice(2)).buffer);
   const x=values?.[15]||0,other=values?.[3]||0,phase=tick%180;
+  // Platform passing requires a fresh down-stick edge, so pulse and release.
+  const drop=combat&&(values?.[16]||0)>(values?.[4]||0)+12&&phase<20;
   const buttons=Array.from({length:17},()=>({pressed:false,value:0}));
-  if(combat)for(const index of [phase<12?0:-1,phase>=60&&phase<72?1:-1,phase>=120&&phase<126?2:-1])if(index>=0)buttons[index]={pressed:true,value:1};
-  return [{index:0,id:'Local simulated opponent',mapping:'standard',connected:true,axes:[combat&&Math.abs(other-x)>10?Math.sign(other-x)*.45:0,0,0,0],buttons}];
+  if(combat&&!drop)for(const index of [phase<12?0:-1,phase>=60&&phase<72?1:-1,phase>=120&&phase<126?2:-1])if(index>=0)buttons[index]={pressed:true,value:1};
+  return [{index:0,id:'Local simulated opponent',mapping:'standard',connected:true,axes:[combat&&Math.abs(other-x)>10?Math.sign(other-x)*.45:0,drop&&phase%8<2?1:0,0,0],buttons}];
  }});
 }
 
