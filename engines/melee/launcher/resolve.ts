@@ -10,6 +10,9 @@ export async function resolveFighters(action:any,roster:Fighter[],signal:AbortSi
   const response=await fetch(url,{...init,signal,headers:{'Content-Type':'application/json',...init.headers}});
   const result=await response.json();if(!response.ok)throw Error(result.error||'Could not prepare the selected fighter.');return result;
  }
+ const imports=await json(meleePath('/api/imports'));
+ if(!Array.isArray(imports))throw Error('Could not read the local Melee roster.');
+ roster=[...roster.filter(f=>!imports.some((local:Fighter)=>local.slug===f.slug)),...imports];
  for(const pick of [action.character,...(action.picks||[])].filter(Boolean)){
   if(roster.some(f=>f.slug===pick.slug)||resolved.has(pick.slug))continue;
   onStatus('Preparing '+pick.name+' for Melee…');

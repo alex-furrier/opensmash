@@ -215,7 +215,7 @@ class Handler(BaseHTTPRequestHandler):
             if NATIVE and route == '/catalog.json':return self.file(ROOT/'web/public/catalog.json')
             if route.startswith('/api/imports/portraits/'):
                 name=route.removeprefix('/api/imports/portraits/')
-                if not re.fullmatch(r'import-[a-f0-9]{24}\.webp',name):raise FileNotFoundError(name)
+                if not re.fullmatch(r'import-[a-f0-9]{24}(?:-tile|-medium)?\.webp',name):raise FileNotFoundError(name)
                 return self.file(descendant(IMPORTS.root,name))
             if route.startswith('/api/imports/'):
                 job=IMPORTS.jobs.get(route.removeprefix('/api/imports/'))
@@ -491,6 +491,7 @@ if __name__ == '__main__':
     parser.add_argument('--port', type=int, default=8781)
     parser.add_argument('--characters', type=Path, default=CHARACTERS, help='Exported character library (one directory per roster slug)')
     parser.add_argument('--import-origin', action='append', default=[], help='Additional exact source-export origin for local development')
+    parser.add_argument('--private-roster', type=Path, help='Local private roster manifest; imports only validated export directories')
     parser.add_argument('--trace-io', action='store_true', help='Record local asset request timings for startup profiling')
     args = parser.parse_args()
     startup_started = time.monotonic()
@@ -514,6 +515,7 @@ if __name__ == '__main__':
     startup_log('Loading character import service')
     from opensmash_melee.character_import import ImportManager
     IMPORTS=ImportManager(CATALOG,LOCK,['https://smash.fun','https://www.smash.fun',*args.import_origin])
+    if args.private_roster:IMPORTS.load_local_roster(args.private_roster)
     startup_log('Character import service ready')
     if args.desktop:
         if not TOKEN:raise SystemExit('Desktop service requires its session token')

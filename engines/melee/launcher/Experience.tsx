@@ -25,7 +25,7 @@ export default function MeleeExperience({action,localPortPlan,onClose,soundOn=tr
  const fighters=resolved?.roster||roster;
  const fighter=resolved?.action.character?fighters.find(f=>f.slug===resolved.action.character.slug):fighters[0];
  useEffect(()=>{
-  if(!ready||joiningFriend)return;
+  if(!ready)return;
   const abort=new AbortController();
   setResolved(null);setError('');
   const saved=loadSettings();
@@ -53,10 +53,10 @@ export default function MeleeExperience({action,localPortPlan,onClose,soundOn=tr
    }else if(file)await selectLocalDisc(file);
   }catch(e){setError((e as Error).message);}
  }
- if(!desktop()&&joiningFriend&&ready){
+ if(!desktop()&&joiningFriend&&ready&&resolved){
   if(friendAvailable===undefined)return <section className="melee-setup"><p>Checking friend rooms…</p></section>;
   if(!friendAvailable)return <section className="melee-setup"><p>Friend rooms are not configured on this host.</p><button onClick={onClose}>Return to roster</button></section>;
-  return <FriendMatch fighter={roster[0]} settings={settings} localPortPlan={localPortPlan} roster={roster} onClose={onClose} soundOn={soundOn}/>;
+  return <FriendMatch fighter={fighters[0]} settings={settings} localPortPlan={localPortPlan} roster={fighters} onClose={onClose} soundOn={soundOn}/>;
  }
  if(ready&&!resolved)return <section className="melee-setup"><h2>Preparing fighters</h2><p role={error?'alert':'status'}>{error||preparationStatus}</p></section>;
  if(!fighter)return <section className="melee-setup" role="alert"><p>This character has not been prepared for Melee yet.</p><button onClick={onClose}>Return to roster</button></section>;

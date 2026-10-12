@@ -705,13 +705,22 @@ export default function App() {
     return () => { cancelled = true; };
   }, []);
 
+  const [localMeleeRoster,setLocalMeleeRoster]=useState([]);
+  useEffect(()=>{
+    if(!isMelee){setLocalMeleeRoster([]);return;}
+    const abort=new AbortController();
+    fetch('/melee/api/imports',{signal:abort.signal,cache:'no-store'}).then(r=>r.ok?r.json():[]).then(rows=>{
+      if(!abort.signal.aborted&&Array.isArray(rows))setLocalMeleeRoster(rows.map(row=>({...row,visibility:'private',portrait:row.portrait&&'/melee'+row.portrait,portraitTile:row.portraitTile&&'/melee'+row.portraitTile,portraitMedium:row.portraitMedium&&'/melee'+row.portraitMedium})));
+    }).catch(()=>{});
+    return()=>abort.abort();
+  },[isMelee]);
   // Live demos show the public roster only: no private/own fighters, no jobs.
   // Memoised: the grid effect below re-syncs every tile when this identity
   // changes, and a fresh filtered array per render made every state change
   // (engine boot, pin, Esc) repaint 1000 caption bitmaps in one task.
   const gridCharacters = useMemo(() => (demoMode
     ? (isMelee ? meleeDemoGridOrder : demoGridOrder)(characters.filter((character) => character.visibility !== "private" && !character.mine))
-    : characters), [characters, demoMode, isMelee]);
+    : [...localMeleeRoster,...characters.filter(character=>!localMeleeRoster.some(local=>local.slug===character.slug))]), [characters, demoMode, isMelee,localMeleeRoster]);
   const gridJobs = demoMode ? [] : fighterJobs;
 
   useEffect(() => {

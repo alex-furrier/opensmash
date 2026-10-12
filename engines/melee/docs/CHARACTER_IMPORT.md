@@ -85,3 +85,21 @@ cross-platform performance benchmark.
 The Melee suite passed 58 tests; the creator export/protocol suite passed 6 tests.
 Both web production builds passed. Tests cover owner checks, export whitelisting,
 manifest hashes, URL restrictions, source round-trip and presentation metadata.
+
+### Local private roster
+
+The loopback asset service accepts `--private-roster /absolute/path/roster-manifest.json`.
+It reads version 1 manifests marked `private: true`, imports only characters with
+`status: validated_local_source`, and reads each character's direct
+`exports/<slug>` directory beside the manifest. Each ready entry supplies `slug`,
+`name`, `short`, `target`, `source_directory`, and `source_sha256` for `rigged.glb`.
+Required assets, native source hints, and optional generated portrait derivatives
+use the existing source importer checks. Intake paths and unrelated files are
+ignored. This option is local startup configuration, not an HTTP file import API.
+
+Ready characters appear in the ordinary Melee roster and use the same retained
+source, native fitting, and selected match settings as other imported fighters.
+Tile and medium portraits use supplied derivatives when available. Restart the
+local asset service after adding validated exports. Keep the manifest, exports,
+retained assets and browser evidence outside public source control. Pending
+entries are omitted; successful source import alone does not prove gameplay.
