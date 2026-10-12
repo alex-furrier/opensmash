@@ -20,8 +20,8 @@ export function validateFriendProposal(value){
  return {...rules,ports,costumes};
 }
 /** One local website owns its ephemeral room registry; browsers own prepared assets/game. */
-export function attachFriendRooms(server,{engine,host='127.0.0.1'}){
- const rooms=createRooms({identity:{},launch:{},maxRooms:8,ttlMs:60*60*1000,resolveMatch:value=>{const proposal=validateFriendProposal(value);return {identity:null,launch:resolvedRules(proposal),proposal};},validateReady:(identity,room)=>{
+export function attachFriendRooms(server,{engine,host='127.0.0.1',simulatedPeer}){
+ const rooms=createRooms({identity:{},launch:{},maxRooms:8,ttlMs:60*60*1000,permitTestBot:()=>!!simulatedPeer,startTestBot:request=>simulatedPeer.start(request),stopTestBot:session=>simulatedPeer?.stop(session),permitTestBotJoin:()=>!!simulatedPeer,resolveMatch:value=>{const proposal=validateFriendProposal(value);return {identity:null,launch:resolvedRules(proposal),proposal};},validateReady:(identity,room)=>{
   if(identity?.engine!==engine||identity.disc!==disc||identity.seed!==seed||identity.rules!==digest(resolvedRules(room.launch))||!/^[a-f0-9]{64}$/.test(identity.costumes))throw Error('Installed friend match identity mismatch.');
  }});
  const wss=new WebSocketServer({noServer:true,maxPayload:16384,perMessageDeflate:false});

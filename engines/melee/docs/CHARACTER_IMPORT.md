@@ -103,3 +103,7 @@ Tile and medium portraits use supplied derivatives when available. Restart the
 local asset service after adding validated exports. Keep the manifest, exports,
 retained assets and browser evidence outside public source control. Pending
 entries are omitted; successful source import alone does not prove gameplay.
+
+An empty, otherwise valid 16-bit PCM announcer WAV is treated as an unvoiced
+character. The character-select builder encodes one silent DSP block without
+modifying the retained source or creating a voice.

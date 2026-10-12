@@ -403,7 +403,7 @@ export default function App() {
       behavior: demoMode ? "instant" : "smooth",
     }));
     bootEngineAfterScroll(() => {
-      setEngine({experience:'melee',id:crypto.randomUUID(),action:{...action,selectionMode:advancedOptions.selectionMode,portPlan:controllerPlan(advancedOptions,gamepads)}});
+      setEngine({experience:'melee',id:crypto.randomUUID(),action:{...action,selectionMode:action.selectionMode||advancedOptions.selectionMode,portPlan:controllerPlan(advancedOptions,gamepads)}});
     });
   }
 
@@ -706,6 +706,8 @@ export default function App() {
   }, []);
 
   const [localMeleeRoster,setLocalMeleeRoster]=useState([]);
+  const [roomDraft,setRoomDraft]=useState(false),[localOpponentAvailable,setLocalOpponentAvailable]=useState(false);
+  useEffect(()=>{if(!isMelee){setRoomDraft(false);setLocalOpponentAvailable(false);return;}const abort=new AbortController();fetch('/melee/api/netplay/config',{signal:abort.signal}).then(r=>r.ok?r.json():null).then(c=>{if(!abort.signal.aborted)setLocalOpponentAvailable(c?.simulatedOpponent===true);}).catch(()=>{});return()=>abort.abort();},[isMelee]);
   useEffect(()=>{
     if(!isMelee){setLocalMeleeRoster([]);return;}
     const abort=new AbortController();
@@ -1285,8 +1287,8 @@ export default function App() {
       : type === "character"
       ? {
           type,
-          character: characters.find((character) => character.slug === slug),
-          picks: picks.map((pickSlug) => characters.find((character) => character.slug === pickSlug)),
+          character: gridCharacters.find((character) => character.slug === slug),
+          picks: picks.map((pickSlug) => gridCharacters.find((character) => character.slug === pickSlug)),
         }
       : { type };
     if (type === "character" && (!action.character || action.picks.some((pick) => !pick))) {
@@ -1294,7 +1296,7 @@ export default function App() {
       return "about:blank";
     }
     try {
-      if(isMelee){launchMelee(action);return "about:blank";}
+      if(isMelee){launchMelee({...action,...(roomDraft?{roomMode:'computer',selectionMode:'full-roster'}:{})});setRoomDraft(false);return "about:blank";}
       const launchOptions = launchOptionsFor(action);
       const launchAction = prepareLaunchAction(action, launchOptions);
       const src = engineUrl(launchAction, launchOptions, gamepads);
@@ -1628,7 +1630,7 @@ export default function App() {
 
   if (!isCreatePage) {
     Object.assign(visualBridgeRef.current, {
-      characters,
+      characters:gridCharacters,
       fighterJobs,
       handlesGameSetup: isMelee||nativeSsb64,
       trailerCapture: isMelee && demoMode && !meleeDesktop(),
@@ -1636,7 +1638,7 @@ export default function App() {
       switchExperience,
       nativeDiscPicker: isMelee && Boolean(meleeDesktop()),
       announceCharacter(slug) {
-        const character = characters.find((candidate) => candidate.slug === slug);
+        const character = gridCharacters.find((candidate) => candidate.slug === slug);
         if (character) announceCharacter(character);
       },
       clearVerification,
@@ -1645,6 +1647,7 @@ export default function App() {
       hasGamepad() { return gamepads.length > 0; },
       selectionSlots() {
         if(isMelee){
+          if(roomDraft)return ['1P','CPU2'];
           if(demoMode&&!meleeDesktop())return ['1P'];
           const plan=controllerPlan(advancedOptions,gamepads);
           return meleeSelectionPorts(plan,advancedOptions.selectionMode,loadMeleeSettings().mode).map(port=>
@@ -1702,6 +1705,8 @@ export default function App() {
           immersive={immersive}
           isFullscreen={isFullscreen || immersive}
           launchFlowOpen={overlayMusicActive}
+          onCreateRoom={isMelee&&!demoMode&&localOpponentAvailable&&!engine?()=>setRoomDraft(current=>!current):undefined}
+          roomDraft={roomDraft}
           onAboutChange={setAboutOpen}
           onAdvanced={() => setAdvancedOpen(true)}
           onCreate={openCreateExperience}

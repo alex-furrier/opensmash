@@ -36,7 +36,7 @@ import { ACTIVE_JOB_STATUSES } from "./job-protocol.js";
 
 const PORT = Number(process.env.PORT || 4174);
 const HOST = process.env.HOST || (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
-if(process.env.MELEE_NETPLAY_ENGINE_ROOT&&!['127.0.0.1','localhost','::1'].includes(HOST))throw Error('Friend runtime requires a loopback HOST.');
+if((process.env.MELEE_NETPLAY_ENGINE_ROOT||process.env.MELEE_SIMULATED_PEER_ISO)&&!['127.0.0.1','localhost','::1'].includes(HOST))throw Error('Friend runtime requires a loopback HOST.');
 const handleMelee = createEmbeddedMeleeHandler();
 let friendRuntime=null,attachFriendRooms;
 if(process.env.MELEE_NETPLAY_ENGINE_ROOT){
@@ -832,7 +832,7 @@ async function handleRequest(req, res, vite) {
   res.setHeader('Cross-Origin-Opener-Policy','same-origin');
   res.setHeader('Cross-Origin-Embedder-Policy','require-corp');
 
-  if(pathname==='/melee/api/netplay/config'&&req.method==='GET')return json(res,200,{enabled:!!friendRuntime});
+  if(pathname==='/melee/api/netplay/config'&&req.method==='GET')return json(res,200,{enabled:!!friendRuntime,...(simulatedPeer?{simulatedOpponent:true}:{})});
   if(friendRuntime?.handle(req,res))return;
 
   // Firebase's hosted sign-in helper, served from our origin (see auth.js).
@@ -1420,8 +1420,16 @@ const server = http.createServer((req, res) => {
     else res.destroy();
   });
 });
-const friendRooms=friendRuntime&&attachFriendRooms(server,{engine:friendRuntime.engine,host:HOST});
-if(friendRuntime)process.once('SIGINT',()=>{friendRooms?.close();void friendRuntime.close().then(()=>process.exit());});
+let simulatedPeer;
+if(process.env.MELEE_SIMULATED_PEER_ISO){
+ if(!Number.isInteger(PORT)||PORT<1||PORT>65535)throw Error('Local opponent requires a fixed valid website port.');
+ if(!friendRuntime||!process.env.MELEE_PLAYWRIGHT_MODULE)throw Error('Local opponent needs the verified friend runtime and an existing Playwright module.');
+ const {createRequire}=await import('node:module');
+ const {createSimulatedPeer}=await import('../../engines/melee/server/simulated-peer.mjs');
+ simulatedPeer=createSimulatedPeer({chromium:createRequire(import.meta.url)(process.env.MELEE_PLAYWRIGHT_MODULE).chromium,origin:`http://${HOST.includes(':')?'['+HOST+']':HOST}:${PORT}`,iso:process.env.MELEE_SIMULATED_PEER_ISO,onObservation:event=>{if(event.type==='phase')console.info('[local opponent]',event.phase);}});
+}
+const friendRooms=friendRuntime&&attachFriendRooms(server,{engine:friendRuntime.engine,host:HOST,simulatedPeer});
+if(friendRuntime)process.once('SIGINT',()=>{friendRooms?.close();void Promise.all([friendRuntime.close(),simulatedPeer?.close()]).then(()=>process.exit());});
 server.keepAliveTimeout = 65_000;
 server.headersTimeout = 66_000;
 

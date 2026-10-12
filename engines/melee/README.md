@@ -166,3 +166,22 @@ platform, browser and what happened. Join the
 
 Thanks to [999sian/melee-pc](https://github.com/999sian/melee-pc),
 [doldecomp/melee](https://github.com/doldecomp/melee), and the Melee community.
+
+## Local simulated opponent
+
+For a local user test, enable the verified friend runtime and set
+`MELEE_SIMULATED_PEER_ISO` to your legal local disc and `MELEE_PLAYWRIGHT_MODULE`
+to an existing Playwright module. The website must listen on loopback at a fixed
+port. No installation or disc-serving endpoint is added by this option.
+
+In Melee, **Create room** starts a local draft: choose your fighter and the
+opponent through the normal roster. First-time players still choose their local
+disc and complete the existing controls step. The lineup is frozen when the
+server room is created. Both browser clients prepare and verify their own
+runtime, disc, costumes and settings before Ready. The counterpart is a local
+scripted browser player using the normal input acquisition boundary; it does
+not demonstrate native CPU AI, a remote network or rollback. **Rematch** ends
+the current room and prepares a fresh session with the same lineup. **Stop**
+returns to room actions; **Return to roster** leaves the experience.
+
+Private roster exports and local recordings stay outside source control.

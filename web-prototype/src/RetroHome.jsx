@@ -242,6 +242,8 @@ export default function RetroHome({
   isFullscreen,
   launchFlowOpen,
   onAboutChange,
+  onCreateRoom,
+  roomDraft=false,
   onAdvanced,
   onCreate,
   onFullscreen,
@@ -533,6 +535,8 @@ export default function RetroHome({
             >
               About
             </button>
+            {onCreateRoom&&<button className="retro-site-link" type="button" onClick={onCreateRoom}>{roomDraft?'Cancel room':'Create room'}</button>}
+            {roomDraft&&<span className="retro-room-selection" role="status">Choose your fighter, then an opponent</span>}
             {!mobileLayout && (
               <button
                 id="controls-menu-button"

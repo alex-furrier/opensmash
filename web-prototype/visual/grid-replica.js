@@ -113,7 +113,7 @@ function liveRosterCharacter(character) {
     visibility: character.visibility || 'public',
     // The viewer's own fighters (their jobs, or private ones only they can
     // see) sort to the top of the roster.
-    mine: Boolean(character.mine || character.visibility === 'private'),
+    mine: Boolean(!character.imported && (character.mine || character.visibility === 'private')),
   };
 }
 

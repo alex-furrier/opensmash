@@ -71,9 +71,14 @@ def dsp_clip(path, cache=None, *, trim=False):
         raise ValueError('Invalid announcer PCM WAV') from error
     with stream as wav:
         channels, width, rate, count = wav.getnchannels(), wav.getsampwidth(), wav.getframerate(), wav.getnframes()
-        if width != 2 or channels not in (1, 2) or not 8000 <= rate <= 48000 or not 0 < count <= rate * 15:
+        if width != 2 or channels not in (1, 2) or not 8000 <= rate <= 48000 or not 0 <= count <= rate * 15:
             raise ValueError('Announcer must be a mono/stereo 16-bit PCM WAV, at most 15 seconds')
         samples = np.frombuffer(wav.readframes(count), dtype='<i2').reshape(-1, channels).mean(axis=1).tolist()
+    if not count:
+        # An empty PCM export denotes an unvoiced character. DSP banks still
+        # need one complete block; retain silence without altering the source.
+        samples=[0]*14
+        count=14
     if trim:
         # Remove only quiet edges; retain 15 ms around speech and all internal pauses.
         signal = np.asarray(samples)
