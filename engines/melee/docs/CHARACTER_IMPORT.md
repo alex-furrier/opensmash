@@ -90,7 +90,7 @@ manifest hashes, URL restrictions, source round-trip and presentation metadata.
 
 The loopback asset service accepts `--private-roster /absolute/path/roster-manifest.json`.
 It reads version 1 manifests marked `private: true`, imports only characters with
-`status: validated_local_source`, and reads each character's direct
+`status: validated_local_source` or `actual_native_game_smoke_passed`, and reads each character's direct
 `exports/<slug>` directory beside the manifest. Each ready entry supplies `slug`,
 `name`, `short`, `target`, `source_directory`, and `source_sha256` for `rigged.glb`.
 Required assets, native source hints, and optional generated portrait derivatives

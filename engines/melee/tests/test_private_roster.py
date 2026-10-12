@@ -47,6 +47,7 @@ class PrivateRosterTests(unittest.TestCase):
      with Image.open(manager.root/(rows[0]['slug']+'-tile.webp')) as art:self.assertEqual(art.size,(90,86))
      self.assertEqual(manager.load_local_roster(manifest),rows)
      (export/'announcer.wav').write_bytes(b'updated local voice')
+     data['characters'][0]['status']='actual_native_game_smoke_passed';manifest.write_text(json.dumps(data))
      current=manager.load_local_roster(manifest)
      self.assertEqual(len(current),1);self.assertNotEqual(current[0]['slug'],rows[0]['slug'])
      self.assertEqual(manager.private_rows,current);self.assertEqual(len(manager.rows),2)

@@ -153,7 +153,7 @@ class ImportManager:
         if manifest.get('version')!=1 or manifest.get('private') is not True or not isinstance(manifest.get('characters'),list):raise ValueError('Invalid private roster manifest.')
         rows=manifest['characters']
         if len(rows)>64:raise ValueError('Private roster exceeds the character limit.')
-        ready=[r for r in rows if r.get('status')=='validated_local_source']
+        ready=[r for r in rows if r.get('status') in ('validated_local_source','actual_native_game_smoke_passed')]
         if len({r.get('slug') for r in ready})!=len(ready):raise ValueError('Duplicate private roster slug.')
         active=[]
         for entry in ready:
