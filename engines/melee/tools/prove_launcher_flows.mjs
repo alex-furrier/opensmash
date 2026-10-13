@@ -7,6 +7,9 @@ import {resolve} from 'node:path';
 const args=process.argv.slice(2),option=name=>{const index=args.indexOf('--'+name);return index<0?undefined:args[index+1];};
 const origin=option('origin'),iso=option('iso'),output=option('output'),slug=option('character');
 if(!origin||!iso||!output||!slug||!process.env.MELEE_PLAYWRIGHT_MODULE)throw Error('Supply --origin, --iso, --output, --character and MELEE_PLAYWRIGHT_MODULE.');
+const profileSeconds=Number(option('profile-seconds')||0),debugScenario=option('debug-scenario');
+if(profileSeconds!==0&&(!Number.isInteger(profileSeconds)||profileSeconds<30||profileSeconds>120))throw Error('Profile seconds must be 30–120.');
+if(debugScenario&&!['reference','delay','jitter','hold'].includes(debugScenario))throw Error('Invalid debug scenario.');
 const {chromium}=createRequire(import.meta.url)(process.env.MELEE_PLAYWRIGHT_MODULE);
 const out=resolve(output);await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:false});
@@ -16,7 +19,7 @@ page.on('console',message=>consoleLog.push({type:message.type(),text:message.tex
 page.on('pageerror',error=>consoleLog.push({type:'pageerror',text:error.message}));
 page.on('response',async response=>{if(response.url().includes('/api/'))network.push({url:response.url(),status:response.status(),error:response.status()>=400?await response.text().catch(()=>null):undefined});});
 page.on('websocket',socket=>{socket.on('framesent',event=>{try{const data=JSON.parse(event.payload);if(data.type!=='peer'||['applied','input'].includes(data.packet?.type))wire.push({direction:'sent',...data});}catch{}});socket.on('framereceived',event=>{try{const data=JSON.parse(event.payload);if(data.type!=='peer'||['applied','input'].includes(data.packet?.type))wire.push({direction:'received',...data});}catch{}});});
-await page.addInitScript(()=>{window.launcherProof=[];window.ownedInputTrace=[];window.addEventListener('message',({data})=>{if(['pad','input'].includes(data?.type)){window.ownedInputTrace.push(data);if(window.ownedInputTrace.length>2000)window.ownedInputTrace.shift();}if(['playable','error','confirmed-tick','session'].includes(data?.type))window.launcherProof.push(data);});});
+await page.addInitScript(()=>{window.launcherProof=[];window.ownedInputTrace=[];window.addEventListener('message',({data})=>{if(['pad','input'].includes(data?.type)){window.ownedInputTrace.push(data);if(window.ownedInputTrace.length>2000)window.ownedInputTrace.shift();}if(['playable','error','confirmed-tick','session','status','progress','metrics','frame-stall','combat-performance','startup-performance'].includes(data?.type)){window.launcherProof.push({observedAt:performance.now(),...data});if(window.launcherProof.length>15000)window.launcherProof.shift();}});});
 const pick=()=>page.locator(`[data-roster-character="${slug}"]`);
 const snapshot=async()=>{
  const frame=page.frames().find(frame=>frame.url().includes('/engine/upstream/runtime.html'));assert.ok(frame,'actual upstream runtime frame');
@@ -27,6 +30,8 @@ async function setupDisc(){
  await page.locator('.melee-disc-settings input[type=file]').setInputFiles(iso);await page.getByRole('button',{name:'Clear disc',exact:true}).waitFor();
  await page.getByRole('button',{name:'Back',exact:true}).click();await page.getByRole('button',{name:'Cancel',exact:true}).click();
 }
+// Optional existing debug fixture affects only this diagnostic client's acquisition.
+if(debugScenario)await context.addInitScript(scenario=>{window.addEventListener('message',({data})=>{if(data?.type==='select'&&data.netplay)data.netplay.debug={scripted:false,scenario,seed:17};});},debugScenario);
 async function begin(mode,skip=false){
  await page.evaluate(()=>{window.launcherProof=[];});await pick().click();
  if(skip){const tutorial=page.getByRole('button',{name:'Skip',exact:true}),choice=page.getByRole('button',{name:mode==='solo'?'Play solo':'Play against computer',exact:true});await Promise.race([tutorial.waitFor(),choice.waitFor()]);if(await tutorial.isVisible())await tutorial.click();}
@@ -42,6 +47,7 @@ async function playable(label){
  const before=await snapshot();assert.equal(before.scene,2);assert.equal(before.state[0],1);
  await page.keyboard.down('d');await controlFrame.waitForFunction(frame=>window.Module._direct_frame_count()>=frame,before.frame+90,{timeout:15000});const moved=await snapshot();await page.keyboard.down('j');await controlFrame.waitForFunction(frame=>window.Module._direct_frame_count()>=frame,moved.frame+8,{timeout:15000});await page.keyboard.up('j');await page.keyboard.up('d');
  const after=await snapshot();await writeFile(out+'/'+label+'-control.json',JSON.stringify({before,moved,after},null,2));const runtime=page.frames().find(frame=>frame.url().includes('/engine/upstream/runtime.html'));const acquired=await runtime.evaluate(()=>window.ownedInputTrace);assert.ok(acquired.some(row=>row.values?.[0]===0&&(row.values[1]&0x100)&& (row.type==='input'?row.values[2]>0:(row.values[2]&255)>128)),label+' keyboard crosses its actual owned input boundary');assert.ok(after.frame>before.frame+15,label+' native game progresses');assert.ok(Math.abs(moved.state[3]-before.state[3])>5,label+' owned keyboard controls the selected fighter');
+ if(profileSeconds){await page.waitForTimeout(profileSeconds*1000);await writeFile(out+'/'+label+'-profile.json',JSON.stringify({events:await page.evaluate(()=>window.launcherProof),diagnostics:await page.evaluate(()=>window.meleeLaunchDiagnostics)},null,2));}
  await page.screenshot({path:out+'/'+label+'-start.png'});results.push({label,display,frames:after.frame-before.frame,positionDelta:moved.state[3]-before.state[3],actualPlayable:true});
 }
 async function stop(mode){

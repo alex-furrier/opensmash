@@ -515,3 +515,29 @@ relay retains its own lobby, room and handoff lifetime. Fixture characterization
 verified all 23 launcher asset hashes, manifest identity, response headers/statuses
 and cleanup before this extraction. The main website owns its room sockets and
 shutdown; the asset module has no separate lifetime to close.
+
+
+## Loading and stutter diagnostics
+
+Each launcher attempt owns a bounded 120-event diagnostic record at
+`window.meleeLaunchDiagnostics`. Fighter preparation, runtime loading and match
+startup each have a three-minute deadline. Human Ready and trailer holds do not
+consume that deadline. Repeated graphics percentages do not extend it; failure
+terminates the attempt and exposes the existing retry/return controls.
+
+Confirmed ticks report input-digest, input-synchronization, simulation,
+applied-digest and applied-acknowledgement durations. Synchronization includes
+owned acquisition, optional debug delay and peer protocol waits; it is not a
+network RTT measurement. These timings do not participate in identity, input or
+selected-state comparison. State disagreement still fails the session.
+
+The normal local-opponent launcher does not enable artificial delay/jitter.
+The opt-in launcher proof accepts `--profile-seconds 30` (30–120 seconds per
+start) to retain frame times, engine phases, loading and confirmed-tick timings.
+`--debug-scenario delay|jitter|hold|reference` explicitly enables the existing
+owned-input fault fixture for that diagnostic client. Application delays are
+not TCP packet-loss tests. Outputs stay in the caller-supplied private directory.
+
+A slow confirmed tick can extend the engine's inclusive game-step timer. Read
+its synchronization/acknowledgement timings before attributing that duration to
+simulation or GPU work. Selected-state agreement is not complete-state proof.

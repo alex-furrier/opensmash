@@ -15,7 +15,7 @@ test('bridge owns actual tick acquisition and prior-consumed-input comparison in
   const ports = new MessageChannel(), modules = [module(),module()], calls = [0,0], rows = [[],[]];
   const peers = modules.map((runtime,player)=>installConfirmedInput(runtime,
     {channel:messagePortChannel(player?ports.port2:ports.port1),session:'fresh',player,identity},
-    {acquireOwnedPad:(tick,physical)=>{calls[player]++;assert.deepEqual(physical,neutralPad());const p=neutralPad();p[0]=256<<player;p[1]=player?-25:19;return p;},onTick:row=>rows[player].push(row)}));
+    {now:()=>0,acquireOwnedPad:(tick,physical)=>{calls[player]++;assert.deepEqual(physical,neutralPad());const p=neutralPad();p[0]=256<<player;p[1]=player?-25:19;return p;},onTick:row=>rows[player].push(row)}));
   peers.forEach(p=>p.start());
   try {
     for(let tick=0;tick<64;tick++){
@@ -50,4 +50,16 @@ test('unequal graphics readiness releases preparation on the same confirmed tick
   if(tick===2)assert.deepEqual(released[0],['intro','intro','match']);
   await Promise.all(modules.map((m,i)=>m.onConfirmedTick(tick,pads[i].flat(),state)));
  }}finally{peers.forEach(p=>p.stop());ports.port1.close();ports.port2.close();}
+});
+
+
+test('tick timings distinguish a delayed owned acquisition from simulation without changing pads or divergence checks',async()=>{
+ const ports=new MessageChannel(),modules=[module(),module()],rows=[[],[]];
+ const peers=modules.map((m,player)=>installConfirmedInput(m,{channel:messagePortChannel(player?ports.port2:ports.port1),session:'timed',player,identity},{onTick:row=>rows[player].push(row),acquireOwnedPad:async(tick,pad)=>{if(player===1)await new Promise(resolve=>setTimeout(resolve,35));return pad;}}));
+ peers.forEach(p=>p.start());
+ try{
+  const state=Array(50).fill(0),pads=await Promise.all(modules.map(m=>m.onConfirmedInput(0,neutralPad(),state)));
+  assert.deepEqual(pads[0],pads[1]);await Promise.all(modules.map((m,i)=>m.onConfirmedTick(0,pads[i].flat(),state)));
+  for(const row of rows.flat()){assert.ok(row.timing.inputWaitMs>=25);assert.ok(row.timing.totalMs>=row.timing.inputWaitMs);assert.ok(row.timing.simulationMs>=0);}
+ }finally{peers.forEach(p=>p.stop());ports.port1.close();ports.port2.close();}
 });

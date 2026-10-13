@@ -1,4 +1,5 @@
 import {installedMatchIdentity} from '../../runtime/web/netplay/match-identity.mjs';
+import {createLaunchDiagnostics} from '../lib/launch-diagnostics.mjs';
 import {localOpponentStatus} from '../lib/local-opponent-status.mjs';
 import MeleeTouchControls from './MeleeTouchControls';
 import {resolveRenderWidth} from '../lib/render-resolution.mjs';
@@ -35,6 +36,11 @@ export default function Game({fighter,settings,roster,onClose,soundOn=true,chrom
   let playable=matchMode!==0, audioConnecting=false;
   let running=false,firstFrame=true,selectionAcknowledged=false,fullBootVisible=false,frameSamples:number[]=[],launchPlan:any;
   const skin='host';
+  const diagnostics=createLaunchDiagnostics();
+  const publishDiagnostics=()=>{(window as any).meleeLaunchDiagnostics=diagnostics.snapshot();};
+  const failLaunch=(message:string)=>{if(closed||abort.signal.aborted)return;diagnostics.observe({type:'error',message});publishDiagnostics();abort.abort();running=false;clearInterval(watchdog);cancelAnimationFrame(raf);audioNode?.disconnect();stopAnnouncer();room?.connection.stop(message);worker?.terminate();setError(message);};
+  const watchdog=setInterval(()=>{if(closed)return;const error=diagnostics.expired();publishDiagnostics();if(error)failLaunch(error);},1000);
+  diagnostics.arm('Preparing fighters');
   const send=(schedule=true)=>{
    if(worker&&running){
     // Modal visibility is constant for this input sample. Querying layout for
@@ -107,13 +113,14 @@ export default function Game({fighter,settings,roster,onClose,soundOn=true,chrom
      }));
     })(),
    ]);
-   setStatus('Loading Melee…');if(closed)return;
+   setStatus('Loading Melee…');diagnostics.arm('Loading Melee');if(closed)return;
    const audio=session.audio;
-   const startAudio=()=>{if(audioConnecting)return;audioConnecting=true;connectAudio(audio).then(node=>{if(closed)node.disconnect();else audioNode=node;}).catch(error=>{audioConnecting=false;console.warn('[Melee audio]',error);});};
+   const startAudio=()=>{if(audioConnecting)return;audioConnecting=true;connectAudio(audio).then(node=>{if(closed||abort.signal.aborted)node.disconnect();else audioNode=node;}).catch(error=>{audioConnecting=false;console.warn('[Melee audio]',error);});};
    startAudio();
-   worker.onerror=e=>{if(!closed)setError(e.message||'The game worker stopped.');};
+   worker.onerror=e=>failLaunch(e.message||'The game worker stopped.');
    worker.onmessage=({data})=>{
-    if(closed)return;
+    if(closed||abort.signal.aborted)return;
+    diagnostics.observe(data);
     if(data.type==='frame'){if(data.bitmap)canvas.current?.getContext('bitmaprenderer')?.transferFromImageBitmap(data.bitmap);if(firstFrame){firstFrame=false;if(!holdForTrailer||trailerVisible.current)canvas.current?.focus();}}
     if(data.type==='session' && data.launch)selectionAcknowledged=true;
     if(data.type==='frame' && matchMode===4 && selectionAcknowledged && !fullBootVisible){fullBootVisible=true;setStatus('');}
@@ -122,14 +129,14 @@ export default function Game({fighter,settings,roster,onClose,soundOn=true,chrom
     if(data.type==='trailer-ready')trailerReadyCallback.current?.();
     if(data.type==='intro'){if(holdForTrailer&&!trailerVisible.current){setError('The deployed Melee runtime does not support trailer preloading. Deploy the updated engine input release, then reload this page.');return;}stopAnnouncer();setStatus('');startAudio();}
     if(data.type==='playable'){playable=true;setStatus('');startAudio();if(!gameInputBlocked())canvas.current?.focus({preventScroll:true});}
-    if(data.type==='error'){room?.connection.stop(data.message);setError(previous=>previous||data.message||'Melee initialization failed without an error message.');running=false;}
+    if(data.type==='error')failLaunch(data.message||'Melee initialization failed without an error message.');
     if(data.type==='log'){console.log('[Melee]',data.text);if(playable&&data.text.includes('[opensmash] destination ready'))setStatus('');}
     if(data.type==='metrics'){
      setFps(playable&&data.completeCombatInterval!==false&&data.combatFrames>0?data.fps:null);frameSamples.push(...data.frameTimes);if(frameSamples.length>36000)frameSamples=frameSamples.slice(-36000);
      (window as any).meleePerformance={frames:data.frames,fps:data.fps,frameTimes:frameSamples};
     }
    };
-   await session.ready;if(closed)return;
+   await session.ready;if(closed||abort.signal.aborted)return;diagnostics.pause();
    let netplay;
    if(room){
     const verified=session.identity;if(!verified)throw Error('Runtime verification unavailable.');
@@ -138,15 +145,15 @@ export default function Game({fighter,settings,roster,onClose,soundOn=true,chrom
     await new Promise<void>(resolve=>{readyClick.current=resolve;});if(closed)return;setAwaitingReady(false);setStatus(room.assignment.testBot?'Waiting for the local opponent…':'Waiting for your friend…');
     netplay=await room.connection.ready(identity,(state:{opponentPhase?:string})=>{if(!closed&&room.assignment.testBot)setStatus(localOpponentStatus(state));});if(closed)return;
    }
-   running=true;
+   if(abort.signal.aborted)return;diagnostics.arm('Starting Melee');running=true;
    const selection={type:'select',...(netplay?{netplay}:{}),holdForTrailer,renderWidth:resolveRenderWidth(settings.renderWidth),requestedAt,warmReadyBeforeClick:session.readyAt<=requestedAt,character:fighter.slug,skin,fighter:launchPlan.ports[0].fighter,launch:launchPlan,costumes,cssAssets};
    if(worker instanceof MeleeFrameWorker)worker.postMessage(selection,netplay?[netplay.port]:[]);else worker.postMessage(selection,netplay?[netplay.port]:[]);
    raf=requestAnimationFrame(()=>send());
-  }catch(e){if(!closed){room?.connection.stop((e as Error).message);setError((e as Error)?.message||String(e||'Melee could not start.'));}}}
+  }catch(e){failLaunch((e as Error)?.message||String(e||'Melee could not start.'));}}
   // StrictMode replays setup/cleanup synchronously. Claim the warmed engine
   // only after that replay so the discarded effect cannot terminate it.
   queueMicrotask(()=>{if(!closed)void start();});
-  return()=>{closed=true;readyClick.current?.();readyClick.current=undefined;abort.abort();if(worker)room?.connection.stop();cancelAnimationFrame(raf);if(worker)releaseMelee(worker);audioNode?.disconnect();window.removeEventListener('keydown',keydown);window.removeEventListener('keyup',keyup);window.removeEventListener('blur',blur);touch.current=neutralTouchPad();};
+  return()=>{closed=true;clearInterval(watchdog);publishDiagnostics();readyClick.current?.();readyClick.current=undefined;abort.abort();if(worker)room?.connection.stop();cancelAnimationFrame(raf);if(worker)releaseMelee(worker);audioNode?.disconnect();window.removeEventListener('keydown',keydown);window.removeEventListener('keyup',keyup);window.removeEventListener('blur',blur);touch.current=neutralTouchPad();};
  },[fighter,settings,roster,attempt,holdForTrailer,room]);
  return <div className="game-overlay" role="region" aria-label={'Play as '+fighterLabel(fighter)}><section className="game-panel">{chrome&&<header><div><h2>{fighterLabel(fighter)}</h2><p>{names[matchTarget]} moveset · {schema.modes.find(m=>m.id===matchMode)?.label}</p></div><span className="fps" data-slow={fps!==null&&fps<58.5} title="Target: sustained 60 FPS in combat">{fps===null?'':Math.round(fps)+' FPS'}</span><button onClick={()=>{const panel=canvas.current?.closest('.intro-video-frame');if(document.fullscreenElement)void document.exitFullscreen();else void panel?.requestFullscreen();}} aria-label="Toggle fullscreen">⛶</button><button onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen();onClose();}} aria-label={room?'Stop friend match':'Return to roster'}>{room?'Stop':'✕'}</button>{room&&onRematch&&<button onClick={onRematch}>Rematch</button>}{room?.assignment.testBot&&<span>Local simulated opponent</span>}{room&&!room.assignment.testBot&&<button onClick={()=>void navigator.clipboard.writeText(location.origin+'/melee#room='+room.assignment.room)}>Copy room link</button>}</header>}<div className="game-screen"><canvas id="canvas" key={attempt} ref={canvas} width={960} height={720} tabIndex={0}/>{status&&!error&&<div className="game-message" role="status"><p>{status}</p>{awaitingReady&&<button onClick={()=>void unlockAudio().then(()=>readyClick.current?.())}>Ready</button>}</div>}{error&&<div className="game-message" role="alert"><p>{error.split('\n')[0]}</p>{error.includes('\n')&&<details className="game-error-details"><summary>Details</summary><pre>{error.slice(error.indexOf('\n')+1)}</pre></details>}<button onClick={()=>{setError('');setStatus('Preparing…');setFps(null);setAttempt(n=>n+1);}}>Try again</button></div>}</div>{chrome&&!room&&<><button className="sound-game" onClick={()=>void unlockAudio()}>Enable sound</button><button className="confirm-game" onClick={()=>gameWorker.current?.postMessage({type:'confirm'})}>Confirm · A</button></>}{chrome&&<p className="game-help">{[keyLabel(kb.up),keyLabel(kb.left),keyLabel(kb.down),keyLabel(kb.right)].join(' ')} move · {keyLabel(kb.a)} attack · {keyLabel(kb.b)} special · {keyLabel(kb.x)} / {keyLabel(kb.y)} jump · {keyLabel(kb.l)} / {keyLabel(kb.r)} shield · {keyLabel(kb.z)} grab · {[kb.cup,kb.cleft,kb.cdown,kb.cright].map(keyLabel).join(' ')} smash · {keyLabel(kb.start)} start / pause<br/>Rebind keys and gamepads in Settings → Players &amp; Controllers. Press {keyLabel(kb.a)} to confirm any first-run memory card prompt.</p>}<MeleeTouchControls pad={touch}/></section></div>;
 }
