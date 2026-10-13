@@ -555,3 +555,20 @@ An unversioned global Mario preference from the old roster resolves to Character
 default. A moveset saved through current Settings is versioned, so an explicit
 Mario or other override remains effective; valid moveset URL overrides remain
 explicit. This is a legacy preference migration, not a runtime base picker.
+
+The Melee roster selector reuses the existing grid: **High School** contains the
+active private imports, and **All** also includes the OpenSmash catalog. Catalog
+membership does not grant playability; missing installed sources are disabled.
+The imports API's `roster=available` view reports only entries with complete local
+source files, and browser selection rejects absent sources before export/import.
+
+A separate portrait-corner button opens a keyboard-accessible base picker.
+Private manifests may declare `defaultTarget` (equal to `target`) and
+`supportedTargets`; only accepted pairs belong in that list. Legacy manifests
+allow their existing target only. Preparation and launch planning reject other
+pairs. Choices are saved per player port and source identity, separately from
+character defaults. Removing an earlier pick discards later picks; changes to the
+controller/selection context restart acquisition rather than reassigning bases.
+Reset All Settings clears these choices and the roster filter. Human browser
+performance differences, including Safari versus Chrome, remain observations
+unless a controlled trace establishes their cause.
