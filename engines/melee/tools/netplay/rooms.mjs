@@ -39,7 +39,7 @@ export function createRooms({identity, launch, maxRooms = 32, now = Date.now, tt
           const match=resolveMatch?resolveMatch(message.match):{identity,launch};
           room = {identity:match.identity,launch:match.launch,match:match.proposal,code:randomBytes(16).toString('hex'),session:randomUUID(),members:[null,null],started:false,expires:now()+ttlMs,testBot:!!message.testBot,...(message.testBot?{opponentDeadline:now()+testBotStartupMs}:{})};
           member = {socket,player:0,ready:false,room};room.members[0]=member;
-          rooms.set(room.code,room);memberships.set(socket,member);welcome(room,member);if(room.testBot)Promise.resolve().then(()=>{if(rooms.has(room.code))return startTestBot({room:room.code,session:room.session,scenario:message.scenario||'reference',onPhase:phase=>{if(rooms.has(room.code)&&!room.started){room.opponentPhase=phase;if(phase==='ready'||(phase==='verified'&&!room.members[0]?.ready))delete room.opponentDeadline;status(room);}}});}).catch(error=>finish(room,'Test opponent: '+error.message));return;
+          rooms.set(room.code,room);memberships.set(socket,member);welcome(room,member);if(room.testBot)Promise.resolve().then(()=>{if(rooms.has(room.code))return startTestBot({room:room.code,session:room.session,scenario:message.scenario||'reference',onPhase:phase=>{if(rooms.has(room.code)&&!room.started){room.opponentPhase=phase;if(phase==='verified'&&!room.members[0]?.ready)delete room.opponentDeadline;status(room);}}});}).catch(error=>finish(room,'Test opponent: '+error.message));return;
         }
         if (message.type === 'join') {
           if (member || !/^[a-f0-9]{32}$/.test(message.room || '')) throw Error('Invalid room link.');

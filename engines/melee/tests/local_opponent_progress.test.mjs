@@ -11,3 +11,9 @@ test('verified opponent may wait for human Ready; after that barrier startup is 
  const host=socket();rooms.receive(host,{type:'create',testBot:true});await Promise.resolve();start.onPhase('verified');clock=150;rooms.sweep();assert.ok(!host.closed);
  rooms.receive(host,{type:'ready',identity:{engine:'fixture'}});const guest=socket();rooms.receive(guest,{type:'join',room:start.room});rooms.receive(guest,{type:'ready',identity:{engine:'fixture'}});assert.equal(host.messages.at(-1).type,'start');clock=300;rooms.sweep();assert.ok(!host.closed);rooms.close();
 });
+
+test('a Ready click observation does not clear the relay acknowledgement deadline',async()=>{
+ let clock=1,start;const rooms=createRooms({identity:{engine:'fixture'},launch:{},now:()=>clock,testBotStartupMs:100,permitTestBot:()=>true,startTestBot:request=>{start=request;return new Promise(()=>{});}});
+ const host=socket();rooms.receive(host,{type:'create',testBot:true});await Promise.resolve();start.onPhase('verified');rooms.receive(host,{type:'ready',identity:{engine:'fixture'}});start.onPhase('ready');
+ clock=102;rooms.sweep();assert.equal(host.messages.at(-1).type,'stopped');assert.match(host.messages.at(-1).reason,/timed out/);rooms.close();
+});
