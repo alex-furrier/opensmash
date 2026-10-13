@@ -77,3 +77,18 @@ test('Stop interrupts stalled context acquisition by closing that session browse
  const first=peer.start({room:'a'.repeat(32),session:'stalled'});const failed=assert.rejects(first,/Browser closed/);await atContext;peer.stop('stalled');await failed;
  await assert.rejects(peer.start({room:'b'.repeat(32),session:'retry'}),/could not prepare/);await peer.close();assert.equal(launches,2);assert.equal(closes,2);
 });
+
+
+test('normal telemetry omits tick RPCs while the browser-local controller still consumes them; proof can opt in',async()=>{
+ const {installPeerObservation,installSimulatedController}=await import('../server/simulated-peer.mjs');
+ const names=['window','navigator','localStorage','sessionStorage'],saved=new Map(names.map(n=>[n,Object.getOwnPropertyDescriptor(globalThis,n)])),handlers=[],seen=[];
+ try{
+  const store={setItem(){}};Object.defineProperty(globalThis,'window',{configurable:true,value:{WebSocket:class{},addEventListener(type,handler){if(type==='message')handlers.push(handler);},__observePeer:data=>seen.push(data)}});
+  Object.defineProperty(globalThis,'navigator',{configurable:true,value:{}});Object.defineProperty(globalThis,'localStorage',{configurable:true,value:store});Object.defineProperty(globalThis,'sessionStorage',{configurable:true,value:store});
+  installPeerObservation({ticks:false});installSimulatedController();const state=new Float32Array(48);state[3]=30;state[16]=50;
+  const tick={type:'confirmed-tick',tick:8,selectedState:[0,2,...new Uint32Array(state.buffer)]};for(const handler of handlers)handler({data:tick});
+  assert.equal(seen.length,0);assert.equal(navigator.getGamepads()[0].axes[0],.45);assert.equal(navigator.getGamepads()[0].axes[1],1);
+  for(const type of ['status','error','frame-stall','combat-performance'])for(const handler of handlers)handler({data:{type}});assert.deepEqual(seen.map(x=>x.type),['status','error','frame-stall','combat-performance']);
+  handlers.length=0;installPeerObservation();handlers[0]({data:tick});assert.equal(seen.at(-1),tick,'legacy proof observer remains opt-in capable');
+ }finally{for(const name of names){const descriptor=saved.get(name);if(descriptor)Object.defineProperty(globalThis,name,descriptor);else delete globalThis[name];}}
+});

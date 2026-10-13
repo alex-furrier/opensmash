@@ -22,7 +22,14 @@ export function installSimulatedController(){
  }});
 }
 
-export function createSimulatedPeer({chromium,origin,iso,onObservation}){
+// Full tick export is useful for opt-in proof, but normal server diagnostics
+// need only phases, errors and bounded performance observations.
+export function installPeerObservation({ticks=true}={}){
+ const types=['playable','error','status','frame-stall','combat-performance','startup-performance'];
+ window.addEventListener('message',({data})=>{if((ticks&&data?.type==='confirmed-tick')||types.includes(data?.type))void window.__observePeer(data);});
+}
+
+export function createSimulatedPeer({chromium,origin,iso,onObservation,observeTicks=true}){
  let active,closed=false;const waiting=new Map();
  const emit=value=>onObservation?.(value);
  function closeBrowser(run){
@@ -46,7 +53,7 @@ export function createSimulatedPeer({chromium,origin,iso,onObservation}){
    phase('page');
    await run.context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
    const page=await run.context.newPage();run.page=page;
-   if(onObservation){await page.exposeFunction('__observePeer',value=>emit({session,...value}));await page.addInitScript(()=>window.addEventListener('message',({data})=>{if(['confirmed-tick','playable','error','status','frame-stall','combat-performance','startup-performance'].includes(data?.type))void window.__observePeer(data);}));}
+   if(onObservation){await page.exposeFunction('__observePeer',value=>emit({session,...value}));await page.addInitScript(installPeerObservation,{ticks:observeTicks});}
    if(onObservation){page.on('console',message=>{if(['warning','error'].includes(message.type()))emit({session,type:'browser-console',level:message.type(),message:message.text().slice(0,500)});});page.on('pageerror',error=>emit({session,type:'browser-error',message:error.message.slice(0,500)}));}
    await page.addInitScript(installSimulatedController);
    phase('loading');
