@@ -523,7 +523,9 @@ Each launcher attempt owns a bounded 120-event diagnostic record at
 `window.meleeLaunchDiagnostics`. Fighter preparation, runtime loading and match
 startup each have a three-minute deadline. Human Ready and trailer holds do not
 consume that deadline. Repeated graphics percentages do not extend it; failure
-terminates the attempt and exposes the existing retry/return controls.
+terminates the attempt and exposes the existing retry/return controls. Trailer
+release resumes the deadline. The launcher checks it when its event loop runs;
+a blocked browser can report the timeout late.
 
 Confirmed ticks report input-digest, input-synchronization, simulation,
 applied-digest and applied-acknowledgement durations. Synchronization includes

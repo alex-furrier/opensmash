@@ -13,3 +13,9 @@ test('human Ready waits and successful gameplay do not time out; diagnostics sta
  for(let i=0;i<500;i++)d.observe({type:'frame-stall',frame:i,durationMs:90});
  d.observe({type:'metrics',frameTimes:[16,45,NaN,80]});const s=d.snapshot();assert.equal(s.events.length,120);assert.equal(s.frames,3);assert.equal(s.over33ms,2);assert.equal(s.longestStallMs,80);
 });
+
+test('trailer hold is unlimited, but releasing it resumes the deadline until actual playable',()=>{
+ let time=0;const d=createLaunchDiagnostics({now:()=>time,timeoutMs:100});d.arm('Starting');d.observe({type:'trailer-ready'});time=1000;assert.equal(d.expired(),undefined);
+ d.resumeTrailer();time=1099;assert.equal(d.expired(),undefined);time=1100;assert.match(d.expired(),/timed out/);
+ const successful=createLaunchDiagnostics({now:()=>time,timeoutMs:100});successful.arm('Starting');successful.observe({type:'trailer-ready'});successful.resumeTrailer();successful.observe({type:'playable'});time=10000;successful.resumeTrailer();assert.equal(successful.expired(),undefined);
+});
