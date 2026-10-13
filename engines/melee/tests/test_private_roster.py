@@ -43,11 +43,21 @@ class PrivateRosterTests(unittest.TestCase):
     with patch('opensmash_melee.character_import.GLB') as glb,patch('opensmash_melee.__main__.import_character',side_effect=retain),patch('opensmash_melee.character_import.run_stage') as convert:
      glb.return_value.mesh.return_value={'positions':[],'triangles':[],'names':[]}
      rows=manager.load_local_roster(manifest)
-     self.assertEqual(rows[0]['defaultTarget'],'mario');self.assertEqual(rows[0]['supportedTargets'],['mario'])
+     self.assertEqual(rows[0]['defaultTarget'],'mario');self.assertEqual(rows[0]['supportedTargets'],['mario']);self.assertEqual(rows[0]['rosterCategory'],'high-school')
      self.assertEqual(len(rows),1);self.assertIn('portraitTile',rows[0]);convert.assert_not_called()
      with Image.open(manager.root/(rows[0]['slug']+'-tile.webp')) as art:self.assertEqual(art.size,(90,86))
      self.assertEqual(manager.load_local_roster(manifest),rows)
      original_slug=rows[0]['slug']
+     data['characters'][0].update(rosterCategory='family',display='Alex (Family)');manifest.write_text(json.dumps(data))
+     family=manager.load_local_roster(manifest)
+     self.assertEqual(family[0]['slug'],original_slug);self.assertEqual(family[0]['name'],'Alex')
+     self.assertEqual(family[0]['displayName'],'Alex (Family)');self.assertEqual(family[0]['rosterCategory'],'family')
+     self.assertEqual(json.loads(manager.index.read_text())[0]['rosterCategory'],'family')
+     data['characters'][0]['rosterCategory']='unapproved';manifest.write_text(json.dumps(data))
+     with self.assertRaisesRegex(ValueError,'roster category'):manager.load_local_roster(manifest)
+     data['characters'][0].pop('rosterCategory');manifest.write_text(json.dumps(data))
+     restored=manager.load_local_roster(manifest);self.assertEqual(restored[0]['rosterCategory'],'high-school')
+     self.assertEqual(restored[0]['slug'],original_slug)
      data['characters'][0]['target']='luigi';manifest.write_text(json.dumps(data))
      varied=manager.load_local_roster(manifest)
      self.assertEqual(varied[0]['slug'],original_slug)

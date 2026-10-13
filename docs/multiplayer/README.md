@@ -556,8 +556,11 @@ default. A moveset saved through current Settings is versioned, so an explicit
 Mario or other override remains effective; valid moveset URL overrides remain
 explicit. This is a legacy preference migration, not a runtime base picker.
 
-The Melee roster selector reuses the existing grid: **High School** contains the
-active private imports, and **All** also includes the OpenSmash catalog. Catalog
+The Melee roster selector reuses the existing grid: **High School** and **Family**
+show their active private imports, and **All** includes both plus the OpenSmash
+catalog. Private manifests may set `rosterCategory` to `high-school` or `family`;
+legacy entries default to `high-school`. This presentation field never changes
+source identity or its accepted base list. Catalog
 membership does not grant playability; missing installed sources are disabled.
 The imports API's `roster=available` view reports only entries with complete local
 source files, and browser selection rejects absent sources before export/import.

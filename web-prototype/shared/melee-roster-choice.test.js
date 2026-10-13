@@ -31,3 +31,15 @@ test('base preferences are per physical port and source identity, preserve other
  assert.equal(chosenBase(row,{},'2P','fox'),'fox');assert.equal(chosenBase(row,{},'2P','marth'),'auto');
  assert.equal(chosenBase({slug:'catalog',target:'mario'},{},'1P','fox'),'fox','catalog without pair metadata retains valid explicit overrides');
 });
+
+test('Family isolates accepted private entries while High School keeps legacy rows and All keeps the catalog',()=>{
+ const school={slug:'school-alex',name:'Alex Furrier'},family={slug:'family-alex',name:'Alex (Family)',rosterCategory:'family'};
+ const active=[school,family],catalog=[{slug:'public-source'},school,family];
+ assert.deepEqual(meleeGridRoster(catalog,active,active,'high-school').map(row=>row.slug),['school-alex']);
+ assert.deepEqual(meleeGridRoster(catalog,active,active,'family').map(row=>row.slug),['family-alex']);
+ const all=meleeGridRoster(catalog,active,active,'all');
+ assert.deepEqual(all.map(row=>row.slug),['school-alex','family-alex','public-source']);
+ assert.equal(all.find(row=>row.slug==='public-source').meleeAvailable,false);
+ assert.deepEqual(meleeGridRoster(catalog,[],active,'family'),[],'catalog membership cannot populate a named private roster');
+ assert.deepEqual(meleeGridRoster(catalog,active,[],'family').map(row=>row.meleeAvailable),[false]);
+});

@@ -165,6 +165,8 @@ class ImportManager:
             supported=entry.get('supportedTargets',[target])
             if default!=target or not isinstance(supported,list) or not supported or len(supported)>len(TARGETS) or any(not isinstance(t,str) or t not in TARGETS for t in supported) or len(set(supported))!=len(supported) or default not in supported:
                 raise ValueError('Invalid validated private roster movesets.')
+            category=entry.get('rosterCategory','high-school')
+            if category not in ('high-school','family'):raise ValueError('Invalid private roster category.')
             display=entry.get('display') or entry.get('name')
             if not isinstance(display,str) or not display.strip() or len(display)>80:raise ValueError('Invalid private roster display name.')
             job={'id':uuid.uuid4().hex}
@@ -172,7 +174,7 @@ class ImportManager:
             if job['state']!='complete':raise ValueError(f"Private roster import failed for {entry['slug']}: {job['message']}")
             # Presentation metadata never changes the source signature or slug.
             job['fighter']['displayName']=display.strip()
-            job['fighter'].update(defaultTarget=default,supportedTargets=list(supported))
+            job['fighter'].update(defaultTarget=default,supportedTargets=list(supported),rosterCategory=category)
             active.append(job['fighter'])
         atomic_write(self.index,(json.dumps(self.rows,indent=2)+'\n').encode())
         self.private_rows=active

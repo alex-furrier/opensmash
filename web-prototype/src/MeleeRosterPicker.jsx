@@ -5,7 +5,7 @@ import './melee-roster-picker.css';
 
 export function MeleeRosterSelector({value,onChange,loading}){
  return <div className="melee-roster-selector" role="group" aria-label="Choose roster">
-  <span>Roster</span>{[['all','All'],['high-school','High School']].map(([id,label])=><button type="button" key={id} aria-pressed={value===id} onClick={()=>onChange(id)}>{label}</button>)}
+  <span>Roster</span>{[['all','All'],['high-school','High School'],['family','Family']].map(([id,label])=><button type="button" key={id} aria-pressed={value===id} onClick={()=>onChange(id)}>{label}</button>)}
   {loading&&<span role="status">Checking sources…</span>}
  </div>;
 }
