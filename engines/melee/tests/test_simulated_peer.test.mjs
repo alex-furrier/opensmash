@@ -1,12 +1,12 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createSimulatedPeer} from '../server/simulated-peer.mjs';
 import {EventEmitter} from 'node:events';
-test('Stop during browser launch prevents stale join and lets the next session retry without duplicate browsers',async()=>{
+test('Stop during browser launch closes the old browser before a fresh session acquires its own browser',async()=>{
  let release,launches=0,contexts=0;const pending=new Promise(resolve=>release=resolve),browser={async newContext(){contexts++;throw Error('fixture stops at context boundary');},async close(){}};
  const bot=createSimulatedPeer({chromium:{launch(){launches++;return pending;}},origin:'http://127.0.0.1:1',iso:'fixed-private-path'});
  const first=bot.start({room:'a'.repeat(32),session:'old'});bot.stop('old');
  const next=bot.start({room:'b'.repeat(32),session:'fresh'});release(browser);
- await assert.rejects(first,/stopped/);await assert.rejects(next,/could not prepare/);assert.equal(launches,1);assert.equal(contexts,1);await bot.close();
+ await assert.rejects(first,/stopped/);await assert.rejects(next,/could not prepare/);assert.equal(launches,2);assert.equal(contexts,1);await bot.close();
 });
 test('failed Chrome launch permits a fresh-room retry and failed-launch shutdown',async()=>{
  let launches=0,contexts=0,closes=0;
@@ -21,7 +21,7 @@ test('failed Chrome launch permits a fresh-room retry and failed-launch shutdown
  await assert.rejects(failed.start({room:'c'.repeat(32),session:'failed-close'}),/could not prepare/);
  await failed.close();
 });
-test('disconnected cached Chrome is replaced on the next fresh room',async()=>{
+test('each fresh room owns its browser and cannot reuse a previous closed instance',async()=>{
  let launches=0,contexts=0;const browsers=[];
  const bot=createSimulatedPeer({chromium:{async launch(){launches++;const browser=new EventEmitter();browser.newContext=async()=>{contexts++;throw Error('context boundary');};browser.close=async()=>{};browsers.push(browser);return browser;}},origin:'http://127.0.0.1:1',iso:'fixed-private-path'});
  await assert.rejects(bot.start({room:'a'.repeat(32),session:'before-crash'}),/could not prepare/);
@@ -65,5 +65,15 @@ test('Stop cancels a session waiting for predecessor teardown before it acquires
  const old=peer.start({room:'a'.repeat(32),session:'old'});const oldRejected=assert.rejects(old,/could not prepare/);await entered;peer.stop('old');
  const cancelled=peer.start({room:'b'.repeat(32),session:'cancelled-waiter'});const waiterRejected=assert.rejects(cancelled,/stopped/);peer.stop('cancelled-waiter');
  const fresh=peer.start({room:'c'.repeat(32),session:'fresh'});const freshRejected=assert.rejects(fresh,/could not prepare/);releaseCleanup();
- await Promise.all([oldRejected,waiterRejected,freshRejected]);assert.equal(contexts,2);assert.equal(launches,1);await peer.close();
+ await Promise.all([oldRejected,waiterRejected,freshRejected]);assert.equal(contexts,2);assert.equal(launches,2);await peer.close();
+});
+
+test('Stop interrupts stalled context acquisition by closing that session browser; retry launches a fresh browser',async()=>{
+ let rejectContext,entered,launches=0,closes=0;
+ const atContext=new Promise(resolve=>entered=resolve);
+ const stalled={newContext:()=>new Promise((_,reject)=>{rejectContext=reject;entered();}),close:async()=>{closes++;rejectContext(Error('Browser closed'));}};
+ const fresh={newContext:async()=>{throw Error('fresh context boundary');},close:async()=>{closes++;}};
+ const peer=createSimulatedPeer({chromium:{launch:async()=>++launches===1?stalled:fresh},origin:'http://127.0.0.1:1',iso:'local'});
+ const first=peer.start({room:'a'.repeat(32),session:'stalled'});const failed=assert.rejects(first,/Browser closed/);await atContext;peer.stop('stalled');await failed;
+ await assert.rejects(peer.start({room:'b'.repeat(32),session:'retry'}),/could not prepare/);await peer.close();assert.equal(launches,2);assert.equal(closes,2);
 });

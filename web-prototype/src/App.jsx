@@ -712,7 +712,7 @@ export default function App() {
     if(!isMelee){setLocalMeleeRoster([]);return;}
     const abort=new AbortController();
     fetch('/melee/api/imports?roster=active',{signal:abort.signal,cache:'no-store'}).then(r=>r.ok?r.json():[]).then(rows=>{
-      if(!abort.signal.aborted&&Array.isArray(rows))setLocalMeleeRoster(rows.map(row=>({...row,visibility:'private',portrait:row.portrait&&'/melee'+row.portrait,portraitTile:row.portraitTile&&'/melee'+row.portraitTile,portraitMedium:row.portraitMedium&&'/melee'+row.portraitMedium})));
+      if(!abort.signal.aborted&&Array.isArray(rows))setLocalMeleeRoster(rows.map(row=>({...row,sourceName:row.name,name:row.displayName||row.name,visibility:'private',portrait:row.portrait&&'/melee'+row.portrait,portraitTile:row.portraitTile&&'/melee'+row.portraitTile,portraitMedium:row.portraitMedium&&'/melee'+row.portraitMedium})));
     }).catch(()=>{});
     return()=>abort.abort();
   },[isMelee]);

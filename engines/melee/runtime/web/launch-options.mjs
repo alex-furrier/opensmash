@@ -17,7 +17,7 @@ export function planLaunch(schema, settings, selected, roster, random = Math.ran
     return !character.startsWith('random') && (character === 'vanilla:3' || kinds[target] === 3) ? [character] : [];
   }));
   const randomCustom = (override) => {
-    const compatible = roster.filter(f => kinds[f.target] !== undefined &&
+    const compatible = roster.filter(f => f.randomReady !== false && kinds[f.target] !== undefined &&
       (kinds[override && override !== 'auto' ? override : f.target] !== 3 || !gameWatchOccupants.size ||
        (gameWatchOccupants.size === 1 && gameWatchOccupants.has(f.slug))));
     const pool = compatible.filter(f => !taken.has(f.slug));

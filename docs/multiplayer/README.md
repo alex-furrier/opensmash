@@ -19,6 +19,22 @@ launcher remains available. Browser-local disc storage and the main launcher's
 standalone prototype's temporary one-tap download grant is not part of this
 flow. A saved copy from the same HTTPS origin/browser can still be restored.
 
+Browser random custom opponents come from the active installed source roster;
+catalog metadata alone does not prove a model is available. Historical imports
+remain addressable by frozen matches. Private display names are presentation
+metadata and do not replace source names or content-based identities.
+
+Each local-opponent session owns its browser. Startup phases are visible while
+the host waits, and a stalled preparation or Ready acknowledgement ends the room
+with a retry message. The normal solo surface also exposes Return to roster.
+
+The opt-in `engines/melee/tools/prove_launcher_flows.mjs` exercises fresh UI
+settings, disc selection, default random CPU preparation, keyboard acquisition,
+results, asset-fault Retry, cached-disc refresh and fresh local-opponent rooms.
+Supply `--origin`, your own local `--iso`, an installed `--character` slug, a
+private `--output` directory and `MELEE_PLAYWRIGHT_MODULE`. It reads selected
+native snapshots for progress/control evidence; this is not rollback proof.
+
 Private development remains loopback-bound. Optional `MELEE_PRIVATE_ORIGIN`
 admits one exact HTTPS tailnet origin, without Funnel. The website denies raw
 game files, disc-management/native-process APIs and system bundles, including
