@@ -1,5 +1,6 @@
 import MeleeControls from '../../engines/melee/web/app/Controls';
 import MeleeRosterPicker,{MeleeRosterSelector} from './MeleeRosterPicker.jsx';
+import meleeCatalog from '../../engines/melee/web/public/catalog.json';
 import {preferences as meleePreferences} from '../../engines/melee/web/lib/desktop';
 import {rosterChoiceKey,rosterScopes,selectionPort,chosenBase,rememberBase,meleeGridRoster,meleeSelectionAvailable} from '../shared/melee-roster-choice.js';
 import {meleeRosterPresentation} from '../shared/melee-roster.js';
@@ -736,7 +737,7 @@ export default function App() {
   // (engine boot, pin, Esc) repaint 1000 caption bitmaps in one task.
   const gridCharacters = useMemo(() => (demoMode
     ? (isMelee ? meleeDemoGridOrder : demoGridOrder)(characters.filter((character) => character.visibility !== "private" && !character.mine))
-    : (isMelee?meleeGridRoster(characters,localMeleeRoster,availableMeleeRoster,rosterUi.roster,checkingMeleeSources):characters)), [characters, demoMode, isMelee,localMeleeRoster,availableMeleeRoster,rosterUi.roster,checkingMeleeSources]);
+    : (isMelee?meleeGridRoster(mergeCharactersBySlug(meleeCatalog,characters),localMeleeRoster,availableMeleeRoster,rosterUi.roster,checkingMeleeSources):characters)), [characters, demoMode, isMelee,localMeleeRoster,availableMeleeRoster,rosterUi.roster,checkingMeleeSources]);
   const gridJobs = demoMode ? [] : fighterJobs;
   useEffect(()=>{window.gameLauncher?.clearPicks();setBasePick(null);},[gridCharacters]);
 

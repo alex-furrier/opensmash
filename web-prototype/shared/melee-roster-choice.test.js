@@ -1,6 +1,13 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {meleeGridRoster,meleeSelectionAvailable,chosenBase,rememberBase,supportedBases,selectionPort} from './melee-roster-choice.js';
+import catalog from '../../engines/melee/web/public/catalog.json' with {type:'json'};
+import {mergeCharactersBySlug} from './character-roster.js';
 const row={slug:'source-a',target:'luigi',defaultTarget:'luigi',supportedTargets:['luigi','fox']};
+test('All retains the complete source catalog even when the website has only a small installed public subset',()=>{
+ const installed=catalog.slice(0,2).map(row=>({...row,portrait:'/existing-art'}));
+ const all=meleeGridRoster(mergeCharactersBySlug(catalog,installed),[],installed,'all');
+ assert.equal(all.length,catalog.length);assert.equal(all.filter(row=>row.meleeAvailable).length,2);assert.equal(all[0].portrait,'/existing-art');assert.ok(all.some(row=>row.meleeAvailability==='Source unavailable'));
+});
 test('prepared demo reveal retains its catalog click path; ordinary play requires actual installed availability',()=>{
  assert.equal(meleeSelectionAvailable([{slug:'catalog'}],{demo:true}),true);
  assert.equal(meleeSelectionAvailable([{slug:'catalog'}]),false);
