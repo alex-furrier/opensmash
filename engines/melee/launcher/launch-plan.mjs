@@ -20,7 +20,8 @@ export function applyLauncherSelection(settings, action) {
     const slot=action.portPlan[index];
     const device=slot?.kind==='gamepad'?`gamepad${slot.index}`:slot?.kind==='keyboard'?'keyboard':slot?.kind==='none'?'off':'cpu';
     const chosen=picks[selectedPorts.indexOf(index)];
-    return {...port,device,character:chosen?.slug || (device==='off'?'vanilla:2':port.character==='selected'?'random':port.character)};
+    const chosenTarget=action.targets?.[selectedPorts.indexOf(index)];
+    return {...port,device,...(chosenTarget?{target:chosenTarget}:{}),character:chosen?.slug || (device==='off'?'vanilla:2':port.character==='selected'?'random':port.character)};
   })};
 }
 

@@ -43,6 +43,7 @@ class PrivateRosterTests(unittest.TestCase):
     with patch('opensmash_melee.character_import.GLB') as glb,patch('opensmash_melee.__main__.import_character',side_effect=retain),patch('opensmash_melee.character_import.run_stage') as convert:
      glb.return_value.mesh.return_value={'positions':[],'triangles':[],'names':[]}
      rows=manager.load_local_roster(manifest)
+     self.assertEqual(rows[0]['defaultTarget'],'mario');self.assertEqual(rows[0]['supportedTargets'],['mario'])
      self.assertEqual(len(rows),1);self.assertIn('portraitTile',rows[0]);convert.assert_not_called()
      with Image.open(manager.root/(rows[0]['slug']+'-tile.webp')) as art:self.assertEqual(art.size,(90,86))
      self.assertEqual(manager.load_local_roster(manifest),rows)
@@ -51,6 +52,13 @@ class PrivateRosterTests(unittest.TestCase):
      varied=manager.load_local_roster(manifest)
      self.assertEqual(varied[0]['slug'],original_slug)
      self.assertEqual(varied[0]['target'],'luigi')
+     data['characters'][0].update(defaultTarget='luigi',supportedTargets=['luigi','fox'])
+     manifest.write_text(json.dumps(data));supported=manager.load_local_roster(manifest)
+     self.assertEqual(supported[0]['slug'],original_slug);self.assertEqual(supported[0]['supportedTargets'],['luigi','fox'])
+     self.assertEqual(json.loads(manager.index.read_text())[0]['defaultTarget'],'luigi')
+     data['characters'][0]['supportedTargets']=['fox'];manifest.write_text(json.dumps(data))
+     with self.assertRaisesRegex(ValueError,'validated'):manager.load_local_roster(manifest)
+     data['characters'][0].pop('supportedTargets');data['characters'][0].pop('defaultTarget')
      self.assertEqual(len(manager.rows),1)
      convert.assert_not_called()
      data['characters'][0]['target']='mario'

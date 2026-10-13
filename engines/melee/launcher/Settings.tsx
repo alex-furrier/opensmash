@@ -34,6 +34,7 @@ export function MeleeDiscSettings(){
 // Settings > Reset All Settings: launch settings and control bindings.
 export function resetMeleePreferences(){
  try{preferences.removeItem('melee-launch-v1');}catch{}
+ try{preferences.removeItem('melee-roster-ui-v1');}catch{}
  saveBindings(defaultBindings());
 }
 export function MeleeSettings(){

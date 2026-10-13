@@ -229,6 +229,7 @@ function RuntimeControls() {
 }
 
 export default function RetroHome({
+  rosterSelector,
   aboutOpen,
   advancedActive,
   authorized,
@@ -686,6 +687,7 @@ export default function RetroHome({
           </div>
         </section>
         <div id="game-switch-row" className="is-game-switch" role="group" aria-label="Choose game" />
+        {rosterSelector}
         <div className="arena-surface"><div id="replica-grid" className="replica-grid" role="grid" aria-label="Search, create, and character roster" />{!ready && <p className="retro-roster-loading">Loading fighters…</p>}<p id="fighter-empty-state" className="fighter-empty-state" role="status" aria-live="polite" hidden /><p id="fighter-pick-prompt" className="fighter-pick-prompt" role="status" aria-live="polite" hidden /></div>
         <span id="replica-metrics" hidden>Building 200-cell grid…</span>
       </main>

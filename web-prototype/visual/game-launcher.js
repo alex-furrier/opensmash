@@ -454,14 +454,15 @@ function clearPicks() {
 }
 
 function collectPick(fighter, slots) {
-  const signature = slots.join(",");
+  const signature = JSON.stringify([slots,APP_BRIDGE?.selectionContext?.()]);
   if (pendingPickSlots !== signature) clearPicks();
   pendingPickSlots = signature;
   const index = pendingPicks.findIndex(pick => pick.slug === fighter.slug);
   if (index >= 0) {
-    pendingPicks.splice(index, 1);
+    // Removing an earlier pick restarts later ports rather than shifting their bases.
+    pendingPicks.splice(index);
   } else {
-    pendingPicks.push(fighter);
+    pendingPicks.push({...fighter,slot:slots[pendingPicks.length],target:APP_BRIDGE?.baseFor?.(fighter.slug,slots[pendingPicks.length])});
   }
   window.characterGrid?.clearPicks?.();
   pendingPicks.forEach((pick, i) => window.characterGrid?.markPick?.(pick.selectionName || pick.slug, slots[i]));
@@ -489,11 +490,12 @@ function launch(fighter) {
     [fighter, ...picks] = ready;
   } else {
     clearPicks();
+    fighter={...fighter,target:APP_BRIDGE?.baseFor?.(fighter.slug,slots[0]||'1P')};
   }
   controlEmbeddedTrailer(introVideo, 'pauseVideo');
   gameFrame.title = `${fighter.displayName} — Smash.fun`;
   const source = APP_BRIDGE?.launch
-    ? APP_BRIDGE.launch({ type: fighter.actionType || 'character', slug: fighter.slug, picks: picks.map(pick => pick.slug) })
+    ? APP_BRIDGE.launch({ type: fighter.actionType || 'character', slug: fighter.slug, picks: picks.map(pick => pick.slug),targets:[fighter,...picks].map(pick=>pick.target) })
     : engineUrl(fighter);
   if (!source || source === 'about:blank') {
     window.characterGrid?.select(null);
@@ -2954,6 +2956,12 @@ gameFrame?.addEventListener('load', () => {
 
 window.gameLauncher = Object.freeze({
   clearPicks,
+  selectionSlot(slug) {
+    const slots=APP_BRIDGE?.selectionSlots?.()||['1P'];
+    if(pendingPickSlots&&pendingPickSlots!==JSON.stringify([slots,APP_BRIDGE?.selectionContext?.()]))clearPicks();
+    return pendingPicks.find(pick=>pick.slug===slug)?.slot||slots[pendingPicks.length]||slots[0];
+  },
+  updatePickTarget(slug,target) {const pick=pendingPicks.find(pick=>pick.slug===slug);if(pick)pick.target=target;},
   get running() { return Boolean(videoFrame?.classList.contains('is-game-running')); },
   get verified() { return hasVerifiedRom(); },
   get mobileControls() { return usesMobileControls(); },

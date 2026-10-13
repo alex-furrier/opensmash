@@ -1,0 +1,19 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {meleeGridRoster,chosenBase,rememberBase,supportedBases,selectionPort} from './melee-roster-choice.js';
+const row={slug:'source-a',target:'luigi',defaultTarget:'luigi',supportedTargets:['luigi','fox']};
+test('named roster filters the existing grid and catalog membership never grants source availability',()=>{
+ const catalog=[{slug:'absent',name:'Catalog Fighter'},row],active=[{...row,imported:true}];
+ const all=meleeGridRoster(catalog,active,[row],'all');assert.equal(all.length,2);assert.equal(all.find(r=>r.slug==='absent').meleeAvailable,false);assert.equal(all[0].meleeAvailable,true);
+ assert.deepEqual(meleeGridRoster(catalog,active,[row],'high-school').map(r=>r.slug),['source-a']);
+ assert.equal(meleeGridRoster(catalog,[],[],'all',true)[0].meleeAvailability,'Checking source…');
+});
+test('base preferences are per physical port and source identity, preserve other choices and ignore revoked pairs',()=>{
+ let choices=rememberBase({},row,'1P','fox');choices=rememberBase(choices,row,'CPU2','auto');
+ assert.equal(chosenBase(row,choices,'1P'),'fox');assert.equal(chosenBase(row,choices,'CPU2'),'auto');assert.equal(selectionPort('CPU4'),3);
+ assert.equal(chosenBase({...row,slug:'other'},choices,'1P'),'auto');
+ assert.equal(chosenBase({...row,supportedTargets:['luigi']},choices,'1P'),'auto');
+ assert.deepEqual(chosenBase(row,JSON.parse(JSON.stringify(choices)),'1P'),'fox');
+ assert.throws(()=>rememberBase(choices,row,'2P','marth'),/validated/);
+ assert.deepEqual(supportedBases({target:'mario'}),['mario']);
+ assert.equal(chosenBase(row,{},'2P','fox'),'fox');assert.equal(chosenBase(row,{},'2P','marth'),'auto');
+});

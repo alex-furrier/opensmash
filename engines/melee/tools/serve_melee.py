@@ -211,7 +211,14 @@ class Handler(BaseHTTPRequestHandler):
                 imported = ROOT / 'assets/characters' / ident / 'announcer.wav'
                 return self.file(imported if imported.is_file() else descendant(CHARACTERS, slug + '/announcer.wav'))
             if route == '/api/imports':
-                active=parse_qs(urlsplit(self.path).query).get('roster')==['active']
+                roster=parse_qs(urlsplit(self.path).query).get('roster')
+                if roster==['available']:
+                    available=[]
+                    for row in CATALOG.values():
+                        source=ROOT/'assets/characters'/cache_id(row['slug'],row['target'],row['target']) if row.get('imported') else CHARACTERS/row['slug']
+                        if all((source/name).is_file() for name in ['rigged.glb','portrait_raw.png','stock_raw.png','emblem_raw.png','announcer.wav']):available.append(row)
+                    return self.json(available)
+                active=roster==['active']
                 return self.json(list(IMPORTS.private_rows if active and IMPORTS.private_rows is not None else IMPORTS.rows))
             if NATIVE and route == '/catalog.json':return self.file(ROOT/'web/public/catalog.json')
             if route.startswith('/api/imports/portraits/'):
@@ -239,6 +246,7 @@ class Handler(BaseHTTPRequestHandler):
                 query = parse_qs(urlsplit(self.path).query)
                 target = query.get('target',[CATALOG[slug]['target']])[0]
                 if target not in BY_SLUG: raise ValueError('Unknown moveset')
+                if 'supportedTargets' in CATALOG[slug] and target not in CATALOG[slug]['supportedTargets']:raise ValueError('This base is not validated for this character.')
                 fighter, code = KINDS[target]
                 ident = cache_id(slug,target,CATALOG[slug].get('original_target', CATALOG[slug]['target']))
                 variant = ('browser-compact/' if query.get('compact') == ['1'] else 'browser/') if query.get('skin') == ['host'] else ''
@@ -415,6 +423,7 @@ class Handler(BaseHTTPRequestHandler):
         row = CATALOG[slug]
         target = query.get('target',[row['target']])[0]
         if target not in BY_SLUG: return self.json({'error':'Unknown moveset'},400)
+        if 'supportedTargets' in row and target not in row['supportedTargets']:return self.json({'error':'This base is not validated for this character. Choose its character default or a supported base.'},400)
         fighter, code = KINDS[target]
         slots = BY_SLUG[target]['costumes']
         if not 0 <= color < len(slots): return self.send_error(400)

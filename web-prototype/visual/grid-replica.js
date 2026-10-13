@@ -100,6 +100,9 @@ function expandShortLabel(short, name) {
 function liveRosterCharacter(character) {
   return {
     asset: character.slug,
+    meleeAvailable: character.meleeAvailable,
+    meleeAvailability: character.meleeAvailability,
+    imported: character.imported,
     portrait: `live:${character.slug}`,
     // The server points `portrait` at the 90x86 tile derivative; a job that
     // predates the derivatives still resolves to a usable portrait.
@@ -600,6 +603,12 @@ gameRule.className = 'replica-game-rule';
 gameRule.setAttribute('aria-hidden', 'true');
 gameCell.append(gameRule);
 
+function fighterCellElement(){
+ const cell=document.createElement('div'),select=document.createElement('button');
+ select.type='button';select.className='replica-select-control';cell.append(select);
+ return cell;
+}
+
 CELL_IDS.forEach((id, index) => {
   const isSearch = index === 0;
   const isCreate = index === 1;
@@ -610,8 +619,8 @@ CELL_IDS.forEach((id, index) => {
       : rosterCharacterForIndex(index - 2);
   const fkind = character.fkind ?? VANILLA_ROSTER.indexOf(character);
   const label = character.label;
-  const button = document.createElement(isSearch ? 'label' : 'button');
-  if (!isSearch) button.type = 'button';
+  const button = isSearch?document.createElement('label'):isCreate?document.createElement('button'):fighterCellElement();
+  if (isCreate) button.type = 'button';
   button.className = `replica-cell${isSearch ? ' is-search' : isCreate ? ' is-create' : ''}`;
   button.dataset.character = id;
   button.dataset.kind = isSearch ? 'search' : isCreate ? 'create' : 'fighter';
@@ -1055,8 +1064,7 @@ function rosterCellId(slug) {
 
 function createRosterCell(character) {
   const id = rosterCellId(character.asset);
-  const button = document.createElement('button');
-  button.type = 'button';
+  const button = fighterCellElement();
   button.className = 'replica-cell';
   button.dataset.character = id;
   button.dataset.kind = 'fighter';
@@ -1133,6 +1141,18 @@ async function syncCharacters(characters = []) {
       : character.name);
 
     setNativePortrait(button, character);
+    const selectControl=button.querySelector('.replica-select-control');
+    const unavailable=character.meleeAvailable===false;
+    button.dataset.sourceUnavailable=String(unavailable);
+    if(selectControl){selectControl.disabled=unavailable;selectControl.setAttribute('aria-label',unavailable?`${character.name}: ${character.meleeAvailability||'Source unavailable'}`:`Select ${character.name}`);}
+    else if(button.tagName==='BUTTON')button.disabled=unavailable;
+    let status=button.querySelector('.replica-source-status');
+    if(unavailable){if(!status){status=document.createElement('span');status.className='replica-source-status';button.append(status);}status.textContent=character.meleeAvailability||'Source unavailable';}else status?.remove();
+    let base=button.querySelector('.replica-base-button');
+    if(character.imported&&character.meleeAvailable===true){
+      if(!base){base=document.createElement('button');base.type='button';base.className='replica-base-button';base.textContent='↺';base.addEventListener('click',event=>{event.stopPropagation();event.preventDefault();APP_BRIDGE?.chooseBase?.(base.dataset.slug);});button.append(base);}
+      base.dataset.slug=character.asset;base.title='Choose base fighter';base.setAttribute('aria-label',`Choose base fighter for ${character.name}`);base.setAttribute('aria-haspopup','dialog');
+    }else base?.remove();
   }
 
   // Cells are updated in place, so a roster whose ORDER changed (the demo's
@@ -1380,6 +1400,7 @@ function select(name) {
   cells.forEach(cell => {
     if (cell.hasAttribute('aria-pressed')) {
       cell.setAttribute('aria-pressed', String(cell === selected));
+      cell.querySelector('.replica-select-control')?.setAttribute('aria-pressed',String(cell===selected));
     }
   });
   return selected;
@@ -1400,7 +1421,7 @@ function clearPicks() {
 
 function requestSelection(name) {
   const selected = name == null ? null : getCell(name);
-  if (selected) {
+  if (selected&&selected.dataset.sourceUnavailable!=='true') {
     pendingSearchSelection = null;
     clearFighterSearch();
     grid.dispatchEvent(new CustomEvent('characterselect', {
@@ -1421,6 +1442,7 @@ function requestSelection(name) {
 
 function attachCellActivation(cell) {
   cell.addEventListener('click', () => {
+    if(cell.dataset.sourceUnavailable==='true')return;
     if (cell.dataset.kind === 'search') {
       fighterSearch?.focus({ preventScroll: true });
       return;

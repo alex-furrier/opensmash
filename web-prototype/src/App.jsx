@@ -1,4 +1,7 @@
 import MeleeControls from '../../engines/melee/web/app/Controls';
+import MeleeRosterPicker,{MeleeRosterSelector} from './MeleeRosterPicker.jsx';
+import {preferences as meleePreferences} from '../../engines/melee/web/lib/desktop';
+import {rosterChoiceKey,rosterScopes,selectionPort,chosenBase,rememberBase,meleeGridRoster} from '../shared/melee-roster-choice.js';
 import {meleeRosterPresentation} from '../shared/melee-roster.js';
 import {MeleeSettings,MeleeDiscSettings as MeleeRomSettings,resetMeleePreferences} from '../../engines/melee/launcher/Settings';
 import {loadSharedRom} from './shared-game-files.js';
@@ -706,15 +709,25 @@ export default function App() {
     return () => { cancelled = true; };
   }, []);
 
-  const [localMeleeRoster,setLocalMeleeRoster]=useState([]);
+  const [localMeleeRoster,setLocalMeleeRoster]=useState([]),[availableMeleeRoster,setAvailableMeleeRoster]=useState([]),[checkingMeleeSources,setCheckingMeleeSources]=useState(true);
+  const [rosterUi,setRosterUi]=useState(()=>{try{const saved=JSON.parse(meleePreferences.getItem(rosterChoiceKey)||'{}');return {roster:rosterScopes.includes(saved.roster)?saved.roster:'high-school',choices:saved.choices||{}};}catch{return {roster:'high-school',choices:{}};}});
+  const [basePick,setBasePick]=useState(null);
+  function saveRosterUi(next){setRosterUi(next);try{meleePreferences.setItem(rosterChoiceKey,JSON.stringify(next));}catch{}}
+  function selectRoster(roster){window.gameLauncher?.clearPicks();setBasePick(null);saveRosterUi({...rosterUi,roster});}
+  function chooseRosterBase(target){
+    const choices=rememberBase(rosterUi.choices,basePick.character,basePick.slot,target);
+    saveRosterUi({...rosterUi,choices});window.gameLauncher?.updatePickTarget(basePick.character.slug,target);setBasePick(null);
+  }
+  useEffect(()=>{if(!isMelee)setBasePick(null);},[isMelee]);
   const [roomDraft,setRoomDraft]=useState(false),[roomCapabilities,setRoomCapabilities]=useState({enabled:false,simulatedOpponent:false});
   useEffect(()=>{if(!isMelee){setRoomDraft(false);setRoomCapabilities({enabled:false,simulatedOpponent:false});return;}const abort=new AbortController();fetch('/melee/api/netplay/config',{signal:abort.signal}).then(r=>r.ok?r.json():null).then(c=>{if(!abort.signal.aborted)setRoomCapabilities({enabled:c?.enabled===true,simulatedOpponent:c?.simulatedOpponent===true});}).catch(()=>{});return()=>abort.abort();},[isMelee]);
   useEffect(()=>{
     if(!isMelee){setLocalMeleeRoster([]);return;}
     const abort=new AbortController();
-    fetch('/melee/api/imports?roster=active',{signal:abort.signal,cache:'no-store'}).then(r=>r.ok?r.json():[]).then(rows=>{
-      if(!abort.signal.aborted&&Array.isArray(rows))setLocalMeleeRoster(rows.map(meleeRosterPresentation));
-    }).catch(()=>{});
+    setCheckingMeleeSources(true);
+    Promise.all(['active','available'].map(roster=>fetch('/melee/api/imports?roster='+roster,{signal:abort.signal,cache:'no-store'}).then(r=>{if(!r.ok)throw Error('Could not check installed Melee sources.');return r.json();}))).then(([active,available])=>{
+      if(!abort.signal.aborted&&Array.isArray(active)&&Array.isArray(available)){setLocalMeleeRoster(active.map(meleeRosterPresentation));setAvailableMeleeRoster(available);}
+    }).catch(()=>{if(!abort.signal.aborted)setAvailableMeleeRoster([]);}).finally(()=>{if(!abort.signal.aborted)setCheckingMeleeSources(false);});
     return()=>abort.abort();
   },[isMelee]);
   // Live demos show the public roster only: no private/own fighters, no jobs.
@@ -723,8 +736,9 @@ export default function App() {
   // (engine boot, pin, Esc) repaint 1000 caption bitmaps in one task.
   const gridCharacters = useMemo(() => (demoMode
     ? (isMelee ? meleeDemoGridOrder : demoGridOrder)(characters.filter((character) => character.visibility !== "private" && !character.mine))
-    : (isMelee?[...localMeleeRoster,...characters.filter(character=>!localMeleeRoster.some(local=>local.slug===character.slug))]:characters)), [characters, demoMode, isMelee,localMeleeRoster]);
+    : (isMelee?meleeGridRoster(characters,localMeleeRoster,availableMeleeRoster,rosterUi.roster,checkingMeleeSources):characters)), [characters, demoMode, isMelee,localMeleeRoster,availableMeleeRoster,rosterUi.roster,checkingMeleeSources]);
   const gridJobs = demoMode ? [] : fighterJobs;
+  useEffect(()=>{window.gameLauncher?.clearPicks();setBasePick(null);},[gridCharacters]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1129,6 +1143,7 @@ export default function App() {
     try { n64Keyboard?.save(n64Keyboard.defaults()); } catch { /* storage blocked */ }
     window.openSmashControllerRemap?.clearAllProfiles?.();
     resetMeleePreferences();
+    window.gameLauncher?.clearPicks();setBasePick(null);setRosterUi({roster:'high-school',choices:{}});
   }
 
   async function requestLaunch(action) {
@@ -1282,7 +1297,7 @@ export default function App() {
     return result;
   }
 
-  function launchVisualAction({ type, slug, picks = [] }) {
+  function launchVisualAction({ type, slug, picks = [],targets = [] }) {
     const action = type === "trailer-intro"
       ? { type: "start", trailerIntro: true, trailerRecording }
       : type === "character"
@@ -1290,9 +1305,10 @@ export default function App() {
           type,
           character: gridCharacters.find((character) => character.slug === slug),
           picks: picks.map((pickSlug) => gridCharacters.find((character) => character.slug === pickSlug)),
+          targets,
         }
       : { type };
-    if (type === "character" && (!action.character || action.picks.some((pick) => !pick))) {
+    if (type === "character" && (!action.character || action.picks.some((pick) => !pick) || (isMelee&&[action.character,...action.picks].some(pick=>!pick.meleeAvailable)))) {
       setPageError("That fighter is no longer available.");
       return "about:blank";
     }
@@ -1632,6 +1648,9 @@ export default function App() {
   if (!isCreatePage) {
     Object.assign(visualBridgeRef.current, {
       characters:gridCharacters,
+      selectionContext(){return isMelee?JSON.stringify([controllerPlan(advancedOptions,gamepads),advancedOptions.selectionMode,loadMeleeSettings().mode,rosterUi.roster,roomDraft]):null;},
+      baseFor(slug,slot){const row=gridCharacters.find(row=>row.slug===slug);return isMelee&&row?chosenBase(row,rosterUi.choices,slot,loadMeleeSettings().ports[selectionPort(slot)]?.target):undefined;},
+      chooseBase(slug){const character=gridCharacters.find(row=>row.slug===slug);if(!isMelee||!character?.meleeAvailable)return;setBasePick({character,slot:window.gameLauncher?.selectionSlot(slug)||'1P'});},
       fighterJobs,
       handlesGameSetup: isMelee||nativeSsb64,
       trailerCapture: isMelee && demoMode && !meleeDesktop(),
@@ -1688,6 +1707,7 @@ export default function App() {
 
     return (
       <>
+        {basePick&&<MeleeRosterPicker pick={basePick} value={chosenBase(basePick.character,rosterUi.choices,basePick.slot,loadMeleeSettings().ports[selectionPort(basePick.slot)]?.target)} onChange={chooseRosterBase} onClose={()=>setBasePick(null)}/>}
         {isMelee && demoMode && meleeDiscReady && !loadingCharacters && <Suspense fallback={null}><TrailerCapture ref={meleeTrailerRef} characters={characters} soundOn={soundOn}/></Suspense>}
         {isTrailerPage && !trailerSetup && (
           <TrailerSetup characters={characters} loading={loadingCharacters || loadingSession}
@@ -1695,6 +1715,7 @@ export default function App() {
         )}
         <RetroHome
           engineContent={engine?.experience==='melee'?<Suspense fallback={<p>Loading Melee…</p>}><MeleeExperience key={engine.id} action={engine.action} localPortPlan={controllerPlan(advancedOptions,gamepads)} onClose={closeMeleeExperience} soundOn={soundOn}/></Suspense>:nativeSsb64&&engine?<Suspense fallback={<p>Loading Smash 64…</p>}><NativeSsb64 key={engine.src} src={engine.src} onClose={()=>setEngine(null)} soundOn={soundOn}/></Suspense>:null}
+          rosterSelector={isMelee&&!demoMode?<MeleeRosterSelector value={rosterUi.roster} onChange={selectRoster} loading={checkingMeleeSources}/>:null}
           aboutOpen={aboutOpen}
           advancedActive={hasAdvancedOverrides(advancedOptions)}
           authorized={authorized}
