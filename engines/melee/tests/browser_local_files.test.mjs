@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mountSizedFile, mountSystemBundle, costumeSlot, COSTUME_SLOT_SIZE,COSTUME_SLOTS,regionalCostumeAssets} from '../runtime/web/local-files.mjs';
+import {mountSizedFile, mountSystemBundle, costumeSlot, COSTUME_SLOT_SIZE,COSTUME_SLOTS,COSTUME_ASSET_NAMES,regionalCostumeAssets} from '../runtime/web/local-files.mjs';
 import {readFileSync} from 'node:fs';
 import {planLaunch} from '../runtime/web/launch-options.mjs';
 
@@ -13,7 +13,7 @@ test('ordinary multi-Falcon lineups install the red costume under both locale fi
  const assets=plan.costumes.map(row=>({filename:row.filename,blob:new Blob([new Uint8Array(32)])}));
  const installed=regionalCostumeAssets(assets);assert.equal(installed.length,5);
  const red=installed.find(row=>row.filename==='PlCaRe.dat'),us=installed.find(row=>row.filename==='PlCaRe.usd');
- assert.ok(red&&us);assert.equal(red.blob,us.blob);assert.ok(COSTUME_SLOTS.includes(us.filename));
+ assert.ok(red&&us);assert.equal(red.blob,us.blob);assert.ok(COSTUME_ASSET_NAMES.includes(us.filename));assert.equal(COSTUME_SLOTS.length,124);assert.ok(!COSTUME_SLOTS.includes(us.filename));
  assert.deepEqual(installed.filter(row=>row!==us),assets);
  const repeated=planLaunch(schema,{...settings,ports:settings.ports.map((p,i)=>i===3?{...p,character:'c'}:p)},roster[0],roster);
  assert.deepEqual(repeated.ports.map(p=>p.color),[0,1,2,2]);assert.equal(repeated.costumes.length,3);

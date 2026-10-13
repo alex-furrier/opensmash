@@ -14,7 +14,7 @@ export function costumeSlot(bytes) {
 
 // Upstream's red Captain Falcon basename ends in a dot: US settings load
 // PlCaRe.usd, while other settings load the canonical PlCaRe.dat export.
-COSTUME_SLOTS.push('PlCaRe.usd');
+export const COSTUME_ASSET_NAMES=[...COSTUME_SLOTS,'PlCaRe.usd'];
 export function regionalCostumeAssets(assets){
   return assets.flatMap(asset=>asset.filename==='PlCaRe.dat'
     ? [asset,{...asset,filename:'PlCaRe.usd'}] : [asset]);

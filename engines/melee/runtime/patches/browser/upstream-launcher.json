@@ -1,8 +1,8 @@
 {
   "baseRevision": "5bc531aafcc941866f2c916afebc38ee75543222",
   "basePatchSha256": "4c367e254cef6d56e49c19e231b0a52b6f7b1542a346c5406482380a594278d3",
-  "patchSha256": "e2d5d746a35e5054576170749866801ba81b812fda130ad778b20b7d9387a759",
+  "patchSha256": "7993c7b1d27eecd72a806b6a45264dfbe024eb63cb1f90e43fc076f4593de81b",
   "files": {
-    "platforms/browser/runtime.mjs": "bd321c125bd8e969b07f1094a3dc451275c9d51f82763ae8e6c5b39150676ece"
+    "platforms/browser/runtime.mjs": "f1e92a121b7eec52c321adb6029eac845fe5a91e6c7a6bd478ab642cdb25d04c"
   }
 }

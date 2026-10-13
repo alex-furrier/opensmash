@@ -1,6 +1,16 @@
 --- a/platforms/browser/runtime.mjs
 +++ b/platforms/browser/runtime.mjs
-@@ -149,7 +149,8 @@
+@@ -141,15 +141,16 @@
+ const script=document.createElement('script');script.src='./melee_browser.js';script.onerror=()=>fail(Error('Build the upstream Melee engine before launching.'));document.head.append(script);
+ async function select(data){
+  if(!ready||selection)throw Error('The upstream engine is not ready for selection.');
+- const {COSTUME_SLOTS}=await import(base+'local-files.mjs');
++ const {COSTUME_ASSET_NAMES,regionalCostumeAssets}=await import(base+'local-files.mjs');
+  const css=['MnSlChr.dat','MnSlChr.usd','audio/nr_select.ssm','audio/us/nr_select.ssm'];
+- for(const [assets,allowed,max] of [[data.costumes||[],COSTUME_SLOTS,2*1024*1024],[data.cssAssets||[],css,16*1024*1024]]){
++ for(const [assets,allowed,max] of [[regionalCostumeAssets(data.costumes||[]),COSTUME_ASSET_NAMES,2*1024*1024],[data.cssAssets||[],css,16*1024*1024]]){
+   for(const asset of assets){if(!allowed.includes(asset.filename))throw Error('Invalid replacement asset.');const bytes=new Uint8Array(await asset.blob.arrayBuffer());if(bytes.length<32||bytes.length>max)throw Error('Invalid replacement asset size.');const path='/mod/'+asset.filename;Module.FS.mkdirTree(path.slice(0,path.lastIndexOf('/')));Module.FS.writeFile(path,bytes);}
+  }
   const c=data.launch;
   if(data.netplay){
    const {installedIdentity}=await import(base+'netplay/identity.mjs');
