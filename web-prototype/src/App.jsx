@@ -1,7 +1,7 @@
 import MeleeControls from '../../engines/melee/web/app/Controls';
 import MeleeRosterPicker,{MeleeRosterSelector} from './MeleeRosterPicker.jsx';
 import {preferences as meleePreferences} from '../../engines/melee/web/lib/desktop';
-import {rosterChoiceKey,rosterScopes,selectionPort,chosenBase,rememberBase,meleeGridRoster} from '../shared/melee-roster-choice.js';
+import {rosterChoiceKey,rosterScopes,selectionPort,chosenBase,rememberBase,meleeGridRoster,meleeSelectionAvailable} from '../shared/melee-roster-choice.js';
 import {meleeRosterPresentation} from '../shared/melee-roster.js';
 import {MeleeSettings,MeleeDiscSettings as MeleeRomSettings,resetMeleePreferences} from '../../engines/melee/launcher/Settings';
 import {loadSharedRom} from './shared-game-files.js';
@@ -1308,7 +1308,7 @@ export default function App() {
           targets,
         }
       : { type };
-    if (type === "character" && (!action.character || action.picks.some((pick) => !pick) || (isMelee&&[action.character,...action.picks].some(pick=>!pick.meleeAvailable)))) {
+    if (type === "character" && (!action.character || action.picks.some((pick) => !pick) || (isMelee&&!meleeSelectionAvailable([action.character,...action.picks],{demo:demoMode})))) {
       setPageError("That fighter is no longer available.");
       return "about:blank";
     }

@@ -2,6 +2,9 @@ export const rosterChoiceKey='melee-roster-ui-v1';
 export const rosterScopes=['all','high-school'];
 export const selectionPort=slot=>Math.max(0,Math.min(3,Number(String(slot).match(/\d/)?.[0]||1)-1));
 
+// Demo clicks reveal the existing prepared trailer; ordinary picks start a game.
+export const meleeSelectionAvailable=(rows,{demo=false}={})=>demo||rows.every(row=>row?.meleeAvailable===true);
+
 export function supportedBases(row){
  const fallback=row.defaultTarget||row.target;
  return [...new Set(row.supportedTargets||[fallback])].filter(Boolean);
@@ -9,6 +12,7 @@ export function supportedBases(row){
 
 export function chosenBase(row,choices,slot,fallback='auto'){
  const target=choices?.[selectionPort(slot)]?.[row.slug]??fallback;
+ if(!row.supportedTargets)return target;
  return target==='auto'||supportedBases(row).includes(target)?target:'auto';
 }
 

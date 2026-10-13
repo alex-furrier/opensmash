@@ -6,8 +6,14 @@ from urllib.error import HTTPError
 from unittest.mock import patch
 from types import SimpleNamespace
 from tools import serve_melee as server
+from opensmash_melee.targets import costume_target_allowed
 
 class RosterChoiceRoutes(unittest.TestCase):
+ def test_required_companion_costumes_remain_available_without_becoming_selectable_bases(self):
+  for primary,companion in [('popo','nana'),('sheik','zelda'),('zelda','sheik')]:
+   row={'target':primary,'supportedTargets':[primary]}
+   self.assertTrue(costume_target_allowed(row,primary));self.assertTrue(costume_target_allowed(row,companion));self.assertNotIn(companion,row['supportedTargets']);self.assertFalse(costume_target_allowed(row,'fox'))
+  self.assertTrue(costume_target_allowed({'target':'mario'},'fox'))
  def test_available_roster_requires_complete_source_and_untested_pairs_never_prepare(self):
   with tempfile.TemporaryDirectory() as temp:
    root=Path(temp);source=root/'library'/'present';source.mkdir(parents=True)

@@ -32,7 +32,7 @@ _manifest_hash = re.search(r'([a-f0-9]{64})\.json$', _manifest_key)
 BUILD_VERSION = _manifest_hash.group(1)[:16] if _manifest_hash else ''
 IMMUTABLE_CACHE = 'public, max-age=31536000, immutable'
 CATALOG = {r['slug']: r for r in json.loads((ROOT / 'web/public/catalog.json').read_text())}
-from opensmash_melee.targets import PLAYABLE, BY_SLUG, cache_id
+from opensmash_melee.targets import PLAYABLE, BY_SLUG, cache_id, costume_target_allowed
 KINDS = {slug:(row['fighter'],row['code']) for slug,row in BY_SLUG.items()}
 LOCK = threading.Lock()
 # Serialize writes to one character/moveset cache, while allowing independent
@@ -246,7 +246,7 @@ class Handler(BaseHTTPRequestHandler):
                 query = parse_qs(urlsplit(self.path).query)
                 target = query.get('target',[CATALOG[slug]['target']])[0]
                 if target not in BY_SLUG: raise ValueError('Unknown moveset')
-                if 'supportedTargets' in CATALOG[slug] and target not in CATALOG[slug]['supportedTargets']:raise ValueError('This base is not validated for this character.')
+                if not costume_target_allowed(CATALOG[slug],target):raise ValueError('This base is not validated for this character.')
                 fighter, code = KINDS[target]
                 ident = cache_id(slug,target,CATALOG[slug].get('original_target', CATALOG[slug]['target']))
                 variant = ('browser-compact/' if query.get('compact') == ['1'] else 'browser/') if query.get('skin') == ['host'] else ''
@@ -423,7 +423,7 @@ class Handler(BaseHTTPRequestHandler):
         row = CATALOG[slug]
         target = query.get('target',[row['target']])[0]
         if target not in BY_SLUG: return self.json({'error':'Unknown moveset'},400)
-        if 'supportedTargets' in row and target not in row['supportedTargets']:return self.json({'error':'This base is not validated for this character. Choose its character default or a supported base.'},400)
+        if not costume_target_allowed(row,target):return self.json({'error':'This base is not validated for this character. Choose its character default or a supported base.'},400)
         fighter, code = KINDS[target]
         slots = BY_SLUG[target]['costumes']
         if not 0 <= color < len(slots): return self.send_error(400)
