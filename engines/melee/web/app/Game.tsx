@@ -1,4 +1,5 @@
 import {installedMatchIdentity} from '../../runtime/web/netplay/match-identity.mjs';
+import {regionalCostumeAssets} from '../../runtime/web/local-files.mjs';
 import {createLaunchDiagnostics} from '../lib/launch-diagnostics.mjs';
 import {localOpponentStatus} from '../lib/local-opponent-status.mjs';
 import MeleeTouchControls from './MeleeTouchControls';
@@ -103,7 +104,7 @@ export default function Game({fighter,settings,roster,onClose,soundOn=true,chrom
       setStatus(preparedCostumes===costumeTotal?'Preparing character select…':`Preparing fighters… ${preparedCostumes}/${costumeTotal}`);
      }
      return costume;
-    })),
+    })).then(regionalCostumeAssets),
     (async()=>{
      if(!costumeTotal)return [];
      const response=await meleeFetch('/api/character-select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({costumes:launchPlan.costumes,sourceOnly:true}),signal:abort.signal});
