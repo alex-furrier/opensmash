@@ -47,6 +47,13 @@ class PrivateRosterTests(unittest.TestCase):
      with Image.open(manager.root/(rows[0]['slug']+'-tile.webp')) as art:self.assertEqual(art.size,(90,86))
      self.assertEqual(manager.load_local_roster(manifest),rows)
      original_slug=rows[0]['slug']
+     data['characters'][0]['target']='luigi';manifest.write_text(json.dumps(data))
+     varied=manager.load_local_roster(manifest)
+     self.assertEqual(varied[0]['slug'],original_slug)
+     self.assertEqual(varied[0]['target'],'luigi')
+     self.assertEqual(len(manager.rows),1)
+     convert.assert_not_called()
+     data['characters'][0]['target']='mario'
      data['characters'][0]['display']='Stage Name';manifest.write_text(json.dumps(data))
      aliased=manager.load_local_roster(manifest)
      self.assertEqual(aliased[0]['slug'],original_slug)

@@ -24,3 +24,10 @@ test('active presentation metadata overrides stale lookup rows without replacing
  const rows=resolvedLaunchRoster([], [source], [{...source,displayName:'Stage Name'}],true);
  assert.equal(rows[0].name,'Source Person');assert.equal(rows[0].displayName,'Stage Name');assert.equal(rows[0].slug,'stable');
 });
+
+test('fixed active assignments with auto use their own bases and allocate distinct same-base costume slots; explicit override still applies',()=>{
+ const active=[{slug:'a',target:'luigi',imported:true},{slug:'b',target:'fox',imported:true},{slug:'c',target:'captain-falcon',imported:true},{slug:'d',target:'luigi',imported:true}];
+ const settings={...structuredClone(schema.defaults),ports:active.map((row,i)=>({device:i?'cpu':'keyboard',character:row.slug,target:'auto'}))};
+ const launch=planLaunch(schema,settings,active[0],resolvedLaunchRoster([],active,active,true));assert.deepEqual(launch.ports.map(p=>p.fighter),[7,2,0,7]);assert.notEqual(launch.ports[0].color,launch.ports[3].color);assert.deepEqual(launch.costumes.map(c=>c.target),['luigi','fox','captain-falcon','luigi']);
+ const overridden=planLaunch(schema,{...settings,ports:settings.ports.map(p=>({...p,target:'mario'}))},active[0],active);assert.ok(overridden.ports.every(p=>p.fighter===8));
+});

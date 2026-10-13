@@ -543,3 +543,15 @@ not TCP packet-loss tests. Outputs stay in the caller-supplied private directory
 A slow confirmed tick can extend the engine's inclusive game-step timer. Read
 its synchronization/acknowledgement timings before attributing that duration to
 simulation or GPU work. Selected-state agreement is not complete-state proof.
+
+
+## Fixed character defaults
+
+Source-only private roster imports can update a saved default target without
+changing the content-based source slug, portraits or original source identity.
+With Character default selected, each active port resolves that fighter's fixed
+assignment and allocates costume slots through the existing launch planner.
+An unversioned global Mario preference from the old roster resolves to Character
+default. A moveset saved through current Settings is versioned, so an explicit
+Mario or other override remains effective; valid moveset URL overrides remain
+explicit. This is a legacy preference migration, not a runtime base picker.
