@@ -416,7 +416,8 @@
   }
   /* Keep the visible icons compact while giving the whole group a generous
      tap target. Private fighters pair their lock with the settings gear. */
-  .replica-manage-button {
+  .replica-manage-button,
+  .replica-base-button {
     position: absolute;
     bottom: 4%;
     right: 4%;
@@ -434,7 +435,8 @@
     cursor: pointer;
     touch-action: manipulation;
   }
-  .replica-manage-button svg {
+  .replica-manage-button svg,
+  .replica-base-button svg {
     position: relative;
     display: block;
     flex: none;
@@ -452,7 +454,8 @@
     width: 14px;
     height: 14px;
   }
-  .replica-manage-button::before {
+  .replica-manage-button::before,
+  .replica-base-button::before {
     content: "";
     position: absolute;
     right: -3px;
@@ -465,16 +468,25 @@
   .replica-cell[data-visibility="private"] .replica-manage-button::before { width: 40px; }
   .replica-manage-button:hover,
   .replica-manage-button:focus-visible,
-  .replica-manage-button:active { color: #fff2d6; }
+  .replica-manage-button:active,
+  .replica-base-button:hover,
+  .replica-base-button:focus-visible,
+  .replica-base-button:active { color: #fff2d6; }
   .replica-manage-button:hover::before,
   .replica-manage-button:focus-visible::before,
-  .replica-manage-button:active::before {
+  .replica-manage-button:active::before,
+  .replica-base-button:hover::before,
+  .replica-base-button:focus-visible::before,
+  .replica-base-button:active::before {
     background: rgba(242, 217, 166, .18);
     box-shadow: inset 0 0 0 1px rgba(242, 217, 166, .5);
   }
-  .replica-cell:has(.replica-manage-button:hover)::after { background: transparent; }
-  .replica-manage-button:focus-visible { outline: none; }
-  .replica-manage-button:focus-visible::before { outline: 2px solid #f2d9a6; outline-offset: 1px; }
+  .replica-cell:has(.replica-manage-button:hover)::after,
+  .replica-cell:has(.replica-base-button:hover)::after { background: transparent; }
+  .replica-manage-button:focus-visible,
+  .replica-base-button:focus-visible { outline: none; }
+  .replica-manage-button:focus-visible::before,
+  .replica-base-button:focus-visible::before { outline: 2px solid #f2d9a6; outline-offset: 1px; }
   .fighter-job-cell.is-generating .replica-private-badge {
     top: 55%;
     right: auto;

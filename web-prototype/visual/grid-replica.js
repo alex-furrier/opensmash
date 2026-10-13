@@ -1150,7 +1150,7 @@ async function syncCharacters(characters = []) {
     if(unavailable){if(!status){status=document.createElement('span');status.className='replica-source-status';button.append(status);}status.textContent=character.meleeAvailability||'Source unavailable';}else status?.remove();
     let base=button.querySelector('.replica-base-button');
     if(character.imported&&character.meleeAvailable===true){
-      if(!base){base=document.createElement('button');base.type='button';base.className='replica-base-button';base.textContent='↺';base.addEventListener('click',event=>{event.stopPropagation();event.preventDefault();APP_BRIDGE?.chooseBase?.(base.dataset.slug);});button.append(base);}
+      if(!base){base=document.createElement('button');base.type='button';base.className='replica-base-button';base.innerHTML='<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 4A4 4 0 1 0 10 7M9.5 1v3H6.5"/></svg>';base.addEventListener('click',event=>{event.stopPropagation();event.preventDefault();APP_BRIDGE?.chooseBase?.(base.dataset.slug);});button.append(base);}
       base.dataset.slug=character.asset;base.title='Choose base fighter';base.setAttribute('aria-label',`Choose base fighter for ${character.name}`);base.setAttribute('aria-haspopup','dialog');
     }else base?.remove();
   }
