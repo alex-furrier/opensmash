@@ -1,3 +1,5 @@
+import {reconcileSelection,selectFighter,readyFighters} from '../shared/local-fighter-selection.js';
+import {startMenuPointer} from './menu-pointer.js';
 import { n64Keyboard } from '../shared/n64-keyboard.js';
 import {loadMeleeKeycapLayout, meleeRequiredControls, meleeControlForEvent, meleeControlLabels, meleePadControls, meleeCalloutLayout} from '../../engines/melee/launcher/controller-tutorial.ts';
 import gameCubeControllerUrl from '../../engines/melee/launcher/assets/fun-gamecube-controller.glb?url';
@@ -440,6 +442,53 @@ const pickPrompt = document.getElementById('fighter-pick-prompt');
 let pendingPicks = [];
 let pendingPickSlots = "";
 
+let localSelection;
+let selectionRenderKey='';
+function localState() {
+  const slots=APP_BRIDGE?.selectionSlots?.()||['1P'];
+  localSelection=reconcileSelection(localSelection,slots,APP_BRIDGE?.selectionContext?.());
+  return localSelection;
+}
+function renderLocalSelection() {
+  const panel=document.getElementById('local-fighter-selection');
+  if(!panel)return;
+  panel.hidden=!APP_BRIDGE?.explicitLocalSelection||document.body.classList.contains('is-game-running');
+  if(panel.hidden)return;
+  const state=localState();
+  const key=JSON.stringify(state);
+  if(key===selectionRenderKey)return;
+  selectionRenderKey=key;
+  const focusedSlot=document.activeElement?.dataset.selectionSlot;
+  const heading=document.createElement('p');heading.textContent='Choose fighters, then play locally';
+  const choices=state.slots.map(slot=>{
+    const button=document.createElement('button');button.type='button';button.dataset.selectionSlot=slot;
+    button.textContent=`${slot}: ${state.picks[slot]?.displayName||'Choose fighter'}`;
+    button.setAttribute('aria-pressed',String(slot===state.active));
+    button.onclick=()=>{localSelection={...localState(),active:slot};renderLocalSelection();};
+    return button;
+  });
+  const play=document.createElement('button');play.type='button';play.textContent='Play locally';
+  play.disabled=!readyFighters(state);play.onclick=()=>{const picks=readyFighters(localState());if(picks)launch(picks[0],picks);};
+  const hint=document.createElement('small');hint.textContent='P1 controller: left stick moves cursor · A / × selects · B / ○ goes back · right stick scrolls';
+  panel.replaceChildren(heading,...choices,play,hint);
+  if(focusedSlot)choices.find(button=>button.dataset.selectionSlot===focusedSlot)?.focus({preventScroll:true});
+  window.characterGrid?.clearPicks?.();
+  for(const [slot,pick] of Object.entries(state.picks))window.characterGrid?.markPick?.(pick.selectionName||pick.slug,slot);
+}
+setInterval(renderLocalSelection,250);
+startMenuPointer({
+  enabled:()=>APP_BRIDGE?.experience==='melee'&&!document.querySelector('.game-overlay,.native-game,.boot-screen'),
+  controllerIndex:()=>APP_BRIDGE?.menuControllerIndex,
+  back:()=>{
+    const modal=Array.from(document.querySelectorAll('dialog[open],[role="dialog"]')).find(element=>element.getClientRects().length&&getComputedStyle(element).visibility!=='hidden');
+    const buttons=Array.from(modal?.querySelectorAll('button')||[]).filter(button=>button.getClientRects().length&&getComputedStyle(button).visibility!=='hidden');
+    const close=buttons.find(button=>/Close|Back/.test(button.getAttribute('aria-label')||''))||buttons.find(button=>/^(Back|Cancel|Close)$/.test(button.textContent.trim()));
+    if(close)close.click();
+    else if(videoFrame?.classList.contains('is-game-running'))closeGame();
+    else {const state=localState();localSelection={...state,picks:{...state.picks,[state.active]:undefined}};renderLocalSelection();}
+  }
+});
+
 function showPickPrompt(text) {
   if (!pickPrompt) return;
   pickPrompt.textContent = text || '';
@@ -451,6 +500,7 @@ function clearPicks() {
   pendingPickSlots = "";
   window.characterGrid?.clearPicks?.();
   showPickPrompt('');
+  if(localSelection&&APP_BRIDGE?.explicitLocalSelection){selectionRenderKey='';renderLocalSelection();}
 }
 
 function collectPick(fighter, slots) {
@@ -478,13 +528,20 @@ function collectPick(fighter, slots) {
   return null;
 }
 
-function launch(fighter) {
+function launch(fighter, selectedPicks) {
   if (!gameFrame || !videoFrame) return;
   pendingFighter = null;
   let picks = [];
   const slots = APP_BRIDGE?.selectionSlots?.()
     ?? Array.from({ length: APP_BRIDGE?.humanPortCount?.() ?? 1 }, (_, i) => `${i + 1}P`);
-  if (slots.length >= 2 && (fighter.actionType || 'character') === 'character') {
+  if (APP_BRIDGE?.explicitLocalSelection && !selectedPicks && (fighter.actionType || 'character') === 'character') {
+    const state=localState();
+    localSelection=selectFighter(state,{...fighter,target:APP_BRIDGE?.baseFor?.(fighter.slug,state.active)});
+    renderLocalSelection();
+    return;
+  }
+  if(selectedPicks){[fighter,...picks]=selectedPicks;}
+  else if (slots.length >= 2 && (fighter.actionType || 'character') === 'character') {
     const ready = collectPick(fighter, slots);
     if (!ready) return;
     [fighter, ...picks] = ready;
@@ -2957,11 +3014,12 @@ gameFrame?.addEventListener('load', () => {
 window.gameLauncher = Object.freeze({
   clearPicks,
   selectionSlot(slug) {
+    if(APP_BRIDGE?.explicitLocalSelection)return localState().active;
     const slots=APP_BRIDGE?.selectionSlots?.()||['1P'];
     if(pendingPickSlots&&pendingPickSlots!==JSON.stringify([slots,APP_BRIDGE?.selectionContext?.()]))clearPicks();
     return pendingPicks.find(pick=>pick.slug===slug)?.slot||slots[pendingPicks.length]||slots[0];
   },
-  updatePickTarget(slug,target) {const pick=pendingPicks.find(pick=>pick.slug===slug);if(pick)pick.target=target;},
+  updatePickTarget(slug,target) {if(APP_BRIDGE?.explicitLocalSelection){const state=localState(),pick=state.picks[state.active];if(pick?.slug===slug){localSelection={...state,picks:{...state.picks,[state.active]:{...pick,target}}};renderLocalSelection();}return;}const pick=pendingPicks.find(pick=>pick.slug===slug);if(pick)pick.target=target;},
   get running() { return Boolean(videoFrame?.classList.contains('is-game-running')); },
   get verified() { return hasVerifiedRom(); },
   get mobileControls() { return usesMobileControls(); },

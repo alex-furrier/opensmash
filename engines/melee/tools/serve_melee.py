@@ -223,6 +223,22 @@ class Handler(BaseHTTPRequestHandler):
                 active=roster==['active']
                 return self.json(list(IMPORTS.private_rows if active and IMPORTS.private_rows is not None else IMPORTS.rows))
             if NATIVE and route == '/catalog.json':return self.file(ROOT/'web/public/catalog.json')
+            if route.startswith('/api/source-portraits/'):
+                name=unquote(route.removeprefix('/api/source-portraits/'))
+                slug=name.removesuffix('.webp')
+                if not name.endswith('.webp') or slug not in CATALOG or CATALOG[slug].get('imported'):raise FileNotFoundError(name)
+                source=descendant(CHARACTERS,slug+'/portrait_raw.png')
+                signature=hashlib.sha256((str(source)+str(source.stat().st_mtime_ns)).encode()).hexdigest()[:24]
+                portrait=ROOT/'build/source-portraits'/(signature+'.webp')
+                with preparation_lock('portrait-'+signature):
+                    if not portrait.is_file():
+                        from PIL import Image,ImageOps
+                        import io
+                        with Image.open(source) as image:
+                            tile=ImageOps.fit(image.convert('RGB'),(90,86),method=Image.Resampling.LANCZOS)
+                            output=io.BytesIO();tile.save(output,format='WEBP',quality=85)
+                            atomic_write(portrait,output.getvalue())
+                return self.file(portrait)
             if route.startswith('/api/imports/portraits/'):
                 name=route.removeprefix('/api/imports/portraits/')
                 if not re.fullmatch(r'import-[a-f0-9]{24}(?:-tile|-medium)?\.webp',name):raise FileNotFoundError(name)

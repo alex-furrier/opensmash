@@ -9,6 +9,24 @@ from tools import serve_melee as server
 from opensmash_melee.targets import costume_target_allowed
 
 class RosterChoiceRoutes(unittest.TestCase):
+ def test_source_portrait_is_bounded_derivative_and_rejects_private_or_unknown_paths(self):
+  from PIL import Image
+  import io
+  with tempfile.TemporaryDirectory() as temp:
+   root=Path(temp);source=root/'library'/'regular';source.mkdir(parents=True)
+   Image.new('RGB',(400,300),'red').save(source/'portrait_raw.png')
+   rows={'regular':{'slug':'regular'},'private':{'slug':'private','imported':True}}
+   with patch.multiple(server,ROOT=root,CHARACTERS=root/'library',TOKEN='',CATALOG=rows):
+    http=ThreadingHTTPServer(('127.0.0.1',0),server.Handler);thread=threading.Thread(target=http.serve_forever,daemon=True);thread.start();origin=f'http://127.0.0.1:{http.server_port}'
+    try:
+     data=urlopen(origin+'/api/source-portraits/regular.webp').read()
+     with Image.open(io.BytesIO(data)) as tile:self.assertEqual(tile.size,(90,86))
+     self.assertEqual(urlopen(origin+'/api/source-portraits/regular.webp').read(),data)
+     for path in ['unknown.webp','private.webp','%2e%2e%2fregular.webp','regular.png']:
+      with self.assertRaises(HTTPError) as error:urlopen(origin+'/api/source-portraits/'+path)
+      self.assertEqual(error.exception.code,404)
+    finally:http.shutdown();http.server_close();thread.join()
+
  def test_available_private_roster_excludes_historical_imports_without_removing_lookup(self):
   with tempfile.TemporaryDirectory() as temp:
    root=Path(temp);rows={slug:{'slug':slug,'target':'mario','imported':True} for slug in ['active','historical']}

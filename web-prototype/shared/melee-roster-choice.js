@@ -26,6 +26,6 @@ export function rememberBase(choices,row,slot,target){
 export function meleeGridRoster(catalog,active,available,scope,loading=false){
  const installed=new Map(available.map(row=>[row.slug,row]));
  const rows=scope==='all'?[...active,...catalog.filter(row=>!active.some(local=>local.slug===row.slug))]:active.filter(row=>(row.rosterCategory||'high-school')===scope);
- return rows.map(row=>({...row,...(installed.has(row.slug)?{target:installed.get(row.slug).target,defaultTarget:installed.get(row.slug).defaultTarget,supportedTargets:installed.get(row.slug).supportedTargets}:{}),
+ return rows.map(row=>({...row,...(row.imported||!installed.has(row.slug)||row.portraitTile||row.portrait?{}:{portraitTile:'/melee/api/source-portraits/'+encodeURIComponent(row.slug)+'.webp'}),...(installed.has(row.slug)?{target:installed.get(row.slug).target,defaultTarget:installed.get(row.slug).defaultTarget,supportedTargets:installed.get(row.slug).supportedTargets}:{}),
   meleeAvailable:installed.has(row.slug),meleeAvailability:loading?'Checking source…':installed.has(row.slug)?'':'Source unavailable'}));
 }
