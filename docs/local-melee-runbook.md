@@ -71,6 +71,15 @@ Without the netplay engine option the website reports friend mode disabled.
 Production builds and source/runtime patches must match; do not change a live
 engine root merely to make a document's example run.
 
+Use Settings for disc management, controls and gameplay rules. Zero minutes means
+unlimited time. Local launch supports P1–P4 port assignments; an online room has
+two humans, each acquiring one local input device. Keep the global moveset at
+`auto` to use character defaults; explicit overrides can mask those defaults.
+The private base selector exposes accepted pairs only. Physical multi-controller
+support still needs testing. At this checkpoint imports/caches use existing
+ignored checkout paths; PR #2's custom storage-root flags are a separate candidate,
+not options to pass to the current gameplay branch without checking support.
+
 ## Existing private HTTPS topology
 
 An approved Tailscale Serve mapping forwards one exact private HTTPS origin to
