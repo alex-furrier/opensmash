@@ -9,6 +9,20 @@ from tools import serve_melee as server
 from opensmash_melee.targets import costume_target_allowed
 
 class RosterChoiceRoutes(unittest.TestCase):
+ def test_available_private_roster_excludes_historical_imports_without_removing_lookup(self):
+  with tempfile.TemporaryDirectory() as temp:
+   root=Path(temp);rows={slug:{'slug':slug,'target':'mario','imported':True} for slug in ['active','historical']}
+   for row in rows.values():
+    source=root/'assets/characters'/server.cache_id(row['slug'],'mario','mario');source.mkdir(parents=True)
+    for name in ['rigged.glb','portrait_raw.png','stock_raw.png','emblem_raw.png','announcer.wav']:(source/name).write_bytes(b'fixture')
+   imports=SimpleNamespace(private_rows=[rows['active']])
+   with patch.multiple(server,ROOT=root,CHARACTERS=root/'library',TOKEN='',CATALOG=rows,IMPORTS=imports):
+    http=ThreadingHTTPServer(('127.0.0.1',0),server.Handler);thread=threading.Thread(target=http.serve_forever,daemon=True);thread.start()
+    try:
+     url=f'http://127.0.0.1:{http.server_port}/api/imports?roster=available'
+     self.assertEqual([r['slug'] for r in json.load(urlopen(url))],['active']);self.assertIn('historical',server.CATALOG)
+     imports.private_rows=None;self.assertEqual({r['slug'] for r in json.load(urlopen(url))},{'active','historical'})
+    finally:http.shutdown();http.server_close();thread.join()
  def test_required_companion_costumes_remain_available_without_becoming_selectable_bases(self):
   for primary,companion in [('popo','nana'),('sheik','zelda'),('zelda','sheik')]:
    row={'target':primary,'supportedTargets':[primary]}
@@ -19,7 +33,7 @@ class RosterChoiceRoutes(unittest.TestCase):
    root=Path(temp);source=root/'library'/'present';source.mkdir(parents=True)
    for name in ['rigged.glb','portrait_raw.png','stock_raw.png','emblem_raw.png','announcer.wav']:(source/name).write_bytes(b'fixture')
    rows={slug:{'slug':slug,'name':slug,'target':'mario','defaultTarget':'mario','supportedTargets':['mario']} for slug in ['present','absent']}
-   with patch.multiple(server,ROOT=root,CHARACTERS=root/'library',TOKEN='',CATALOG=rows,SETUP=SimpleNamespace(ready=True)),patch.object(server,'run_stage') as convert:
+   with patch.multiple(server,ROOT=root,CHARACTERS=root/'library',TOKEN='',CATALOG=rows,IMPORTS=SimpleNamespace(private_rows=None),SETUP=SimpleNamespace(ready=True)),patch.object(server,'run_stage') as convert:
     http=ThreadingHTTPServer(('127.0.0.1',0),server.Handler);thread=threading.Thread(target=http.serve_forever,daemon=True);thread.start();origin=f'http://127.0.0.1:{http.server_port}'
     try:
      available=json.load(urlopen(origin+'/api/imports?roster=available'));self.assertEqual([row['slug'] for row in available],['present'])

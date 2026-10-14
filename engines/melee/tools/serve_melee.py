@@ -214,7 +214,9 @@ class Handler(BaseHTTPRequestHandler):
                 roster=parse_qs(urlsplit(self.path).query).get('roster')
                 if roster==['available']:
                     available=[]
+                    active_imports=None if IMPORTS.private_rows is None else {row['slug'] for row in IMPORTS.private_rows}
                     for row in CATALOG.values():
+                        if row.get('imported') and active_imports is not None and row['slug'] not in active_imports:continue
                         source=ROOT/'assets/characters'/cache_id(row['slug'],row['target'],row['target']) if row.get('imported') else CHARACTERS/row['slug']
                         if all((source/name).is_file() for name in ['rigged.glb','portrait_raw.png','stock_raw.png','emblem_raw.png','announcer.wav']):available.append(row)
                     return self.json(available)
