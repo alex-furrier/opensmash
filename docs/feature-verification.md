@@ -25,6 +25,7 @@ support exactly two humans with one local input source per peer.
 | Feature | User-facing behavior | How tested | What the evidence establishes / limits |
 | --- | --- | --- | --- |
 | Gameplay and return | Select, play, reach results, Stop or return; retry owns a fresh attempt | A: [launch options](../engines/melee/tests/launch_options.test.mjs), [lifecycle](../engines/melee/tests/netplay_lifecycle.test.mjs). B: launcher proof, E2/E3 | Real local combat/results and return were observed. Selected native snapshots prove progress, not complete state equivalence. |
+| Local fighter selection (candidate) | Choose an explicit physical player, retain its fighter, then Play locally; P1 cursor operates website buttons | A: [selection and pointer regressions](https://github.com/alex-furrier/opensmash/blob/a5ea3b2cac7df780d7d43f93ea8391c2771a3fe9/web-prototype/shared/local-fighter-selection.test.js). B: E9 | Two distinct selected sources reached both native ports; simulated pads moved independently; return retained choices. Physical controller and native dropdown navigation remain gaps. |
 | Keyboard and controllers | Unified physical-port assignment; per-device buttons, axes and trigger deadzone; guest uses its own human device | A: [controller ports](../web-prototype/shared/controller-ports.test.js), [profiles](../engines/melee/tests/controller_profiles.test.mjs), [friend selection](../engines/melee/tests/friend_match.test.mjs). B: E2/E3 | Keyboard acquisition/movement and synthetic standard gamepad routing. Gap: physical multi-controller, hotplug and nonstandard adapters. |
 | Touch controls | Independent pointers and analog sticks reset on cancel/focus loss | A: [mobile input](../web-prototype/shared/mobile-input.test.js), [touch controls](../web-prototype/shared/mobile-controls.test.js). B: [touch-emulation evidence](../engines/melee/validation/launch-prep/README.md). U: E6 | Emulated browser touch plus a narrow subjective phone report; no current phone/controller certification. |
 | Roster filters and base choice | All preserves catalog rows; installed sources determine playability; named categories filter entries; each source/port retains an accepted base choice | A: [roster choice](../web-prototype/shared/melee-roster-choice.test.js), [launch roster](../engines/melee/tests/launch_roster.test.mjs), [route enforcement](../engines/melee/tests/test_roster_choices.py). B: E3 | Catalog membership does not grant model availability. Unsupported/revoked pairs cannot prepare. Private identities and per-pair acceptance belong in the private companion. |
@@ -173,3 +174,21 @@ gaps. Full browser rollback needs complete state ownership and remains unsupport
 Custom-domain homelab deployment is unimplemented; the observed private HTTPS
 surface uses a restricted tailnet origin. No recovery or deployment work is part
 of this documentation change.
+
+- **E9 — local selection repair candidate:** source `a5ea3b2cac7df780d7d43f93ea8391c2771a3fe9`,
+  2026-10-14 UTC, macOS, fresh headless Chrome contexts on isolated loopback, with and without the optional room chooser.
+  Runtime WASM SHA-256 `780c8e1ba76c3277cfa9baae4c52b3afa9934f1d8fbdc601985e831b11b05bf7`;
+  browser runtime module `f1e92a121b7eec52c321adb6029eac845fe5a91e6c7a6bd478ab642cdb25d04c`.
+  38 focused Node, 31 related room/controller regressions and four Python HTTP regressions passed. The
+  opt-in [browser proof](https://github.com/alex-furrier/opensmash/blob/a5ea3b2cac7df780d7d43f93ea8391c2771a3fe9/engines/melee/tools/prove_local_selection.mjs)
+  exercised two synthetic standard gamepads through navigator polling, website
+  cursor P2 assignment and start clicks, submenu/native-dialog B-back, right-stick scrolling, two distinct selected
+  source IDs, both native fighter kinds, 210 advancing ticks, one-pad-at-a-time directed movement with the other observed input neutral,
+  return and P2 replacement. B closed the native base picker without erasing choices; its cursor rendered in the dialog top layer. Website cursor input was disabled during the match. Swapped/mirrored/opposite/missing input-trace fixtures were rejected. Unchanged neutral packets were retained as observed held inputs across the bridge’s deduplication. A native lifecycle DOM fixture also blocked website input; native gameplay was not run.
+  Display alias labels preserved source identity; an ordinary All-roster portrait
+  decoded as a 90×86 derivative. Run with `MELEE_PLAYWRIGHT_MODULE` set to an
+  existing Playwright installation, then `node engines/melee/tools/prove_local_selection.mjs
+  --origin <isolated-loopback-origin> --iso <legal-local-disc> --output <private-evidence-directory>`.
+  Receipts and images remain private. This establishes candidate browser behavior;
+  it does not certify physical hardware, native select-menu control, full-match
+  results, new donor pairs, or a live deployment.
