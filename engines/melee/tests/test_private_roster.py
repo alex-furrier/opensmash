@@ -24,6 +24,15 @@ class PrivateRosterTests(unittest.TestCase):
    self.assertEqual(info['name'],'Alex');self.assertFalse((dest/'intake-photo.jpg').exists())
    entry['source_sha256']='0'*64
    with self.assertRaisesRegex(ValueError,'integrity'):import_local_source(entry,manifest,dest)
+ def test_source_pivot_sidecar_survives_import_and_changes_source_identity(self):
+  with tempfile.TemporaryDirectory() as temp:
+   root=Path(temp).resolve();manifest,entry,export=self.fixture(root);sidecar=export/'melee-source-pivot.json';sidecar.write_text('{"version":1}')
+   with patch('opensmash_melee.character_import.GLB') as glb:
+    glb.return_value.mesh.return_value={'positions':[],'triangles':[],'names':[]}
+    first=root/'first';first.mkdir();a=import_local_source(entry,manifest,first)
+    self.assertEqual((first/sidecar.name).read_bytes(),sidecar.read_bytes())
+    sidecar.write_text('{"version":2}');second=root/'second';second.mkdir();b=import_local_source(entry,manifest,second)
+   self.assertNotEqual(a['signature'],b['signature']);self.assertEqual(a['name'],b['name'])
  def test_rejects_external_directory_and_symlink_assets(self):
   with tempfile.TemporaryDirectory() as temp:
    root=Path(temp).resolve();manifest,entry,export=self.fixture(root);dest=root/'result';dest.mkdir()

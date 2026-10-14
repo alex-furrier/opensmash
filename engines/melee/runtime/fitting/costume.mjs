@@ -33,6 +33,7 @@ class Archive {
 /** Standard HSD envelopes and GX matrix palettes, matching gx.polygons in the
  * offline exporter. No OSSK skinning or OSUI presentation extension is needed. */
 export function buildStandardCostume(raw,source,target,fitted,texture,color=0){
+  if(source.fitStrategy==='source-pivot'||fitted.sourcePivot)throw Error('Source-pivot costumes require the browser runtime renderer; standard DAT export is unsupported');
   const a=new Archive(raw),n=source.n,slots=target.mode==='round'?5:4;
   if(!Number.isInteger(n)||n<1||n>65535||!Number.isInteger(source.triangleCount)||source.triangleCount<1||source.triangleCount>100000
     ||source.uv.length!==n*2||source.triangles.length!==source.triangleCount*3
@@ -123,13 +124,16 @@ export function buildStandardCostume(raw,source,target,fitted,texture,color=0){
 
 export function buildCostume(raw,source,target,fitted,texture,color=0,identityRaw=null){
   const a=new Archive(raw),n=source.n,slots=target.mode==='round'?5:4;
-  const presentation=preparePresentation(target,fitted);
+  const pivot=fitted.sourcePivot;
+  if(pivot&&(!['donkey-kong','bowser','pikachu','pichu'].includes(target.target)||target.sourcePivotRootJoint!==pivot.rootJoint||target.sourcePivotRootInverse?.length!==16||!Number.isInteger(target.sourcePivotTranslationJoint)))throw Error('Unsupported source-pivot target presentation');
+  const presentation=pivot?{scale:1,offset:0,attachments:[]}:preparePresentation(target,fitted);
   for(const row of presentation.attachments)row.value.forEach((v,i)=>a.f32(row.offset+i*4,v));
   if(source.uv.length!==n*2||source.triangles.length!==source.triangleCount*3||texture.byteLength!==source.textureSize**2*4)throw Error('Invalid source surface');
   const pos=a.floats(fitted.positions),normal=a.floats(fitted.normals),uv=a.floats(source.uv);
   const srcpos=a.floats(fitted.positions),srcnormal=a.floats(fitted.normals);
-  const bones=[...new Set(fitted.joints)].filter(j=>j!==0xffffffff).sort((a,b)=>a-b);
-  if(!bones.length||bones.some(j=>j>=target.jointOffsets.length))throw Error('Invalid fitted joint');
+  const bones=pivot?Array.from({length:source.sourceJoints},(_,i)=>i):[...new Set(fitted.joints)].filter(j=>j!==0xffffffff).sort((a,b)=>a-b);
+  const drivers=pivot?bones.map(i=>i===0?pivot.rootJoint:i===pivot.translationBone?target.sourcePivotTranslationJoint:target.anatomy[pivot.driverParts[i]]):bones;
+  if(!bones.length||drivers.some(j=>!Number.isInteger(j)||j<0||j>=target.jointOffsets.length))throw Error('Invalid fitted joint');
   const boneIndex=new Map(bones.map((j,i)=>[j,i])),envs=[],envIndex=new Map(),vertexEnvs=[];
   for(let i=0;i<n;i++){const env=[];for(let k=0;k<slots;k++){const j=fitted.joints[i*slots+k],w=fitted.weights[i*slots+k];if(j!==0xffffffff)env.push([boneIndex.get(j),w]);}
     if(!env.length)throw Error('Empty fitted envelope');const key=JSON.stringify(env);if(!envIndex.has(key)){envIndex.set(key,envs.length);envs.push(env);}vertexEnvs.push(envIndex.get(key));}
@@ -137,11 +141,16 @@ export function buildCostume(raw,source,target,fitted,texture,color=0,identityRa
   envs.forEach((original,i)=>{const env=original.length===1?[[original[0][0],.5],[original[0][0],.5]]:original;
     const record=a.alloc(4+env.length*8);a.u32(record,env.length);env.forEach(([j,w],k)=>{a.u32(record+4+k*8,j);a.f32(record+8+k*8,w);});a.pointer(records+i*4,record);});
   const vertexEnv=a.alloc(n*2);vertexEnvs.forEach((e,i)=>a.u16(vertexEnv+i*2,e));
-  const metadata=a.alloc(48);[0x4f53534b,1,n,envs.length,bones.length].forEach((x,i)=>a.u32(metadata+i*4,x));
+  const metadata=a.alloc(48);[0x4f53534b,pivot?2:1,n,envs.length,bones.length].forEach((x,i)=>a.u32(metadata+i*4,x));
   [srcpos,srcnormal,records,vertexEnv,pos,normal].forEach((ptr,i)=>a.pointer(metadata+20+i*4,ptr));
+  if(pivot){
+    const sourceTable=a.alloc(16+bones.length*16);[0x4f535032,bones.length,pivot.bodyBone,3|(pivot.translationBone<<8)].forEach((v,i)=>a.u32(sourceTable+i*4,v));
+    bones.forEach((bone,i)=>{a.u32(sourceTable+16+i*16,pivot.parents[bone]>>>0);for(let k=0;k<3;k++)a.f32(sourceTable+20+i*16+k*4,pivot.origins[bone*3+k]);});
+    a.pointer(metadata+44,sourceTable);
+  }
   const desc=a.alloc(120);
   [[0,1,0,0,null],[9,3,1,12,pos],[10,3,0,12,normal],[13,3,1,8,uv],[255,0x4f53534b,0,0,metadata]].forEach(([attr,kind,count,stride,ptr],i)=>{const p=desc+i*24;[attr,kind,count,4].forEach((x,k)=>a.u32(p+k*4,x));a.u16(p+18,stride);a.pointer(p+20,ptr);});
-  const boneDesc=a.alloc((bones.length+1)*8);bones.forEach((j,i)=>{a.pointer(boneDesc+i*8,target.jointOffsets[j]);a.f32(boneDesc+i*8+4,1/bones.length);});const table=a.alloc(8);a.pointer(table,boneDesc);
+  const boneDesc=a.alloc((bones.length+1)*8);bones.forEach((j,i)=>{a.pointer(boneDesc+i*8,target.jointOffsets[drivers[i]]);a.f32(boneDesc+i*8+4,1/bones.length);});const table=a.alloc(8);a.pointer(table,boneDesc);
   let first=null,previous=null;
   for(let begin=0;begin<source.triangles.length;begin+=65535){const tris=source.triangles.slice(begin,begin+65535);const dl=a.alloc(Math.ceil((3+tris.length*7)/32)*32,32);a.bytes[dl]=0x90;a.u16(dl+1,tris.length);
     tris.forEach((vertex,i)=>{if(!Number.isInteger(vertex)||vertex<0||vertex>=n)throw Error('Invalid triangle index');const p=dl+3+i*7;a.bytes[p]=0;[1,3,5].forEach(k=>a.u16(p+k,vertex));});
@@ -155,12 +164,12 @@ export function buildCostume(raw,source,target,fitted,texture,color=0,identityRa
     const original=base+source.identityMaterial;
     a.f32(original+68,presentation.scale);a.f32(original+72,presentation.offset);
     // Fit the portrait camera using the final head envelope in target bind space.
-    const points=[],inv=target.headInverse;
-    for(let i=0;i<n;i++){let weight=0;for(let k=0;k<slots;k++)if(fitted.joints[i*slots+k]===target.headJoint)weight+=fitted.weights[i*slots+k];
+    const points=[],inv=pivot?target.sourcePivotRootInverse:target.headInverse;
+    for(let i=0;i<n;i++){let weight=0;for(let k=0;k<slots;k++)if(fitted.joints[i*slots+k]===(pivot?6:target.headJoint))weight+=fitted.weights[i*slots+k];
       if(weight>=.5){const v=fitted.positions.subarray(i*3,i*3+3);points.push([0,1,2].map(r=>inv[r*4]*v[0]+inv[r*4+1]*v[1]+inv[r*4+2]*v[2]+inv[r*4+3]));}}
     if(points.length>=4){const low=[Infinity,Infinity,Infinity],high=[-Infinity,-Infinity,-Infinity];for(const p of points)for(let k=0;k<3;k++){low[k]=Math.min(low[k],p[k]);high[k]=Math.max(high[k],p[k]);}
       const center=low.map((x,k)=>(x+high[k])/2),radius=Math.max(...points.map(p=>Math.hypot(...p.map((x,k)=>x-center[k]))));
-      a.pointer(original+48,target.jointOffsets[target.headJoint]);[...center,radius].forEach((x,k)=>a.f32(original+52+k*4,x));}
+      a.pointer(original+48,target.jointOffsets[pivot?pivot.rootJoint:target.headJoint]);[...center,radius].forEach((x,k)=>a.f32(original+52+k*4,x));}
     for(const dobj of new Set([target.dobj,target.rootDobj])){
       const old=a.v.getUint32(dobj+8),m=a.append(a.bytes.slice(original,original+144));
       // Retain the fighter's original material inputs, extending only identity.

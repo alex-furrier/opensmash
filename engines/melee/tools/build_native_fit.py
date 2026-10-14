@@ -19,11 +19,11 @@ def main():
     a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True)
     compiler=str(a.emsdk/'upstream/emscripten/em++') if a.emsdk else shutil.which('em++')
     if not compiler:p.error('Set MELEE_EMSDK or put em++ on PATH')
-    source=ROOT/'runtime/fitting';files=[source/'round_fit.cpp',source/'humanoid_fit.cpp']
+    source=ROOT/'runtime/fitting';files=[source/'round_fit.cpp',source/'humanoid_fit.cpp',source/'source_pivot_fit.cpp']
     common=[*[str(f) for f in files],'-std=c++17','-O3','-ffp-contract=off']
     subprocess.run([compiler,*common,'--no-entry','-s','MODULARIZE=1','-s','EXPORT_ES6=1',
                     '-s','ENVIRONMENT=web,worker','-s','ALLOW_MEMORY_GROWTH=1','-s','DISABLE_EXCEPTION_CATCHING=0',
-                    '-s','EXPORTED_FUNCTIONS=["_fit_round","_fit_humanoid","_malloc","_free"]',
+                    '-s','EXPORTED_FUNCTIONS=["_fit_round","_fit_humanoid","_fit_source_pivot","_malloc","_free"]',
                     # native-fit.mjs reads/writes module.HEAPU8; modern Emscripten only
                     # attaches heap views to the module when exported explicitly.
                     '-s','EXPORTED_RUNTIME_METHODS=["HEAPU8"]',

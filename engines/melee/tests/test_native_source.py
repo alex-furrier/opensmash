@@ -38,6 +38,17 @@ class NativeSourceTest(unittest.TestCase):
             self.assertNotEqual(changed['base'],results[0]['base'])
             self.assertEqual(run.call_count,2)
 
+    def test_strategy_sidecar_invalidates_source_revision_and_removal_restores_baseline(self):
+        with patch('opensmash_melee.native_source.subprocess.run',side_effect=self.build) as run:
+            ordinary=prepare(self.root,self.source,'obama')
+            sidecar=self.source/'melee-source-pivot.json';sidecar.write_text('{"version":1}')
+            pivot=prepare(self.root,self.source,'obama');self.assertNotEqual(pivot['base'],ordinary['base'])
+            self.assertTrue(prepare(self.root,self.source,'obama')['cached'])
+            sidecar.write_text('{"version":2}')
+            changed=prepare(self.root,self.source,'obama');self.assertNotEqual(changed['base'],pivot['base'])
+            sidecar.unlink();restored=prepare(self.root,self.source,'obama')
+            self.assertEqual(restored['base'],ordinary['base']);self.assertTrue(restored['cached']);self.assertEqual(run.call_count,3)
+
     def test_portable_build_package_needs_no_conversion(self):
         import shutil
         with patch('opensmash_melee.native_source.subprocess.run', side_effect=self.build):

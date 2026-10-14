@@ -1,8 +1,11 @@
 {
   "baseRevision": "5bc531aafcc941866f2c916afebc38ee75543222",
   "basePatchSha256": "4c367e254cef6d56e49c19e231b0a52b6f7b1542a346c5406482380a594278d3",
-  "patchSha256": "7993c7b1d27eecd72a806b6a45264dfbe024eb63cb1f90e43fc076f4593de81b",
+  "patchSha256": "985c590d06cc13ee805c6bf99f85c2f7adbec4d9fe908983d200ec6e22ea49f7",
   "files": {
-    "platforms/browser/runtime.mjs": "f1e92a121b7eec52c321adb6029eac845fe5a91e6c7a6bd478ab642cdb25d04c"
+    "platforms/browser/runtime.mjs": "f1e92a121b7eec52c321adb6029eac845fe5a91e6c7a6bd478ab642cdb25d04c",
+    "platforms/browser/skinning.c": "8ca528ecc5dc512d0fc45009152d7617dbd6df1f4b9b99c3d5d83df97be729d4",
+    "platforms/browser/source_pivot.h": "036e3774d24e513d2177013affb75efe86731f065645f93bef7862d0e198e04d",
+    "tests/browser/test_source_pivot.py": "ee0a4b943fd0f67af40c9f07a1da5bf02439b0b1f02cca96ef020fc6c39a7c0a"
   }
 }

@@ -11,7 +11,7 @@ from .glb import GLB
 from .character_build import archive_previous_build,run_stage
 ROOT=Path(__file__).resolve().parents[1]
 FILES={'rigged.glb':64<<20,'portrait_raw.png':16<<20,'stock_raw.png':8<<20,'emblem_raw.png':8<<20,'announcer.wav':16<<20}
-OPTIONAL_FILES={'emblem_stencil.png':8<<20,'melee-source.json':32<<20,'melee-source.rgba8':4<<20,'melee-source.identity.dat':4<<20,'melee-source-ready.json':4096,'portrait_tile.png':8<<20,'portrait_medium.png':8<<20}
+OPTIONAL_FILES={'melee-source-pivot.json':2<<20,'emblem_stencil.png':8<<20,'melee-source.json':32<<20,'melee-source.rgba8':4<<20,'melee-source.identity.dat':4<<20,'melee-source-ready.json':4096,'portrait_tile.png':8<<20,'portrait_medium.png':8<<20}
 from .targets import PLAYABLE
 TARGETS=set(PLAYABLE)
 class NoRedirect(HTTPRedirectHandler):
@@ -69,7 +69,7 @@ def import_source(link,destination,origins,fetch=download):
     # ASCII-escaped JSON also reads correctly in older Windows locale encodings.
     (destination/'character.json').write_text(json.dumps({'name':name,'display':name,'short':short})+'\n',encoding='utf-8')
     # Identity is content-based. Never persist the bearer URL in the public roster.
-    signature=json.dumps({'name':name,'short':short,'files':{n:e['sha256'] for n,e in manifest['files'].items() if n in FILES or n=='emblem_stencil.png'}},sort_keys=True)
+    signature=json.dumps({'name':name,'short':short,'files':{n:e['sha256'] for n,e in manifest['files'].items() if n in FILES or n in ('emblem_stencil.png','melee-source-pivot.json')}},sort_keys=True)
     return {'name':name,'short':short,'signature':hashlib.sha256(signature.encode()).hexdigest()}
 
 def import_local_source(entry,roster_path,destination):

@@ -27,7 +27,7 @@ def prepare(root, source, slug, restore=None):
     started = time.monotonic()
     digest = hashlib.sha256(b'native-source-v1\0')
     # Only source art/geometry and preprocessing code affect these assets.
-    files = [source/name for name in ('rigged.glb','stock_raw.png','emblem_raw.png','emblem_stencil.png')]
+    files = [source/name for name in ('rigged.glb','stock_raw.png','emblem_raw.png','emblem_stencil.png','melee-source-pivot.json')]
     files += sorted((root/'opensmash_melee').glob('*.py'))
     files += [root/'tools/prepare_native_fit_local.py']
     # Only rendered identity fields matter; imported sources omit generation metadata.
