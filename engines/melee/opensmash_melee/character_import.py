@@ -167,6 +167,8 @@ class ImportManager:
                 raise ValueError('Invalid validated private roster movesets.')
             category=entry.get('rosterCategory','high-school')
             if category not in ('high-school','family'):raise ValueError('Invalid private roster category.')
+            order=entry.get('rosterOrder')
+            if order is not None and (type(order) is not int or not 0<=order<=1000000):raise ValueError('Invalid private roster order.')
             display=entry.get('display') or entry.get('name')
             if not isinstance(display,str) or not display.strip() or len(display)>80:raise ValueError('Invalid private roster display name.')
             job={'id':uuid.uuid4().hex}
@@ -175,6 +177,8 @@ class ImportManager:
             # Presentation metadata never changes the source signature or slug.
             job['fighter']['displayName']=display.strip()
             job['fighter'].update(defaultTarget=default,supportedTargets=list(supported),rosterCategory=category)
+            job['fighter'].pop('rosterOrder',None)
+            if order is not None:job['fighter']['rosterOrder']=order
             active.append(job['fighter'])
         atomic_write(self.index,(json.dumps(self.rows,indent=2)+'\n').encode())
         self.private_rows=active

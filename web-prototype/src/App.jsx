@@ -3,7 +3,7 @@ import MeleeControls from '../../engines/melee/web/app/Controls';
 import MeleeRosterPicker,{MeleeRosterSelector} from './MeleeRosterPicker.jsx';
 import meleeCatalog from '../../engines/melee/web/public/catalog.json';
 import {preferences as meleePreferences} from '../../engines/melee/web/lib/desktop';
-import {rosterChoiceKey,rosterScopes,selectionPort,chosenBase,rememberBase,meleeGridRoster,meleeSelectionAvailable} from '../shared/melee-roster-choice.js';
+import {rosterChoiceKey,restoreRosterUi,selectionPort,chosenBase,rememberBase,meleeGridRoster,meleeSelectionAvailable} from '../shared/melee-roster-choice.js';
 import {meleeRosterPresentation} from '../shared/melee-roster.js';
 import {MeleeSettings,MeleeDiscSettings as MeleeRomSettings,resetMeleePreferences} from '../../engines/melee/launcher/Settings';
 import {loadSharedRom} from './shared-game-files.js';
@@ -712,9 +712,10 @@ export default function App() {
   }, []);
 
   const [localMeleeRoster,setLocalMeleeRoster]=useState([]),[availableMeleeRoster,setAvailableMeleeRoster]=useState([]),[checkingMeleeSources,setCheckingMeleeSources]=useState(true);
-  const [rosterUi,setRosterUi]=useState(()=>{try{const saved=JSON.parse(meleePreferences.getItem(rosterChoiceKey)||'{}');return {roster:rosterScopes.includes(saved.roster)?saved.roster:'high-school',choices:saved.choices||{}};}catch{return {roster:'high-school',choices:{}};}});
+  const [rosterUi,setRosterUi]=useState(()=>{try{return restoreRosterUi(meleePreferences.getItem(rosterChoiceKey));}catch{return restoreRosterUi(null);}});
   const [basePick,setBasePick]=useState(null);
-  function saveRosterUi(next){setRosterUi(next);try{meleePreferences.setItem(rosterChoiceKey,JSON.stringify(next));}catch{}}
+  useEffect(()=>{try{meleePreferences.setItem(rosterChoiceKey,JSON.stringify(rosterUi));}catch{}},[rosterUi]);
+  function saveRosterUi(next){setRosterUi(next);}
   function selectRoster(roster){window.gameLauncher?.clearPicks({invalidateControllers:true});setBasePick(null);saveRosterUi({...rosterUi,roster});}
   function chooseRosterBase(target){
     if(basePick.owner&&!window.gameLauncher?.selectionOwnerValid(basePick.owner)){setBasePick(null);return;}
@@ -1148,7 +1149,7 @@ export default function App() {
     try { n64Keyboard?.save(n64Keyboard.defaults()); } catch { /* storage blocked */ }
     window.openSmashControllerRemap?.clearAllProfiles?.();
     resetMeleePreferences();
-    window.gameLauncher?.clearPicks({invalidateControllers:true});setBasePick(null);setRosterUi({roster:'high-school',choices:{}});
+    window.gameLauncher?.clearPicks({invalidateControllers:true});setBasePick(null);setRosterUi(restoreRosterUi(null));
   }
 
   async function requestLaunch(action) {
