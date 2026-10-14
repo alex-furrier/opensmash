@@ -1440,7 +1440,7 @@ if(process.env.MELEE_SIMULATED_PEER_ISO){
  simulatedPeer=createSimulatedPeer({chromium:createRequire(import.meta.url)(process.env.MELEE_PLAYWRIGHT_MODULE).chromium,origin:`http://${HOST.includes(':')?'['+HOST+']':HOST}:${PORT}`,iso:process.env.MELEE_SIMULATED_PEER_ISO,observeTicks:false,onObservation:event=>{if(event.type==='phase')console.info('[local opponent]',event.phase);else if(['combat-performance','startup-performance','browser-error','browser-console','error'].includes(event.type)||event.type==='frame-stall'&&event.durationMs>100)console.info('[local opponent diagnostic]',JSON.stringify(event));}});
 }
 const friendRooms=friendRuntime&&attachFriendRooms(server,{engine:friendRuntime.engine,host:HOST,simulatedPeer,privateOrigin:process.env.MELEE_PRIVATE_ORIGIN});
-process.once('SIGINT',()=>{friendRooms?.close();void Promise.all([simulatedPeer?.close(),hostDisc?.close()]).then(()=>process.exit());});
+if(friendRuntime||hostDisc)process.once('SIGINT',()=>{friendRooms?.close();void Promise.all([simulatedPeer?.close(),hostDisc?.close()]).then(()=>process.exit());});
 server.keepAliveTimeout = 65_000;
 server.headersTimeout = 66_000;
 
