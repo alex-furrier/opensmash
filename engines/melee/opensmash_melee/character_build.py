@@ -1,5 +1,6 @@
 """Retryable costume builds with retained sources and readable diagnostics."""
 import os
+import shutil
 from pathlib import Path
 import re
 import subprocess
@@ -21,7 +22,7 @@ def archive_previous_build(workspace, ident, source=None, *, source_root=None, a
             archive.mkdir(parents=True,exist_ok=True)
             # A default imported costume can use this same folder as input.
             relative=source.relative_to(folder) if source is not None and source.is_relative_to(folder) else None
-            folder.rename(archive/label)
+            shutil.move(str(folder),str(archive/label))
             if relative is not None:source=archive/label/relative
     return source
 

@@ -35,6 +35,16 @@ class PrivateStorageRoutesTests(unittest.TestCase):
     with patch('opensmash_melee.native_source.prepare',return_value={'base':'prepared'})as prepare:
      with urlopen(Request(origin+'/api/native-fit/source/'+slug,method='POST',headers={'Origin':origin}),timeout=5)as response:self.assertEqual(json.loads(response.read()),{'base':'prepared'})
      self.assertEqual(prepare.call_args.args,(ROOT,source,slug));self.assertEqual(prepare.call_args.kwargs['cache_root'],cache)
+    from opensmash_melee.targets import BY_SLUG
+    target=BY_SLUG['mario'];costume=dict(character=slug,target='mario',fighter=target['fighter'],color=0,filename=target['costumes'][0]['filename'])
+    def menu(game,entries,*,cache):
+     self.assertEqual(entries[0][2],source);self.assertEqual(cache,manager.announcer_root)
+     return {'menu.dat':(entries[0][2]/'stock_raw.png').read_bytes()}
+    with patch('opensmash_melee.character_select.character_select_assets',side_effect=menu):
+     body=json.dumps({'costumes':[costume],'sourceOnly':True}).encode()
+     with urlopen(Request(origin+'/api/character-select',data=body,headers={'Origin':origin,'Content-Type':'application/json'}),timeout=5)as response:assets=json.loads(response.read())['assets']
+    self.assertEqual(get(assets[0]['url']),b'stock_raw.png');self.assertTrue(manager.selection_root.is_relative_to(manager.root))
+    self.assertTrue(any(manager.selection_root.rglob('*.bin')))
     with self.assertRaises(HTTPError)as error:urlopen(Request(origin+'/api/prepare/'+slug,method='POST',headers={'Origin':origin}),timeout=5)
     self.assertEqual(error.exception.code,409)
     self.assertFalse((root/'code/assets').exists());self.assertFalse((root/'code/build').exists())

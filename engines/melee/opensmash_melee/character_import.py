@@ -107,6 +107,8 @@ class ImportManager:
         self.source_root=Path(source_root).expanduser().resolve() if source_root is not None else self.workspace/'assets/characters'
         self.root=Path(cache_root).expanduser().resolve() if cache_root is not None else self.workspace/'build/character-imports'
         self.custom_storage=self.source_root.resolve()!=(self.workspace/'assets/characters').resolve() or self.root.resolve()!=(self.workspace/'build/character-imports').resolve()
+        self.selection_root=self.root/'character-select' if self.custom_storage else self.workspace/'build/character-select'
+        self.announcer_root=self.root/'announcer-cache' if self.custom_storage else self.workspace/'build/announcer-cache'
         self.root.mkdir(parents=True,exist_ok=True)
         self.index=self.root/'roster.json';self.jobs={};self.pool=ThreadPoolExecutor(max_workers=1);self.state_lock=threading.Lock()
         self.rows=json.loads(self.index.read_text()) if self.index.exists() else []

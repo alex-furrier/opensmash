@@ -240,7 +240,7 @@ class Handler(BaseHTTPRequestHandler):
                 name = route.removeprefix('/api/character-select/')
                 if not re.fullmatch(r'[a-f0-9]{64}/[0-3]\.bin', name):
                     raise FileNotFoundError(name)
-                return self.file(descendant(ROOT / 'build/character-select', name))
+                return self.file(descendant(IMPORTS.selection_root, name))
             if route.startswith('/api/costume/'):
                 slug = route[len('/api/costume/'):]
                 if slug not in CATALOG:
@@ -382,12 +382,14 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError('Invalid lineup request')
                 body = json.loads(self.rfile.read(length))
                 from opensmash_melee.character_select import catalog_identities, character_select_assets
+                IMPORTS.check_storage_mode(body.get('sourceOnly') is True)
                 entries = catalog_identities(ROOT, CATALOG, body.get('costumes'),
-                                             source_root=CHARACTERS if body.get('sourceOnly') is True else None)
+                                             source_root=CHARACTERS if body.get('sourceOnly') is True else None,
+                                             imported_source_root=IMPORTS.source_root)
                 with LOCK:
-                    assets = character_select_assets(GAME, entries, cache=ROOT / 'build/announcer-cache')
+                    assets = character_select_assets(GAME, entries, cache=IMPORTS.announcer_root)
                     key = hashlib.sha256(b''.join(assets.values())).hexdigest()
-                    folder = ROOT / 'build/character-select' / key
+                    folder = IMPORTS.selection_root / key
                     folder.mkdir(parents=True, exist_ok=True)
                     result = []
                     for index, (name, data) in enumerate(assets.items()):

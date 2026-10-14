@@ -42,6 +42,8 @@ class PrivateRosterTests(unittest.TestCase):
    try:
     self.assertEqual(default.source_root,code/'assets/characters');self.assertEqual(default.root,code/'build/character-imports')
     self.assertFalse(default.custom_storage);self.assertTrue(private.custom_storage)
+    self.assertEqual(default.selection_root,code/'build/character-select');self.assertEqual(default.announcer_root,code/'build/announcer-cache')
+    self.assertEqual(private.selection_root,private.root/'character-select');self.assertEqual(private.announcer_root,private.root/'announcer-cache')
     def retain(source,destination):shutil.copytree(source,destination)
     with patch('opensmash_melee.character_import.GLB') as glb,patch('opensmash_melee.__main__.import_character',side_effect=retain),patch('opensmash_melee.character_import.run_stage') as convert:
      glb.return_value.mesh.return_value={'positions':[],'triangles':[],'names':[]}

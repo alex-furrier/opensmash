@@ -7,13 +7,16 @@ remain unchanged.
 | Server option | Contents | Default relative to the Melee checkout |
 | --- | --- | --- |
 | `--private-source-root` | Retained imports under `web-v1-<source-id>/` | `assets/characters` |
-| `--import-cache-root` | `roster.json`, portraits, import logs and retry archives | `build/character-imports` |
+| `--import-cache-root` | `roster.json`, portraits, logs, retry archives and browser menu/announcer caches | `build/character-imports` |
 | `--source-cache-root` | Content-addressed revision directories and preparation failure logs | `build/native-fit/local/revisions` |
 
 Pass these options to `tools/serve_melee.py` alongside `--private-roster` for a
 local browser asset service. The same interfaces are available as
 `ImportManager(..., source_root=..., cache_root=...)` and
-`native_source.prepare(..., cache_root=...)`. The latter cache root contains
+`native_source.prepare(..., cache_root=...)`. Retry archives can cross filesystems; a failed copy leaves the retained source
+available for recovery. Imported character-selection identities use the retained
+source root, while the generated menu and announcer cache use the import cache
+root. The latter source-cache root contains
 revision directories directly, rather than the entire native-fitting build.
 
 The accepted manifest and its direct `exports/<slug>` children remain a separate,
