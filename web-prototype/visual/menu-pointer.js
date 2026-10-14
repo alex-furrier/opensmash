@@ -24,9 +24,9 @@ export function startMenuPointer({enabled,controllers,controllerIndex,click,back
    cursor.dataset.player=String(owner.port+1);cursor.textContent=`${owner.port+1}P`;
    if(cursor.parentNode!==surface){surface.append(cursor);if(dialog){const box=dialog.getBoundingClientRect();entry.state.x=box.x+box.width/2;entry.state.y=box.y+box.height/2;}}
    const state=entry.state=pointerStep(entry.state,pad,Math.min((now-last)/1000,.05),innerWidth,innerHeight,true);
-   cursor.hidden=!!dialog&&owner.port!==0;cursor.style.transform=`translate(${state.x}px,${state.y}px)`;
+   cursor.hidden=!!dialog&&(dialog.dataset.controllerOwner?dialog.dataset.controllerOwner!==key:owner.port!==0);cursor.style.transform=`translate(${state.x}px,${state.y}px)`;
    const hit=document.elementFromPoint(state.x,state.y);
-   if(state.scroll&&owner.port===0){let scroll=hit;while(scroll&&!(scroll.scrollHeight>scroll.clientHeight&&/(auto|scroll)/.test(getComputedStyle(scroll).overflowY)))scroll=scroll.parentElement;if(scroll)scroll.scrollBy(0,state.scroll);else window.scrollBy(0,state.scroll);}
+   if(state.scroll&&(owner.port===0||(dialog&&dialog.dataset.controllerOwner===key))){let scroll=hit;while(scroll&&!(scroll.scrollHeight>scroll.clientHeight&&/(auto|scroll)/.test(getComputedStyle(scroll).overflowY)))scroll=scroll.parentElement;if(scroll)scroll.scrollBy(0,state.scroll);else window.scrollBy(0,state.scroll);}
    if(state.click&&!cursor.hidden){const target=hit?.closest('button,a,input,select,textarea,[role="button"]');if(target&&!target.disabled)click(target,owner);}
    if(state.goBack)back(owner);
   }

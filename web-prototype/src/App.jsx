@@ -717,10 +717,12 @@ export default function App() {
   function saveRosterUi(next){setRosterUi(next);try{meleePreferences.setItem(rosterChoiceKey,JSON.stringify(next));}catch{}}
   function selectRoster(roster){window.gameLauncher?.clearPicks({invalidateControllers:true});setBasePick(null);saveRosterUi({...rosterUi,roster});}
   function chooseRosterBase(target){
+    if(basePick.owner&&!window.gameLauncher?.selectionOwnerValid(basePick.owner)){setBasePick(null);return;}
     const choices=rememberBase(rosterUi.choices,basePick.character,basePick.slot,target);
-    saveRosterUi({...rosterUi,choices});window.gameLauncher?.updatePickTarget(basePick.character.slug,target,basePick.slot);setBasePick(null);
+    saveRosterUi({...rosterUi,choices});window.gameLauncher?.updatePickTarget(basePick.character.slug,target,basePick.slot,basePick.owner);setBasePick(null);
   }
   useEffect(()=>{if(!isMelee)setBasePick(null);},[isMelee]);
+  useEffect(()=>{if(basePick?.owner&&!window.gameLauncher?.selectionOwnerValid(basePick.owner))setBasePick(null);},[gamepads,basePick]);
   const [roomDraft,setRoomDraft]=useState(false),[roomCapabilities,setRoomCapabilities]=useState({enabled:false,simulatedOpponent:false});
   useEffect(()=>{if(gamepads.length>1)setRoomDraft(false);},[gamepads.length]);
   useEffect(()=>{if(!isMelee){setRoomDraft(false);setRoomCapabilities({enabled:false,simulatedOpponent:false});return;}const abort=new AbortController();fetch('/melee/api/netplay/config',{signal:abort.signal}).then(r=>r.ok?r.json():null).then(c=>{if(!abort.signal.aborted)setRoomCapabilities({enabled:c?.enabled===true,simulatedOpponent:c?.simulatedOpponent===true});}).catch(()=>{});return()=>abort.abort();},[isMelee]);
@@ -1655,7 +1657,7 @@ export default function App() {
       menuControllerIndex:p1MenuController(controllerPlan(advancedOptions,gamepads)),
       selectionContext(){return isMelee?JSON.stringify([controllerPlan(advancedOptions,gamepads),advancedOptions.selectionMode,loadMeleeSettings().mode,rosterUi.roster,roomDraft]):null;},
       baseFor(slug,slot){const row=gridCharacters.find(row=>row.slug===slug);return isMelee&&row?chosenBase(row,rosterUi.choices,slot,loadMeleeSettings().ports[selectionPort(slot)]?.target):undefined;},
-      chooseBase(slug){const character=gridCharacters.find(row=>row.slug===slug);if(!isMelee||!character?.meleeAvailable)return;setBasePick({character,slot:window.gameLauncher?.selectionSlot(slug)||'1P'});},
+      chooseBase(slug){const character=gridCharacters.find(row=>row.slug===slug);if(!isMelee||!character?.meleeAvailable)return;setBasePick({character,slot:window.gameLauncher?.selectionSlot(slug)||'1P',owner:window.gameLauncher?.selectionOwner?.()});},
       fighterJobs,
       handlesGameSetup: isMelee||nativeSsb64,
       trailerCapture: isMelee && demoMode && !meleeDesktop(),

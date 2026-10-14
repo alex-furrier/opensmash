@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {reconcileControllers,lockControllerChoice,unlockControllerChoice,controllerLaunchChoices,isPrimaryController,invalidateControllerChoices} from './controller-selection.js';
+import {reconcileControllers,lockControllerChoice,unlockControllerChoice,controllerLaunchChoices,isPrimaryController,invalidateControllerChoices,controllerOwner,setControllerChoiceTarget} from './controller-selection.js';
 const pad=(index,id='Pad '+index)=>({index,id,connected:true});
 test('each controller locks only its own fighter; locked choice needs its own unlock',()=>{
  let s=reconcileControllers(undefined,[pad(0),pad(1)]);const [p1,p2]=s.devices;
@@ -44,4 +44,13 @@ test('roster invalidation clears every lock and rejects callbacks from the previ
  assert.equal(controllerLaunchChoices(s),null);assert.equal(s.devices[0].choice,null);
  assert.deepEqual(s.devices.map(d=>d.index),[0,1]);
  s=lockControllerChoice(s,old,{slug:'stale'});assert.equal(s.devices[0].choice,null);
+});
+
+test('duplicate fighters retain per-port bases and stale picker owners cannot edit a promoted port',()=>{
+ let s=reconcileControllers(undefined,[pad(0),pad(1)]);const [one,two]=s.devices;
+ s=lockControllerChoice(s,one,{slug:'same',target:'mario'});s=lockControllerChoice(s,two,{slug:'same',target:'mario'});
+ s=setControllerChoiceTarget(s,two,'same','fox');assert.deepEqual(controllerLaunchChoices(s).map(d=>d.target),['mario','fox']);
+ s=reconcileControllers(s,[pad(1)]);assert.equal(controllerOwner(s,two),undefined);
+ assert.equal(setControllerChoiceTarget(s,two,'same','luigi'),s,'old port identity cannot edit promoted controller');
+ const current=s.devices[0];s=setControllerChoiceTarget(s,current,'same','luigi');assert.equal(s.devices[0].choice.target,'luigi');
 });
