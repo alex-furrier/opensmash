@@ -1,5 +1,9 @@
 # Melee multiplayer in the OpenSmash launcher
 
+See the [feature verification map](../feature-verification.md) for the maintained
+behavior/test index, evidence checkpoints and current acceptance gaps. The
+historical records below keep their original scope and revisions.
+
 The current entrypoint is the normal website at `/melee`. **Create room** uses
 its roster to choose and freeze two fighters. First-time players select their
 own unmodified USA 1.02 ISO/GCM and complete or skip the controls check. Both
