@@ -1,5 +1,7 @@
 # OpenSmash
 
+Fork coverage: [feature behavior, tests and verification limits](docs/feature-verification.md).
+
 Super Smash Bros. 64 and Super Smash Bros. Melee in the browser, with new
 fighters from image uploads. Give it a name and (optionally) a photo, and the
 pipeline produces a low-poly rigged mesh, a character-select portrait, a stock
