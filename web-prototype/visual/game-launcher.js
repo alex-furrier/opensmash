@@ -1,4 +1,4 @@
-import {reconcileControllers,lockControllerChoice,unlockControllerChoice,controllerLaunchChoices,isPrimaryController,invalidateControllerChoices,controllerOwner,setControllerChoiceTarget} from '../shared/controller-selection.js';
+import {reconcileControllers,lockControllerChoice,unlockControllerChoice,controllerLaunchChoices,isPrimaryController,invalidateControllerChoices,controllerOwner,setControllerChoiceTarget,baseSelectionOwner} from '../shared/controller-selection.js';
 import {reconcileSelection,selectFighter,readyFighters} from '../shared/local-fighter-selection.js';
 import {startMenuPointer} from './menu-pointer.js';
 import { n64Keyboard } from '../shared/n64-keyboard.js';
@@ -487,6 +487,7 @@ startMenuPointer({
   click:(target,owner)=>{
     const primary=isPrimaryController(ownedState(),owner);
     const device=controllerOwner(ownedState(),owner),slug=target.closest('[data-roster-character]')?.dataset.rosterCharacter;
+    if(!device)return;
     const ownBase=target.closest('.replica-base-button')&&device?.choice?.slug===slug;
     const ownDialog=target.closest('dialog[data-controller-owner]')?.dataset.controllerOwner===`${owner.key}:${owner.generation}`;
     if(!primary&&(!APP_BRIDGE?.explicitLocalSelection||!(target.closest('.replica-select-control')||ownBase||ownDialog)))return;
@@ -3043,12 +3044,13 @@ gameFrame?.addEventListener('load', () => {
 window.gameLauncher = Object.freeze({
   clearPicks,
   selectionSlot(slug) {
-    if(APP_BRIDGE?.explicitLocalSelection){const state=ownedState(),owner=controllerOwner(state,clickingOwner)||state.devices[0];return owner?`${owner.port+1}P`:localState().active;}
+    if(APP_BRIDGE?.explicitLocalSelection){const state=ownedState(),owner=baseSelectionOwner(state,slug,clickingOwner);return owner?`${owner.port+1}P`:localState().active;}
     const slots=APP_BRIDGE?.selectionSlots?.()||['1P'];
     if(pendingPickSlots&&pendingPickSlots!==JSON.stringify([slots,APP_BRIDGE?.selectionContext?.()]))clearPicks();
     return pendingPicks.find(pick=>pick.slug===slug)?.slot||slots[pendingPicks.length]||slots[0];
   },
-  selectionOwner(){const state=ownedState(),owner=controllerOwner(state,clickingOwner)||state.devices[0];return owner?{key:owner.key,generation:owner.generation,port:owner.port}:null;},
+  selectionOwner(slug){const state=ownedState(),owner=baseSelectionOwner(state,slug,clickingOwner);return owner?{key:owner.key,generation:owner.generation,port:owner.port}:null;},
+  baseSelectionContext(slug){const state=ownedState(),owner=baseSelectionOwner(state,slug,clickingOwner);return {slot:owner?`${owner.port+1}P`:localState().active,owner:owner?{key:owner.key,generation:owner.generation,port:owner.port}:null};},
   selectionOwnerValid(owner){return !!controllerOwner(ownedState(),owner);},
   updatePickTarget(slug,target,slot,owner) {if(APP_BRIDGE?.explicitLocalSelection&&ownedState().devices.length){controllerSelection=setControllerChoiceTarget(ownedState(),owner,slug,target);renderLocalSelection();return;}if(APP_BRIDGE?.explicitLocalSelection){const state=localState(),pick=state.picks[state.active];if(pick?.slug===slug){localSelection={...state,picks:{...state.picks,[state.active]:{...pick,target}}};renderLocalSelection();}return;}const pick=pendingPicks.find(pick=>pick.slug===slug);if(pick)pick.target=target;},
   get running() { return Boolean(videoFrame?.classList.contains('is-game-running')); },

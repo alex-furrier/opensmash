@@ -35,3 +35,9 @@ export function setControllerChoiceTarget(state,owner,slug,target){
  const device=controllerOwner(state,owner);if(!device||device.choice?.slug!==slug)return state;
  return {...state,devices:state.devices.map(d=>d===device?{...d,choice:{...d.choice,target}}:d)};
 }
+
+export function baseSelectionOwner(state,slug,actor){
+ if(actor)return controllerOwner(state,actor);
+ const matches=state.devices.filter(d=>d.choice?.slug===slug);
+ return matches.length===1?matches[0]:state.devices[0];
+}

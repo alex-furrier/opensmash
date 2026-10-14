@@ -72,6 +72,11 @@ if(await option.count()){
  assert.equal(remembered[0]?.[picks[0].slug],undefined,'P2 base choice did not overwrite P1');
 }else await page.locator('dialog.melee-base-picker button[aria-label="Close base picker"]').click();
 await page.evaluate(()=>window.proofPads[1].buttons[1]={pressed:true,value:1});await page.waitForTimeout(80);await page.evaluate(()=>window.proofPads[1].buttons[1]={pressed:false,value:0});await controllerClick(tile(picks[1]),1);
+await page.locator(`[data-roster-character="${picks[1].slug}"] .replica-base-button`).evaluate(el=>el.click());
+await page.locator('dialog.melee-base-picker[open]').waitFor();assert.ok((await page.locator('dialog.melee-base-picker header').innerText()).startsWith('2P'),'mouse preserves uniquely selected P2 ownership');
+const mouseOption=page.locator('dialog.melee-base-picker .melee-base-options button[aria-pressed="false"]').first();
+if(await mouseOption.count()){await mouseOption.click();const remembered=await page.evaluate(()=>JSON.parse(localStorage.getItem('melee-roster-ui-v1')).choices);assert.ok(remembered[1]?.[picks[1].slug]!==undefined,'mouse P2 edit persisted under P2');assert.equal(remembered[0]?.[picks[1].slug],undefined,'mouse P2 edit did not create a P1 preference');}
+else await page.locator('dialog.melee-base-picker button[aria-label="Close base picker"]').click();
 await page.locator('#local-fighter-selection').scrollIntoViewIfNeeded();await page.screenshot({path:output+'/selection.png'});
 assert.deepEqual(errors,[]);
 await controllerClick(play,0);
@@ -118,5 +123,5 @@ await page.getByRole('button',{name:'Return to roster',exact:true}).click();awai
 const returned=await page.locator('#local-fighter-selection').innerText();
 assert.equal(await page.locator(`[data-roster-character="${picks[0].slug}"]`).getAttribute('data-pick'),'1P');
 assert.equal(await page.locator(`[data-roster-character="${picks[1].slug}"]`).getAttribute('data-pick'),'2P');
-await writeFile(output+'/game.json',JSON.stringify({select,before,after,ownedPhases,returned,independentOwnedPads:true,modesRestoredOnDisconnect:true,reconnectHeldButtonNeutral:true,assignmentMenuRemoved:true,rosterInvalidation:true,duplicateFighterP2BasePicker:true,replacementDeviceAndKeyboardStayNeutral:true,errors},null,2));
+await writeFile(output+'/game.json',JSON.stringify({select,before,after,ownedPhases,returned,independentOwnedPads:true,modesRestoredOnDisconnect:true,reconnectHeldButtonNeutral:true,assignmentMenuRemoved:true,rosterInvalidation:true,duplicateFighterP2BasePicker:true,uniqueMouseP2BasePicker:true,replacementDeviceAndKeyboardStayNeutral:true,errors},null,2));
 }finally{await browser.close();}

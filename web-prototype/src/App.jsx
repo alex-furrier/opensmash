@@ -1657,7 +1657,7 @@ export default function App() {
       menuControllerIndex:p1MenuController(controllerPlan(advancedOptions,gamepads)),
       selectionContext(){return isMelee?JSON.stringify([controllerPlan(advancedOptions,gamepads),advancedOptions.selectionMode,loadMeleeSettings().mode,rosterUi.roster,roomDraft]):null;},
       baseFor(slug,slot){const row=gridCharacters.find(row=>row.slug===slug);return isMelee&&row?chosenBase(row,rosterUi.choices,slot,loadMeleeSettings().ports[selectionPort(slot)]?.target):undefined;},
-      chooseBase(slug){const character=gridCharacters.find(row=>row.slug===slug);if(!isMelee||!character?.meleeAvailable)return;setBasePick({character,slot:window.gameLauncher?.selectionSlot(slug)||'1P',owner:window.gameLauncher?.selectionOwner?.()});},
+      chooseBase(slug){const character=gridCharacters.find(row=>row.slug===slug);if(!isMelee||!character?.meleeAvailable)return;setBasePick({character,...(window.gameLauncher?.baseSelectionContext(slug)||{slot:'1P',owner:null})});},
       fighterJobs,
       handlesGameSetup: isMelee||nativeSsb64,
       trailerCapture: isMelee && demoMode && !meleeDesktop(),

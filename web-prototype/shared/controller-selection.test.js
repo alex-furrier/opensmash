@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {reconcileControllers,lockControllerChoice,unlockControllerChoice,controllerLaunchChoices,isPrimaryController,invalidateControllerChoices,controllerOwner,setControllerChoiceTarget} from './controller-selection.js';
+import {reconcileControllers,lockControllerChoice,unlockControllerChoice,controllerLaunchChoices,isPrimaryController,invalidateControllerChoices,controllerOwner,setControllerChoiceTarget,baseSelectionOwner} from './controller-selection.js';
 const pad=(index,id='Pad '+index)=>({index,id,connected:true});
 test('each controller locks only its own fighter; locked choice needs its own unlock',()=>{
  let s=reconcileControllers(undefined,[pad(0),pad(1)]);const [p1,p2]=s.devices;
@@ -53,4 +53,13 @@ test('duplicate fighters retain per-port bases and stale picker owners cannot ed
  s=reconcileControllers(s,[pad(1)]);assert.equal(controllerOwner(s,two),undefined);
  assert.equal(setControllerChoiceTarget(s,two,'same','luigi'),s,'old port identity cannot edit promoted controller');
  const current=s.devices[0];s=setControllerChoiceTarget(s,current,'same','luigi');assert.equal(s.devices[0].choice.target,'luigi');
+});
+
+test('base picker keeps unambiguous mouse ownership and explicit duplicate controller ownership',()=>{
+ let s=reconcileControllers(undefined,[pad(0),pad(1)]);const [one,two]=s.devices;
+ s=lockControllerChoice(s,one,{slug:'one'});s=lockControllerChoice(s,two,{slug:'two'});
+ assert.equal(baseSelectionOwner(s,'two',null).port,1);
+ s=unlockControllerChoice(s,two);s=lockControllerChoice(s,two,{slug:'one'});
+ assert.equal(baseSelectionOwner(s,'one',two).port,1);assert.equal(baseSelectionOwner(s,'one',null).port,0);
+ s=invalidateControllerChoices(s);assert.equal(baseSelectionOwner(s,'one',two),undefined,'stale actor never falls through to another owner');
 });
