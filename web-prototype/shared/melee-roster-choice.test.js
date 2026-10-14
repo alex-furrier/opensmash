@@ -48,3 +48,10 @@ test('ordinary installed sources receive the private helper portrait route witho
  const rows=meleeGridRoster([{slug:'regular'}],[{slug:'custom',imported:true,portraitTile:'/melee/private-tile'}],[{slug:'regular'},{slug:'custom'}],'all');
  assert.equal(rows.find(r=>r.slug==='regular').portraitTile,'/melee/api/source-portraits/regular.webp');assert.equal(rows.find(r=>r.slug==='custom').portraitTile,'/melee/private-tile');
 });
+
+test('existing website artwork survives unavailable source checks and takes precedence over the private helper',()=>{
+ const row={slug:'regular',portraitTile:'/website/tile.webp'};
+ assert.equal(meleeGridRoster([row],[],[],'all')[0].portraitTile,row.portraitTile);
+ assert.equal(meleeGridRoster([row],[],[row],'all')[0].portraitTile,row.portraitTile);
+ assert.equal(meleeGridRoster([{slug:'missing'}],[],[],'all')[0].portraitTile,undefined);
+});

@@ -47,6 +47,10 @@ async function controllerClick(locator){
  await page.evaluate(()=>{window.proofPads[0].axes=[0,0,0,0];window.proofPads[0].buttons[0]={pressed:true,value:1};});await page.waitForTimeout(80);await page.evaluate(()=>window.proofPads[0].buttons[0]={pressed:false,value:0});await page.waitForTimeout(50);
 }
 await page.getByRole('button',{name:'Settings',exact:true}).click();await page.locator('.modal-page.is-visible .advanced-screen').waitFor();await page.waitForTimeout(500);await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:true,value:1});await page.waitForTimeout(100);await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:false,value:0});await page.locator('[role="dialog"]:visible').waitFor({state:'hidden',timeout:3000});assert.equal(await page.locator('[role="dialog"]:visible').count(),0,'B backs out of menu');
+const beforeBase=await page.locator('#local-fighter-selection').innerText();
+await page.locator(`[data-roster-character="${picks[0].slug}"] .replica-base-button`).evaluate(el=>el.click());await page.locator('dialog.melee-base-picker[open]').waitFor();await page.waitForTimeout(100);
+await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:true,value:1});await page.waitForTimeout(100);await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:false,value:0});await page.locator('dialog.melee-base-picker').waitFor({state:'detached'});
+assert.equal(await page.locator('#local-fighter-selection').innerText(),beforeBase,'B closes native base dialog without erasing choices');
 const scrollBefore=await page.evaluate(()=>scrollY);await page.evaluate(()=>window.proofPads[0].axes[3]=1);await page.waitForTimeout(250);await page.evaluate(()=>window.proofPads[0].axes[3]=0);assert.ok(await page.evaluate(before=>scrollY>before,scrollBefore),'right stick scrolls website');
 // Native lifecycle surface fixture exercises the same website gate; no native gameplay claim.
 await page.evaluate(()=>{const gate=document.createElement('section');gate.className='native-game';gate.id='proof-native-gate';document.body.append(gate);});await page.waitForTimeout(80);

@@ -480,7 +480,7 @@ startMenuPointer({
   enabled:()=>APP_BRIDGE?.experience==='melee'&&!document.querySelector('.game-overlay,.native-game,.boot-screen'),
   controllerIndex:()=>APP_BRIDGE?.menuControllerIndex,
   back:()=>{
-    const modal=Array.from(document.querySelectorAll('[role="dialog"]')).find(element=>element.getClientRects().length&&getComputedStyle(element).visibility!=='hidden');
+    const modal=Array.from(document.querySelectorAll('dialog[open],[role="dialog"]')).find(element=>element.getClientRects().length&&getComputedStyle(element).visibility!=='hidden');
     const close=modal?.querySelector('button[aria-label*="Close"],button[aria-label*="Back"]')||Array.from(modal?.querySelectorAll('button')||[]).find(button=>/^(Back|Cancel|Close)$/.test(button.textContent.trim()));
     if(close)close.click();
     else if(videoFrame?.classList.contains('is-game-running'))closeGame();
