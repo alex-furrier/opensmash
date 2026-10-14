@@ -6,12 +6,12 @@ from opensmash_melee.character_import import FILES,ImportManager,import_local_so
 
 class PrivateRosterTests(unittest.TestCase):
  def fixture(self,root):
-  export=root/'exports/alex';export.mkdir(parents=True)
+  export=root/'exports/person';export.mkdir(parents=True)
   for name in FILES:
    if name.endswith('.png'):Image.new('RGB',(128,128),'red').save(export/name)
    else:(export/name).write_bytes(b'fixture')
   Image.new('RGB',(90,86),'blue').save(export/'portrait_tile.png')
-  entry={'slug':'alex','name':'Alex','short':'ALEX','status':'validated_local_source','target':'mario','source_directory':str(export),'source_sha256':hashlib.sha256(b'fixture').hexdigest()}
+  entry={'slug':'person','name':'Source Person','short':'PERSON','status':'validated_local_source','target':'mario','source_directory':str(export),'source_sha256':hashlib.sha256(b'fixture').hexdigest()}
   manifest=root/'roster-manifest.json';manifest.write_text(json.dumps({'version':1,'private':True,'characters':[entry]}))
   return manifest,entry,export
  def test_export_allowlist_ignores_intake_and_validates_model(self):
@@ -21,7 +21,7 @@ class PrivateRosterTests(unittest.TestCase):
    with patch('opensmash_melee.character_import.GLB') as glb:
     glb.return_value.mesh.return_value={'positions':[],'triangles':[],'names':[]}
     info=import_local_source(entry,manifest,dest)
-   self.assertEqual(info['name'],'Alex');self.assertFalse((dest/'intake-photo.jpg').exists())
+   self.assertEqual(info['name'],'Source Person');self.assertFalse((dest/'intake-photo.jpg').exists())
    entry['source_sha256']='0'*64
    with self.assertRaisesRegex(ValueError,'integrity'):import_local_source(entry,manifest,dest)
  def test_source_pivot_sidecar_survives_import_and_changes_source_identity(self):
@@ -33,6 +33,28 @@ class PrivateRosterTests(unittest.TestCase):
     self.assertEqual((first/sidecar.name).read_bytes(),sidecar.read_bytes())
     sidecar.write_text('{"version":2}');second=root/'second';second.mkdir();b=import_local_source(entry,manifest,second)
    self.assertNotEqual(a['signature'],b['signature']);self.assertEqual(a['name'],b['name'])
+ def test_default_and_custom_storage_preserve_identity_without_touching_code_assets(self):
+  with tempfile.TemporaryDirectory() as temp:
+   import shutil
+   root=Path(temp).resolve();manifest,entry,export=self.fixture(root);code=root/'code'
+   default=ImportManager({},threading.Lock(),workspace=code)
+   private=ImportManager({},threading.Lock(),workspace=code,source_root=root/'private/sources',cache_root=root/'private/imports')
+   try:
+    self.assertEqual(default.source_root,code/'assets/characters');self.assertEqual(default.root,code/'build/character-imports')
+    self.assertFalse(default.custom_storage);self.assertTrue(private.custom_storage)
+    def retain(source,destination):shutil.copytree(source,destination)
+    with patch('opensmash_melee.character_import.GLB') as glb,patch('opensmash_melee.__main__.import_character',side_effect=retain),patch('opensmash_melee.character_import.run_stage') as convert:
+     glb.return_value.mesh.return_value={'positions':[],'triangles':[],'names':[]}
+     ordinary=default.load_local_roster(manifest);rows=private.load_local_roster(manifest);self.assertEqual(rows,ordinary)
+     ident='web-v1-'+hashlib.sha256(rows[0]['slug'].encode()).hexdigest()[:16]
+     retained=private.source_root/ident;self.assertTrue((retained/'rigged.glb').is_file());self.assertTrue(private.index.is_file())
+     output=code/'build/characters'/ident;output.mkdir(parents=True);(output/'keep.dat').write_bytes(b'legacy output')
+     (retained/'announcer.wav').unlink();self.assertEqual(private.load_local_roster(manifest),rows)
+     self.assertTrue((private.root/'previous-builds').is_dir());self.assertEqual((output/'keep.dat').read_bytes(),b'legacy output')
+     self.assertEqual(json.loads(private.index.read_text()),rows);convert.assert_not_called()
+     with self.assertRaisesRegex(ValueError,'source-only'):private.start('https://smash.fun/engine/character-source/'+'a'*48+'/manifest.json','mario')
+     private.remove(rows[0]['slug']);self.assertFalse(retained.exists());self.assertTrue((default.source_root/ident/'rigged.glb').is_file());self.assertTrue((output/'keep.dat').is_file())
+   finally:default.pool.shutdown();private.pool.shutdown()
  def test_rejects_external_directory_and_symlink_assets(self):
   with tempfile.TemporaryDirectory() as temp:
    root=Path(temp).resolve();manifest,entry,export=self.fixture(root);dest=root/'result';dest.mkdir()
@@ -57,10 +79,10 @@ class PrivateRosterTests(unittest.TestCase):
      with Image.open(manager.root/(rows[0]['slug']+'-tile.webp')) as art:self.assertEqual(art.size,(90,86))
      self.assertEqual(manager.load_local_roster(manifest),rows)
      original_slug=rows[0]['slug']
-     data['characters'][0].update(rosterCategory='family',display='Alex (Family)');manifest.write_text(json.dumps(data))
+     data['characters'][0].update(rosterCategory='family',display='Source Person (Family)');manifest.write_text(json.dumps(data))
      family=manager.load_local_roster(manifest)
-     self.assertEqual(family[0]['slug'],original_slug);self.assertEqual(family[0]['name'],'Alex')
-     self.assertEqual(family[0]['displayName'],'Alex (Family)');self.assertEqual(family[0]['rosterCategory'],'family')
+     self.assertEqual(family[0]['slug'],original_slug);self.assertEqual(family[0]['name'],'Source Person')
+     self.assertEqual(family[0]['displayName'],'Source Person (Family)');self.assertEqual(family[0]['rosterCategory'],'family')
      self.assertEqual(json.loads(manager.index.read_text())[0]['rosterCategory'],'family')
      data['characters'][0]['rosterCategory']='unapproved';manifest.write_text(json.dumps(data))
      with self.assertRaisesRegex(ValueError,'roster category'):manager.load_local_roster(manifest)
@@ -84,7 +106,7 @@ class PrivateRosterTests(unittest.TestCase):
      data['characters'][0]['display']='Stage Name';manifest.write_text(json.dumps(data))
      aliased=manager.load_local_roster(manifest)
      self.assertEqual(aliased[0]['slug'],original_slug)
-     self.assertEqual(aliased[0]['name'],'Alex')
+     self.assertEqual(aliased[0]['name'],'Source Person')
      self.assertEqual(aliased[0]['displayName'],'Stage Name')
      self.assertEqual(len(manager.rows),1)
      self.assertEqual(json.loads(manager.index.read_text())[0]['displayName'],'Stage Name')

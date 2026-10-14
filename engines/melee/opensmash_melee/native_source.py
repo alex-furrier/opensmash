@@ -18,7 +18,7 @@ _guard = threading.Lock()
 _locks = {}
 
 
-def prepare(root, source, slug, restore=None):
+def prepare(root, source, slug, restore=None, *, cache_root=None):
     root, source = Path(root), Path(source)
     if not re.fullmatch(r'[a-z0-9][a-z0-9_-]{0,63}', slug):
         raise ValueError('Invalid character identifier')
@@ -41,7 +41,7 @@ def prepare(root, source, slug, restore=None):
             with file.open('rb') as stream:digest.update(hashlib.file_digest(stream,'sha256').digest())
         else:digest.update(b'missing')
     key = digest.hexdigest()
-    revisions = root/'build/native-fit/local/revisions'
+    revisions = Path(cache_root).expanduser().resolve() if cache_root is not None else root/'build/native-fit/local/revisions'
     storage_key=hashlib.sha256((key+slug).encode()).hexdigest()
     destination = revisions/storage_key
     expected = [destination/'sources'/f'{slug}{suffix}' for suffix in ('.json','.rgba8','.identity.dat')]
@@ -73,7 +73,7 @@ def prepare(root, source, slug, restore=None):
                             '--source',str(source),'--slug',slug,'--source-only','--output',str(stage)],
                             cwd=root,capture_output=True,text=True,timeout=remaining())
                         if result.returncode:
-                            log=root/'build/native-fit'/f'{slug}-source.log'
+                            log=(revisions if cache_root is not None else root/'build/native-fit')/f'{slug}-source.log'
                             log.write_text(result.stdout+'\n'+result.stderr)
                             raise ValueError('This character’s model could not be prepared. Please try another character.')
                     for suffix in ('.json','.rgba8','.identity.dat'):

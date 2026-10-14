@@ -7,14 +7,16 @@ import sys
 import uuid
 
 
-def archive_previous_build(workspace, ident, source=None):
+def archive_previous_build(workspace, ident, source=None, *, source_root=None, archive_root=None, source_only=False):
     if not re.fullmatch('[a-z0-9][a-z0-9_-]{0,95}', ident):
         raise ValueError('Invalid character build identifier')
     workspace=Path(workspace)
     source=Path(source) if source is not None else None
-    archive=workspace/'build/character-imports/previous-builds'/(ident+'-'+uuid.uuid4().hex)
-    for label,folder in [('output',workspace/'build/characters'/ident),
-                         ('source',workspace/'assets/characters'/ident)]:
+    archive=Path(archive_root) if archive_root is not None else workspace/'build/character-imports/previous-builds'
+    archive=archive/(ident+'-'+uuid.uuid4().hex)
+    retained=Path(source_root) if source_root is not None else workspace/'assets/characters'
+    folders=[('source',retained/ident)] if source_only else [('output',workspace/'build/characters'/ident),('source',retained/ident)]
+    for label,folder in folders:
         if folder.exists():
             archive.mkdir(parents=True,exist_ok=True)
             # A default imported costume can use this same folder as input.
