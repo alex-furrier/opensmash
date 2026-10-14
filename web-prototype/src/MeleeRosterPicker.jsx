@@ -1,11 +1,11 @@
 import {useEffect,useRef} from 'react';
 import {MELEE_TARGETS} from '../shared/melee-targets.js';
-import {supportedBases} from '../shared/melee-roster-choice.js';
+import {rosterTabs,supportedBases} from '../shared/melee-roster-choice.js';
 import './melee-roster-picker.css';
 
 export function MeleeRosterSelector({value,onChange,loading}){
  return <div className="melee-roster-selector" role="group" aria-label="Choose roster">
-  <span>Roster</span>{[['all','All'],['high-school','High School'],['family','Family']].map(([id,label])=><button type="button" key={id} aria-pressed={value===id} onClick={()=>onChange(id)}>{label}</button>)}
+  <span>Roster</span>{rosterTabs.map(({id,label})=><button type="button" key={id} aria-pressed={value===id} onClick={()=>onChange(id)}>{label}</button>)}
   {loading&&<span role="status">Checking sources…</span>}
  </div>;
 }

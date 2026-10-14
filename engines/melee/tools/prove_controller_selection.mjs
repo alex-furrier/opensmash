@@ -14,7 +14,7 @@ await context.addInitScript(()=>{
  localStorage.setItem('opensmash.melee-controls-complete.v1','complete');
 });
 try{
-await page.goto(origin+'/melee');await page.waitForFunction(()=>window.openSmashReactBridge?.characters?.some(c=>c.meleeAvailable));
+await page.goto(origin+'/melee');await page.getByRole('button',{name:'High School',exact:true}).click();await page.waitForFunction(()=>window.openSmashReactBridge?.characters?.some(c=>c.meleeAvailable));
 const rows=await page.evaluate(()=>window.openSmashReactBridge.characters.filter(r=>r.meleeAvailable));
 const picks=rows.slice(0,2);assert.equal(picks.length,2);
 await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'ROM Management',exact:true}).click();await page.getByRole('tab',{name:'Melee',exact:true}).click();
@@ -53,7 +53,7 @@ assert.equal(await page.getByRole('button',{name:'Create room',exact:true}).isDi
 await page.evaluate(()=>{window.proofPads[1]=window.proofRemoved;window.proofPads[1].buttons[0]={pressed:true,value:1};window.dispatchEvent(Object.assign(new Event('gamepadconnected'),{gamepad:window.proofPads[1]}));});await page.waitForTimeout(300);
 assert.equal(await play.isDisabled(),true,'reconnected held A does not lock a ghost fighter');
 await page.evaluate(()=>window.proofPads[1].buttons[0]={pressed:false,value:0});await controllerClick(tile(picks[1]),1);
-await page.getByRole('button',{name:'Family',exact:true}).click();await page.waitForTimeout(400);
+await page.getByRole('button',{name:'Friends and Family',exact:true}).click();await page.waitForTimeout(400);
 assert.equal(await play.isDisabled(),true,'roster change invalidates hidden controller choices');
 await page.getByRole('button',{name:'High School',exact:true}).click();await page.waitForTimeout(400);
 assert.equal(await play.isDisabled(),true,'returning to roster requires fresh choices');
