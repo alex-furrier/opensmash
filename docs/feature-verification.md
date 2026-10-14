@@ -89,7 +89,7 @@ is the consolidation date unless the original record supplies a run date.
   These focused passes do not supersede historical full-suite failures/skips in
   [multiplayer validation](multiplayer/README.md#current-validation-and-historical-evidence).
 - **E8 — upstream source restoration:** 2026-10-14, local website at `98ec5d1`
-  with local availability patch `d87c9ec` (source publication pending review).
+  with availability patch `d87c9ec` ([separate draft PR #4](https://github.com/alex-furrier/opensmash/pull/4)).
   The [upstream release](https://github.com/turtlesoupy/opensmash-melee/releases/tag/desktop-characters-v1)
   archive matched SHA-256 `ef0b0191a6d81b704cccc0d78a0cb459874a6e0064de4893a23e2d6542edc878`.
   Path/link checks and the existing GLB mesh reader, PNG verification and WAV
