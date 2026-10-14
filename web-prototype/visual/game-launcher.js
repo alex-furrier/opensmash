@@ -477,7 +477,7 @@ function renderLocalSelection() {
 }
 setInterval(renderLocalSelection,250);
 startMenuPointer({
-  enabled:()=>APP_BRIDGE?.experience==='melee'&&!document.querySelector('.game-overlay,.native-game,.boot-screen'),
+  enabled:()=>APP_BRIDGE?.experience==='melee'&&!document.querySelector('.game-overlay[data-melee-input-owned="true"],.native-game,.boot-screen'),
   controllerIndex:()=>APP_BRIDGE?.menuControllerIndex,
   back:()=>{
     const modal=Array.from(document.querySelectorAll('dialog[open],[role="dialog"]')).find(element=>element.getClientRects().length&&getComputedStyle(element).visibility!=='hidden');
