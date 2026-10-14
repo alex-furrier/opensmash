@@ -213,7 +213,7 @@ of this documentation change.
   node engines/melee/tools/prove_host_disc.mjs --origin "$APP_ORIGIN" --output "$PRIVATE_PROOF" --phase restore
   ```
 
-  Inspect both JSON receipts: exact size/digest, successful cancel/retry, gameplay progress and zero ISO GETs on restoration. The configured and unconfigured shutdown regression is repeatable with existing private inputs:
+  Inspect both JSON receipts: exact size/digest, successful cancel/retry, gameplay progress and zero ISO GETs on restoration. The separate shutdown repair is recorded at source `06b345494c392ad3d113a69824c241e8afef43a5`. Check out that repair revision, rather than the historical E12 implementation, to repeat its configured and unconfigured regression with existing private inputs:
 
   ```sh
   MELEE_TEST_ENGINE_ROOT="$MELEE_ENGINE" MELEE_TEST_HOST_DISC_FILE="$MELEE_DISC" node --test engines/melee/tests/friend_site.test.mjs engines/melee/tests/host_disc_server.test.mjs engines/melee/tests/host_disc_download.test.mjs
