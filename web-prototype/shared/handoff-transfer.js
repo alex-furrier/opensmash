@@ -4,11 +4,16 @@ export const TRANSFER_LIMITS = { ssb64: 64 * 1024 * 1024, melee: 2 * 1024 * 1024
 export function validateTransferHeader(header, game) {
   if (header.type !== 'header' || header.game !== game || !Number.isSafeInteger(header.size) || header.size <= 0 || header.size > TRANSFER_LIMITS[game]) throw new Error('The sending device offered an unexpected game or file size.');
 }
-export function channelInbox(channel, signal) {
+export function channelInbox(channel, signal, {maxQueuedFrames=128,maxQueuedBytes=2*1024*1024}={}) {
   const queue = [];
-  let waiter, failure;
-  const fail = error => { failure = error; waiter?.reject(error); waiter = null; };
-  const message = event => { if (waiter) { waiter.resolve(event.data); waiter = null; } else queue.push(event.data); };
+  let waiter, failure, queuedBytes=0;
+  const fail = error => { failure = error; queue.length=0;queuedBytes=0; waiter?.reject(error); waiter = null; };
+  const bytes=value=>typeof value==='string'?new TextEncoder().encode(value).length:value instanceof ArrayBuffer?value.byteLength:Infinity;
+  const message = event => {
+    if(failure)return;const size=bytes(event.data);
+    if(size>16384||(!waiter&&(queue.length>=maxQueuedFrames||queuedBytes+size>maxQueuedBytes))){fail(new Error('Transfer inbox exceeded its bounded frame/queue limit.'));try{channel.close?.();}catch{}return;}
+    if(waiter){waiter.resolve(event.data);waiter=null;}else{queue.push(event.data);queuedBytes+=size;}
+  };
   const closed = () => fail(new Error('The other device disconnected during the transfer.'));
   const aborted = () => fail(Object.assign(new Error('Handoff cancelled.'), {name:'HandoffCancelled'}));
   channel.addEventListener('message', message);
@@ -19,7 +24,7 @@ export function channelInbox(channel, signal) {
   return {
     async next() {
       if (failure) throw failure;
-      if (queue.length) return queue.shift();
+      if (queue.length) {const value=queue.shift();queuedBytes-=bytes(value);return value;}
       return new Promise((resolve,reject)=>{
         const timer = setTimeout(()=>fail(new Error('The other device stopped responding.')), 90000);
         waiter = {resolve:value=>{clearTimeout(timer);resolve(value);},reject:error=>{clearTimeout(timer);reject(error);}};
@@ -57,33 +62,19 @@ export async function sendGameFile(channel, inbox, loadRom, onState) {
   if ((await frame(inbox)).type !== 'received') throw new Error('The receiving device did not finish the transfer.');
   onState('done',{total:file.size});
 }
-export async function receiveGameFile(channel, inbox, game, onState, setCleanup) {
+export async function receiveGameFile(channel, inbox, game, onState, setCleanup, {expectedSize} = {}) {
   if (!Object.hasOwn(TRANSFER_LIMITS,game)) throw new Error('Unsupported game.');
   channel.send(JSON.stringify({type:'request',game}));
   const header = await frame(inbox);
   validateTransferHeader(header,game);
-  let writer, handle, directory, temporaryName;
-  const receipt = {name: "", adopted: false};
+  if(expectedSize!==undefined&&header.size!==expectedSize)throw new Error('The sending device offered the wrong disc size.');
+  let writer, handle;
+  let receipt = {name: "", adopted: false};
   const chunks=[];
   if (game === 'melee') {
     if (!globalThis.navigator?.storage?.getDirectory) throw new Error('This browser cannot save a disc transfer. Use a browser with local file storage support.');
-    directory=await (await navigator.storage.getDirectory()).getDirectoryHandle("opensmash-melee-disc-v1",{create:true});
-    temporaryName=`incoming-${crypto.randomUUID()}.iso`;
-    receipt.name=temporaryName;
-    let releaseLock=()=>{};
-    if(navigator.locks) {
-      const held=new Promise(resolve=>{releaseLock=resolve;});
-      await new Promise((resolve,reject)=>{navigator.locks.request(`opensmash-disc:${temporaryName}`,async()=>{resolve();await held;}).catch(reject);});
-    }
-    setCleanup(async()=>{
-      try {
-        if(receipt.adopted)return;
-        try {await writer?.abort();} catch {}
-        try {await directory.removeEntry(temporaryName);} catch {}
-      } finally {releaseLock();}
-    });
-    handle=await directory.getFileHandle(temporaryName,{create:true});
-    writer=await handle.createWritable();
+    const staging=await incomingDisc(setCleanup);
+    writer=staging.writer;handle=staging.handle;receipt=staging.receipt;
   }
   channel.send(JSON.stringify({type:'ready'}));
   let received=0;
@@ -112,4 +103,43 @@ export async function receiveGameFile(channel, inbox, game, onState, setCleanup)
       received+=data.byteLength;
     }
   }
+}
+
+async function incomingDisc(setCleanup){
+ let writer;
+ const directory=await (await navigator.storage.getDirectory()).getDirectoryHandle("opensmash-melee-disc-v1",{create:true});
+ const temporaryName=`incoming-${crypto.randomUUID()}.iso`;
+ const receipt={name:temporaryName,adopted:false};
+ let releaseLock=()=>{};
+ if(navigator.locks) {
+   const held=new Promise(resolve=>{releaseLock=resolve;});
+   await new Promise((resolve,reject)=>{navigator.locks.request(`opensmash-disc:${temporaryName}`,async()=>{resolve();await held;}).catch(reject);});
+ }
+ setCleanup(async()=>{
+   try {
+     if(receipt.adopted)return;
+     try {await writer?.abort();} catch {}
+     try {await directory.removeEntry(temporaryName);} catch {}
+   } finally {releaseLock();}
+ });
+ const handle=await directory.getFileHandle(temporaryName,{create:true});
+ writer=await handle.createWritable();
+ return{writer,handle,receipt};
+}
+
+/** Save a bounded HTTP stream using the same incoming-disc receipt as handoff. */
+export async function receiveDiscResponse(response,size,signal,onProgress,setCleanup){
+ if(!response.ok||Number(response.headers.get('content-length'))!==size)throw Error('The temporary dev disc could not be loaded completely.');
+ signal.throwIfAborted();const stage=await incomingDisc(setCleanup),reader=response.body.getReader();let received=0;
+ const abort=()=>{void reader.cancel(signal.reason).catch(()=>{});};signal.addEventListener('abort',abort,{once:true});
+ try{
+  for(;;){signal.throwIfAborted();const{done,value}=await reader.read();signal.throwIfAborted();if(done)break;
+   if(received+value.byteLength>size)throw Error('Invalid dev disc byte count.');
+   await stage.writer.write(value);received+=value.byteLength;onProgress(received);
+  }
+  if(received!==size)throw Error('The dev disc load ended before the whole file arrived.');
+  signal.throwIfAborted();await stage.writer.close();
+  const file=new File([await stage.handle.getFile()],'melee-usa-1.02.iso',{type:'application/octet-stream'});
+  Object.defineProperty(file,Symbol.for('opensmash.received-disc'),{value:stage.receipt});return file;
+ }finally{signal.removeEventListener('abort',abort);await reader.cancel().catch(()=>{});reader.releaseLock();}
 }

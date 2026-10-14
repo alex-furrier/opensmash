@@ -52,6 +52,16 @@ def source_package(source, out, slug=None):
           'humanoidOrigins':flat([mesh['bind'][mesh['names'].index(n)][:3,3] for n in NAMES]),
           'smoothNormals':flat(smooth_normals(mesh)['normals']), 'textureSize':512}
     for name in ['positions','normals','weights','joints','triangles','uv']:data[name]=flat(mesh[name])
+    pivot_path=source/'melee-source-pivot.json'
+    if pivot_path.is_file():
+        if pivot_path.stat().st_size>2<<20:raise ValueError('Source-pivot configuration exceeds limit')
+        pivot=json.loads(pivot_path.read_text())
+        if pivot.get('sourceSha256')!=data['sourceSha256'] or pivot.get('version')!=1:raise ValueError('Source-pivot integrity mismatch')
+        for name,length in [('joints',data['n']*4),('weights',data['n']*4),('humanoidOrigins',117)]:
+            values=pivot.get(name)
+            if not isinstance(values,list) or len(values)!=length or not np.isfinite(values).all():raise ValueError('Invalid source-pivot source arrays')
+            data[name]=values
+        data.update(fitStrategy='source-pivot',sourcePivot=pivot['sourcePivot'])
     # Source-only identity artwork is relocatable; no target rig or fit needed.
     from opensmash_melee.presentation import attach, panel
     identity=Archive(struct.pack('>5I',32,0,0,0,0)+bytes(12))
@@ -180,6 +190,8 @@ def target_package(slug, game, out):
               originalBounds=[float(original_positions[:,1].min()),float(original_positions[:,1].max())],
               costumeSha256=hashlib.sha256(original).hexdigest(),slots=BY_SLUG[slug]['costumes'],layouts=layouts,
               headJoint=rig['mapping'][23],headInverse=flat(rig['skeleton'][rig['mapping'][23]]['inverse_bind']))
+    if slug in ('donkey-kong','bowser','pikachu','pichu'):
+        data.update(sourcePivotRootJoint=3,sourcePivotTranslationJoint=1,sourcePivotRootInverse=flat(rig['skeleton'][3]['inverse_bind']))
     if slug not in ('kirby','jigglypuff'):
         anatomy=np.zeros(59,dtype=np.uint32);anchors=np.zeros((59,3))
         for old,j in rig['mapping'].items():anatomy[old]=j;anchors[old]=np.linalg.inv(rig['skeleton'][j]['inverse_bind'])[:3,3]

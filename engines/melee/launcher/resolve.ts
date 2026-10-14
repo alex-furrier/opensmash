@@ -2,6 +2,7 @@ import {meleeTargetFor} from "../../../web-prototype/shared/melee-targets.js";
 import {meleePath} from '../web/lib/paths';
 import type {Fighter} from '../web/lib/fighter';
 import {desktop} from '../web/lib/desktop';
+import {resolvedLaunchRoster} from './launch-roster.mjs';
 // Resolve generated website fighters through the existing source-export format.
 // Both browser and native clients use the same importer API; only its location differs.
 export async function resolveFighters(action:any,roster:Fighter[],signal:AbortSignal,onStatus:(message:string)=>void,{sourceOnly=!desktop()}={}){
@@ -10,7 +11,15 @@ export async function resolveFighters(action:any,roster:Fighter[],signal:AbortSi
   const response=await fetch(url,{...init,signal,headers:{'Content-Type':'application/json',...init.headers}});
   const result=await response.json();if(!response.ok)throw Error(result.error||'Could not prepare the selected fighter.');return result;
  }
+ const imports=await json(meleePath('/api/imports'));
+ if(!Array.isArray(imports))throw Error('Could not read the local Melee roster.');
+ const active=sourceOnly?await json(meleePath('/api/imports?roster=active')):imports;
+ const available=sourceOnly?await json(meleePath('/api/imports?roster=available')):imports;
+ if(!Array.isArray(active))throw Error('Could not read the active Melee roster.');
+ if(!Array.isArray(available))throw Error('Could not check installed Melee sources.');
+ roster=resolvedLaunchRoster([...roster,...available],imports,active,sourceOnly);
  for(const pick of [action.character,...(action.picks||[])].filter(Boolean)){
+  if(sourceOnly&&!available.some((row:Fighter)=>row.slug===pick.slug))throw Error('This fighter has no installed Melee source. Choose an available fighter.');
   if(roster.some(f=>f.slug===pick.slug)||resolved.has(pick.slug))continue;
   onStatus('Preparing '+pick.name+' for Melee…');
   const target=meleeTargetFor(pick);

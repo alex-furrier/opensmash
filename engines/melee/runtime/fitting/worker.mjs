@@ -23,6 +23,11 @@ self.onmessage=async ({data})=>{
     if(source.version!==1||target.version!==1)throw Error('Unsupported native fitting asset version');
     const loaded=performance.now();
     const input={...source,...target,origins:target.mode==='round'?source.roundOrigins:source.humanoidOrigins,normals:target.mode==='round'?source.normals:source.smoothNormals};
+    if(source.fitStrategy!==undefined&&source.fitStrategy!=='source-pivot')throw Error('Unsupported source fitting strategy');
+    if(source.fitStrategy==='source-pivot'){
+      if(!['donkey-kong','bowser','pikachu','pichu'].includes(slug)||data.format==='dat')throw Error('Source-pivot mode requires the reviewed four-donor runtime renderer');
+      input.mode='source-pivot';input.origins=source.humanoidOrigins;input.normals=source.normals;input.sourcePivot=source.sourcePivot?.targets?.[slug];
+    }
     const fitted=fitCharacter(module,input),fitDone=performance.now();
     const bytes=data.format==='dat'?buildStandardCostume(template,source,target,fitted,texture,color):buildCostume(template,source,target,fitted,texture,color,identity);
     self.postMessage({format:data.format||'runtime',filename:target.slots[color].filename,bytes,metrics:{character,target:slug,loadMs:loaded-start,fitMs:fitDone-loaded,packMs:performance.now()-fitDone,totalMs:performance.now()-start}},[bytes]);

@@ -1,0 +1,23 @@
+.melee-roster-selector{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:12px 16px;background:#140c08;color:#fff0d5;border-block:1px solid #67442b;font:600 15px/1.4 system-ui,sans-serif}
+.melee-roster-selector>span:first-child{margin-right:8px}
+.melee-roster-selector button,.melee-base-picker button{min-height:44px;padding:8px 16px;border:1px solid #9b7046;border-radius:5px;background:#24180f;color:#fff0d5;font:inherit;cursor:pointer;transition:background 120ms}
+.melee-roster-selector button:hover,.melee-base-picker button:hover{background:#50341e}
+.melee-roster-selector button[aria-pressed=true],.melee-base-picker button[aria-pressed=true]{background:#f3c884;color:#201007;border-color:#f3c884}
+.melee-roster-selector button:focus-visible,.melee-base-picker button:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.melee-base-picker{box-sizing:border-box;width:min(440px,calc(100vw - 32px));padding:20px;border:1px solid #be8d53;border-radius:10px;background:#1b110c;color:#fff0d5;font:15px/1.4 system-ui,sans-serif;box-shadow:0 16px 60px #0009}
+.melee-base-picker::backdrop{background:#000b}
+.melee-base-picker header{display:flex;gap:12px;align-items:start;justify-content:space-between;margin-bottom:20px}
+.melee-base-picker header p{margin:0 0 6px;color:#e4bd8e}
+.melee-base-picker h2{margin:0;font-size:20px}
+.melee-base-picker header button{padding:8px;min-width:44px;font-size:22px}
+.melee-base-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.melee-base-options button:first-child{grid-column:1/-1}
+.melee-base-note{margin:16px 0 0;color:#e4bd8e;font-size:13px}
+.replica-select-control{position:absolute;inset:0;z-index:2;appearance:none;border:0;background:transparent;color:inherit;cursor:pointer}
+.replica-cell .replica-base-button{top:7%;bottom:auto;right:6%;align-items:flex-start;appearance:none}
+.replica-cell .replica-base-button svg{width:clamp(8px,1.1vw,14px);height:clamp(8px,1.1vw,14px)}
+.replica-cell .replica-base-button::before{top:-3px;bottom:auto}
+.replica-cell[data-source-unavailable=true] .replica-portrait-layer{filter:grayscale(1);opacity:.45}
+.replica-source-status{position:absolute;left:4px;right:4px;top:8px;z-index:3;padding:3px;background:#110b08e8;color:#fff0d5;font:12px/1.3 system-ui;text-align:center;pointer-events:none}
+.replica-select-control:disabled{cursor:not-allowed}
+@media(prefers-reduced-motion:reduce){.melee-roster-selector button,.melee-base-picker button{transition:none}}

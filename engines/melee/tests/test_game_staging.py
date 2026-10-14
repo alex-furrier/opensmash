@@ -6,6 +6,20 @@ from opensmash_melee.game_staging import stage_game
 
 
 class GameStagingTests(unittest.TestCase):
+    def test_red_falcon_overrides_both_locale_files_and_restores_them_between_matches(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);source=root/'source';game=root/'lineup'
+            (source/'files').mkdir(parents=True)
+            for name in ['PlCaRe.dat','PlCaRe.usd']:(source/'files'/name).write_bytes(name.encode())
+            costume=root/'custom.dat';costume.write_bytes(b'custom Falcon color2')
+            stage_game(source,game,[(costume,'PlCaRe.dat')],lambda _:[])
+            for name in ['PlCaRe.dat','PlCaRe.usd']:
+                self.assertEqual((game/'files'/name).read_bytes(),costume.read_bytes())
+                self.assertEqual((source/'files'/name).read_bytes(),name.encode())
+            with patch('opensmash_melee.game_staging.shutil.copytree',side_effect=AssertionError('rebuilt tree')):
+                stage_game(source,game,[],lambda _:[])
+            for name in ['PlCaRe.dat','PlCaRe.usd']:self.assertEqual((game/'files'/name).read_bytes(),name.encode())
+
     def test_reuses_tree_restores_old_lineup_and_preserves_original_disc(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

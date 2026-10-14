@@ -1,3 +1,4 @@
+import {movesetPreferenceVersion} from '../web/lib/moveset-preference.mjs';
 import {useEffect,useState} from 'react';
 import LaunchSettings from '../web/app/LaunchSettings';
 import {loadSettings,defaults,type Settings} from '../web/lib/launch';
@@ -33,10 +34,11 @@ export function MeleeDiscSettings(){
 // Settings > Reset All Settings: launch settings and control bindings.
 export function resetMeleePreferences(){
  try{preferences.removeItem('melee-launch-v1');}catch{}
+ try{preferences.removeItem('melee-roster-ui-v1');}catch{}
  saveBindings(defaultBindings());
 }
 export function MeleeSettings(){
  const [settings,setSettings]=useState(loadSettings);
- function update(value:Settings){setSettings(value);preferences.setItem('melee-launch-v1',JSON.stringify(value));{const url=new URL(location.href);url.searchParams.delete('moveset');history.replaceState({},'',url);}}
+ function update(value:Settings){const saved={...value,movesetPreferenceVersion};setSettings(saved);preferences.setItem('melee-launch-v1',JSON.stringify(saved));{const url=new URL(location.href);url.searchParams.delete('moveset');history.replaceState({},'',url);}}
  return <div className="melee-settings"><LaunchSettings section="gameplay" value={settings} onChange={update} roster={[]} unifiedMoveset/><div className="advanced-actions"><button className="launch-flow-action" onClick={()=>update({...defaults(),ports:settings.ports.map(p=>({...p,target:"auto"}))})}>Restore Defaults</button></div></div>;
 }

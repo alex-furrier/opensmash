@@ -38,3 +38,14 @@
  .melee-surface .game-panel .game-screen {left:160px;right:170px;}
  .melee-surface .game-panel header {left:160px;right:170px;}
 }
+
+/* Share the launcher's dark, high-contrast controls in setup and play. */
+.melee-setup button,.melee-surface .game-panel header button,.melee-surface .game-message button {
+ color:#fff2d5;background:#211e18;border:1px solid #87754f;padding:8px 14px;font:inherit;cursor:pointer;
+}
+.melee-setup button:hover,.melee-surface .game-panel header button:hover,.melee-surface .game-message button:hover {background:#453824;}
+.melee-setup button:focus-visible,.melee-surface button:focus-visible {outline:2px solid #ffd366;outline-offset:3px;}
+.melee-setup input {color:#fff;background:#161616;border:1px solid #87754f;padding:10px;}
+.melee-setup p {max-width:520px;line-height:1.5;}
+.melee-surface .game-panel header {gap:8px;flex-wrap:wrap;}
+.melee-surface .game-panel header>div {margin-right:auto;}

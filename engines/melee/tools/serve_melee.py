@@ -32,7 +32,7 @@ _manifest_hash = re.search(r'([a-f0-9]{64})\.json$', _manifest_key)
 BUILD_VERSION = _manifest_hash.group(1)[:16] if _manifest_hash else ''
 IMMUTABLE_CACHE = 'public, max-age=31536000, immutable'
 CATALOG = {r['slug']: r for r in json.loads((ROOT / 'web/public/catalog.json').read_text())}
-from opensmash_melee.targets import PLAYABLE, BY_SLUG, cache_id
+from opensmash_melee.targets import PLAYABLE, BY_SLUG, cache_id, costume_target_allowed
 KINDS = {slug:(row['fighter'],row['code']) for slug,row in BY_SLUG.items()}
 LOCK = threading.Lock()
 # Serialize writes to one character/moveset cache, while allowing independent
@@ -211,11 +211,19 @@ class Handler(BaseHTTPRequestHandler):
                 imported = ROOT / 'assets/characters' / ident / 'announcer.wav'
                 return self.file(imported if imported.is_file() else descendant(CHARACTERS, slug + '/announcer.wav'))
             if route == '/api/imports':
-                return self.json(list(IMPORTS.rows))
+                roster=parse_qs(urlsplit(self.path).query).get('roster')
+                if roster==['available']:
+                    available=[]
+                    for row in CATALOG.values():
+                        source=ROOT/'assets/characters'/cache_id(row['slug'],row['target'],row['target']) if row.get('imported') else CHARACTERS/row['slug']
+                        if all((source/name).is_file() for name in ['rigged.glb','portrait_raw.png','stock_raw.png','emblem_raw.png','announcer.wav']):available.append(row)
+                    return self.json(available)
+                active=roster==['active']
+                return self.json(list(IMPORTS.private_rows if active and IMPORTS.private_rows is not None else IMPORTS.rows))
             if NATIVE and route == '/catalog.json':return self.file(ROOT/'web/public/catalog.json')
             if route.startswith('/api/imports/portraits/'):
                 name=route.removeprefix('/api/imports/portraits/')
-                if not re.fullmatch(r'import-[a-f0-9]{24}\.webp',name):raise FileNotFoundError(name)
+                if not re.fullmatch(r'import-[a-f0-9]{24}(?:-tile|-medium)?\.webp',name):raise FileNotFoundError(name)
                 return self.file(descendant(IMPORTS.root,name))
             if route.startswith('/api/imports/'):
                 job=IMPORTS.jobs.get(route.removeprefix('/api/imports/'))
@@ -238,6 +246,7 @@ class Handler(BaseHTTPRequestHandler):
                 query = parse_qs(urlsplit(self.path).query)
                 target = query.get('target',[CATALOG[slug]['target']])[0]
                 if target not in BY_SLUG: raise ValueError('Unknown moveset')
+                if not costume_target_allowed(CATALOG[slug],target):raise ValueError('This base is not validated for this character.')
                 fighter, code = KINDS[target]
                 ident = cache_id(slug,target,CATALOG[slug].get('original_target', CATALOG[slug]['target']))
                 variant = ('browser-compact/' if query.get('compact') == ['1'] else 'browser/') if query.get('skin') == ['host'] else ''
@@ -414,6 +423,7 @@ class Handler(BaseHTTPRequestHandler):
         row = CATALOG[slug]
         target = query.get('target',[row['target']])[0]
         if target not in BY_SLUG: return self.json({'error':'Unknown moveset'},400)
+        if not costume_target_allowed(row,target):return self.json({'error':'This base is not validated for this character. Choose its character default or a supported base.'},400)
         fighter, code = KINDS[target]
         slots = BY_SLUG[target]['costumes']
         if not 0 <= color < len(slots): return self.send_error(400)
@@ -491,6 +501,7 @@ if __name__ == '__main__':
     parser.add_argument('--port', type=int, default=8781)
     parser.add_argument('--characters', type=Path, default=CHARACTERS, help='Exported character library (one directory per roster slug)')
     parser.add_argument('--import-origin', action='append', default=[], help='Additional exact source-export origin for local development')
+    parser.add_argument('--private-roster', type=Path, help='Local private roster manifest; imports only validated export directories')
     parser.add_argument('--trace-io', action='store_true', help='Record local asset request timings for startup profiling')
     args = parser.parse_args()
     startup_started = time.monotonic()
@@ -514,6 +525,7 @@ if __name__ == '__main__':
     startup_log('Loading character import service')
     from opensmash_melee.character_import import ImportManager
     IMPORTS=ImportManager(CATALOG,LOCK,['https://smash.fun','https://www.smash.fun',*args.import_origin])
+    if args.private_roster:IMPORTS.load_local_roster(args.private_roster)
     startup_log('Character import service ready')
     if args.desktop:
         if not TOKEN:raise SystemExit('Desktop service requires its session token')

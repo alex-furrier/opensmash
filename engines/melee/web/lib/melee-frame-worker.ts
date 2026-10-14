@@ -4,7 +4,7 @@ export class MeleeFrameWorker extends EventTarget {
   onmessageerror: ((event: MessageEvent) => void) | null = null;
   onerror: ((event: ErrorEvent) => void) | null = null;
   frame: HTMLIFrameElement;
-  pending: unknown[];
+  pending: {data:unknown;transfer:Transferable[]}[];
   listener: (event: MessageEvent) => void;
   private pads = new Map<number, number[]>();
   private diagnostics: string[] = [];
@@ -24,7 +24,7 @@ export class MeleeFrameWorker extends EventTarget {
     this.listener=event=>{
       if(event.source!==this.frame.contentWindow||event.origin!==location.origin)return;
       if(event.data?.type==='bridge-ready'){
-        clearTimeout(this.bridgeTimer);this.connected=true;for(const data of this.pending)this.postMessage(data);this.pending=[];return;
+        clearTimeout(this.bridgeTimer);this.connected=true;for(const item of this.pending)this.postMessage(item.data,item.transfer);this.pending=[];return;
       }
       let data=event.data;
       if(data?.type==='log'){
@@ -61,6 +61,7 @@ export class MeleeFrameWorker extends EventTarget {
       parent.moveBefore(this.frame,canvas);
     }
     this.surface=canvas;
+    this.frame.addEventListener('focus',()=>canvas.focus({preventScroll:true}));
     canvas.style.opacity='0';
     Object.assign(this.frame.style,{position:'absolute',pointerEvents:'none',transformOrigin:'top left'});
     this.frame.setAttribute('aria-hidden','true');
@@ -71,9 +72,9 @@ export class MeleeFrameWorker extends EventTarget {
     this.resize=new ResizeObserver(fit);this.resize.observe(parent);fit();
     this.postMessage({type:'surface',direct:true});
   }
-  postMessage(data: unknown){
+  postMessage(data: unknown,transfer:Transferable[]=[]){
     if(this.closed)return;
-    if(!this.connected){this.pending.push(data);return;}
+    if(!this.connected){this.pending.push({data,transfer});return;}
     const message=data as {type?:string;values?:number[];audio?:SharedArrayBuffer};
     if(message.type==='start'&&message.audio){
       // Safari can deep-copy SABs in window.postMessage. This same-origin
@@ -87,7 +88,7 @@ export class MeleeFrameWorker extends EventTarget {
       if(previous&&previous.length===values.length&&values.every((value,i)=>value===previous[i]))return;
       this.pads.set(values[0],values.slice());
     }else if(['select','confirm','input'].includes(message?.type||''))this.pads.clear();
-    this.frame.contentWindow?.postMessage(data,location.origin);
+    this.frame.contentWindow?.postMessage(data,location.origin,transfer);
   }
-  terminate(){if(this.closed)return;this.closed=true;clearTimeout(this.bridgeTimer);window.removeEventListener('message',this.listener);this.resize?.disconnect();if(this.surface)this.surface.style.opacity='';this.frame.remove();this.pending=[];}
+  terminate(){if(this.closed)return;this.closed=true;clearTimeout(this.bridgeTimer);window.removeEventListener('message',this.listener);this.resize?.disconnect();if(this.surface)this.surface.style.opacity='';this.frame.contentWindow?.dispatchEvent(new Event('opensmash-runtime-close'));this.frame.remove();this.pending=[];}
 }

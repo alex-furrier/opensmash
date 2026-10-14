@@ -1,0 +1,221 @@
+--- a/platforms/browser/runtime.mjs
++++ b/platforms/browser/runtime.mjs
+@@ -141,15 +141,16 @@
+ const script=document.createElement('script');script.src='./melee_browser.js';script.onerror=()=>fail(Error('Build the upstream Melee engine before launching.'));document.head.append(script);
+ async function select(data){
+  if(!ready||selection)throw Error('The upstream engine is not ready for selection.');
+- const {COSTUME_SLOTS}=await import(base+'local-files.mjs');
++ const {COSTUME_ASSET_NAMES,regionalCostumeAssets}=await import(base+'local-files.mjs');
+  const css=['MnSlChr.dat','MnSlChr.usd','audio/nr_select.ssm','audio/us/nr_select.ssm'];
+- for(const [assets,allowed,max] of [[data.costumes||[],COSTUME_SLOTS,2*1024*1024],[data.cssAssets||[],css,16*1024*1024]]){
++ for(const [assets,allowed,max] of [[regionalCostumeAssets(data.costumes||[]),COSTUME_ASSET_NAMES,2*1024*1024],[data.cssAssets||[],css,16*1024*1024]]){
+   for(const asset of assets){if(!allowed.includes(asset.filename))throw Error('Invalid replacement asset.');const bytes=new Uint8Array(await asset.blob.arrayBuffer());if(bytes.length<32||bytes.length>max)throw Error('Invalid replacement asset size.');const path='/mod/'+asset.filename;Module.FS.mkdirTree(path.slice(0,path.lastIndexOf('/')));Module.FS.writeFile(path,bytes);}
+  }
+  const c=data.launch;
+  if(data.netplay){
+   const {installedIdentity}=await import(base+'netplay/identity.mjs');
+-  const actual=await installedIdentity(verifiedEngine,c,{verifiedDisc:verifiedDiscHash,installedSeed:Module.ENV.MELEE_SEED,freshSaves:options.freshNetplay,costumes:data.costumes||[],cssAssets:data.cssAssets||[]});
++  const {installedMatchIdentity}=await import(base+'netplay/match-identity.mjs');
++  const actual=await (data.netplay.friendMatch?installedMatchIdentity:installedIdentity)(verifiedEngine,c,{verifiedDisc:verifiedDiscHash,installedSeed:Module.ENV.MELEE_SEED,freshSaves:options.freshNetplay,costumes:data.costumes||[],cssAssets:data.cssAssets||[]});
+   if(!Object.keys(actual).every(key=>data.netplay.identity?.[key]===actual[key]))throw Error('Match identity does not describe this installed game.');
+  }
+  if(!c||!Module._direct_configure(c.mode,c.stage,c.level,c.stocks,c.minutes,...c.packedPorts))throw Error('Invalid match configuration.');
+@@ -192,7 +193,7 @@
+   const {ISO_SHA256}=await import(base+'disc.mjs');verifiedDiscHash=ISO_SHA256;
+   report('disc-verified');await runtimeReady;
+   if(data.freshNetplay){
+-   const response=await fetch('/manifest');if(!response.ok)throw Error('Confirmed-input runtime manifest unavailable.');
++   const response=await fetch(prefix?prefix+'/api/netplay/manifest':'/manifest');if(!response.ok)throw Error('Confirmed-input runtime manifest unavailable.');
+    const {verifyRuntime}=await import(base+'netplay/identity.mjs');
+    verifiedEngine=await verifyRuntime(await response.json());
+    if(Module._opensmash_confirmed_input_version?.()!==1)throw Error('Runtime lacks confirmed input.');
+--- a/platforms/browser/skinning.c
++++ b/platforms/browser/skinning.c
+@@ -9,6 +9,9 @@
+ #include <sysdolphin/baselib/mtx.h>
+ #include <dolphin/gx.h>
+ #include <math.h>
++#include <emscripten/heap.h>
++#include "source_pivot.h"
++static int sp_readable(const void* p,unsigned n){uintptr_t a=(uintptr_t)p,size=emscripten_get_heap_size();return a>=1024&&a<=size&&n<=size-a;}
+ #define SKIN_FAIL() do {fprintf(stderr,"[direct-c] invalid skin data at line %d\n",__LINE__);abort();}while(0)
+ static unsigned be32(const void* p){unsigned n;memcpy(&n,p,4);return __builtin_bswap32(n);}
+ static float bef(const void* p){unsigned n=be32(p);float f;memcpy(&f,&n,4);return f;}
+@@ -17,7 +20,8 @@
+  if(!pobj||!pobj->verts)return 0;
+  unsigned* attrs=(unsigned*)pobj->verts;
+  if(be32(attrs+24)!=255||be32(attrs+25)!=0x4f53534b)return 0;
+- unsigned* meta=(unsigned*)be32(attrs+29);if(be32(meta)!=0x4f53534b||be32(meta+1)!=1)SKIN_FAIL();
++ unsigned* meta=(unsigned*)be32(attrs+29);if(be32(meta)!=0x4f53534b)SKIN_FAIL();
++ unsigned strategy=be32(meta+1);if(strategy!=1&&strategy!=2)SKIN_FAIL();
+  unsigned vertices=be32(meta+2),envelopes=be32(meta+3),bones=be32(meta+4);
+  if(!vertices||vertices>65535||!envelopes||envelopes>65535||!bones||bones>128)SKIN_FAIL();
+  float* src=(float*)be32(meta+5);float* normal=(float*)be32(meta+6);unsigned** records=(unsigned**)be32(meta+7);unsigned short* vertexenv=(unsigned short*)be32(meta+8);float* dst=(float*)be32(meta+9);float* dstnormal=(float*)be32(meta+10);
+@@ -26,6 +30,28 @@
+  if(capacity<envelopes){posed=realloc(posed,envelopes*sizeof(Mtx));normals=realloc(normals,envelopes*sizeof(Mtx));if(!posed||!normals)SKIN_FAIL();capacity=envelopes;}
+  HSD_Envelope* e=pobj->u.envelope_list->data;
+  for(unsigned i=0;i<bones;i++){if(!e||!e->jobj||!e->jobj->envelopemtx){fprintf(stderr,"skin bone %u/%u node=%p joint=%p\n",i,bones,e,e?e->jobj:NULL);SKIN_FAIL();}HSD_JObjSetupMatrix(e->jobj);PSMTXConcat(e->jobj->mtx,e->jobj->envelopemtx,transforms[i]);e=e->next;}
++ /* Version 2 is private source-pivot FK; version 1 remains unchanged. */
++ if(strategy==2){
++  unsigned* source=(unsigned*)be32(meta+11);
++  if(!source||!sp_readable(source,8)||be32(source+1)!=bones)SKIN_FAIL();
++  unsigned magic=be32(source),header=magic==0x4f535350?8:magic==0x4f535032?16:0;
++  if(!header||!sp_readable(source,header+bones*16))SKIN_FAIL();
++  int parent[SP_MAX_BONES];float origin[SP_MAX_BONES][3];Mtx articulated[SP_MAX_BONES];
++  for(unsigned i=0;i<bones;i++){
++   parent[i]=(int)be32((unsigned*)((char*)source+header+i*16));
++   for(int c=0;c<3;c++)origin[i][c]=bef((char*)source+header+i*16+4+c*4);
++  }
++  if(header==16){
++   unsigned flags=be32(source+3),translation=flags>>8;
++   if((flags&~0x7f03u)||!(flags&1)||!sp_stabilize_body(bones,be32(source+2),(float(*)[12])transforms))SKIN_FAIL();
++   if(flags&2){
++    if(translation>=bones)SKIN_FAIL();
++    for(int r=0;r<3;r++)transforms[0][r][3]=transforms[translation][r][3];
++   }
++  }
++  if(!sp_reconstruct(bones,parent,origin,(const float(*)[12])transforms,(float(*)[12])articulated))SKIN_FAIL();
++  memcpy(transforms,articulated,bones*sizeof(Mtx));
++ }
+  for(unsigned i=0;i<envelopes;i++){
+   unsigned* record=(unsigned*)be32(records+i),count=be32(record);if(!count||count>8)SKIN_FAIL();Mtx blended={0},scaled;
+   for(unsigned j=0;j<count;j++){unsigned bone=be32(record+1+j*2);float weight=bef(record+2+j*2);if(bone>=bones||!isfinite(weight))SKIN_FAIL();for(int r=0;r<3;r++)for(int c=0;c<4;c++)blended[r][c]=fmaf(weight,transforms[bone][r][c],blended[r][c]);}
+--- /dev/null
++++ b/platforms/browser/source_pivot.h
+@@ -0,0 +1,87 @@
++#ifndef OPENSMASH_SOURCE_PIVOT_H
++#define OPENSMASH_SOURCE_PIVOT_H
++/* Opt-in source-shaped FK. Matrices are row-major 3x4 target skin deltas.
++ * No target joint mutation, allocation, camera transform, or global state. */
++#include <math.h>
++#define SP_MAX_BONES 128
++static float sp_dot(const float a[3],const float b[3]) {
++    return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
++}
++static int sp_unit(float v[3]) {
++    float n=sqrtf(sp_dot(v,v));
++    if(!isfinite(n)||n<1e-6f)return 0;
++    for(int k=0;k<3;k++)v[k]/=n;
++    return 1;
++}
++static int sp_rotation(const float m[12],float r[9]) {
++    float x[3]={m[0],m[4],m[8]},y[3]={m[1],m[5],m[9]};
++    float z[3]={m[2],m[6],m[10]};
++    for(int k=0;k<12;k++)if(!isfinite(m[k]))return 0;
++    if(!sp_unit(x))return 0;
++    float d=sp_dot(x,y);for(int k=0;k<3;k++)y[k]-=d*x[k];
++    if(!sp_unit(y))return 0;
++    float cross[3]={x[1]*y[2]-x[2]*y[1],x[2]*y[0]-x[0]*y[2],x[0]*y[1]-x[1]*y[0]};
++    /* Reflection/collapsed scale cannot be silently interpreted as rotation. */
++    if(sp_dot(cross,z)<1e-6f)return 0;
++    for(int k=0;k<3;k++){r[k*3]=x[k];r[k*3+1]=y[k];r[k*3+2]=cross[k];}
++    return 1;
++}
++/* Optional stable four-paw body: use model root motion and remove target
++ * pelvis posture from limb rotation deltas. Source rest anatomy is untouched. */
++static int sp_stabilize_body(unsigned count,unsigned body,float (*driver)[12]) {
++    if(!count||count>SP_MAX_BONES||body==0||body>=count)return 0;
++    float root[9],pelvis[9];
++    if(!sp_rotation(driver[0],root)||!sp_rotation(driver[body],pelvis))return 0;
++    float basis[9]={0};
++    for(int r=0;r<3;r++)for(int c=0;c<3;c++)for(int k=0;k<3;k++)
++        basis[r*3+c]+=root[r*3+k]*pelvis[c*3+k];
++    for(unsigned i=1;i<count;i++) {
++        float rotation[9],corrected[9]={0};
++        if(!sp_rotation(driver[i],rotation))return 0;
++        for(int r=0;r<3;r++)for(int c=0;c<3;c++)for(int k=0;k<3;k++)
++            corrected[r*3+c]+=basis[r*3+k]*rotation[k*3+c];
++        for(int r=0;r<3;r++)for(int c=0;c<3;c++)driver[i][r*4+c]=corrected[r*3+c];
++    }
++    return 1;
++}
++static int sp_reconstruct(unsigned count,const int* parent,
++                          const float (*origin)[3],const float (*driver)[12],
++                          float (*out)[12]) {
++    if(!count||count>SP_MAX_BONES||parent[0]!=-1)return 0;
++    float rotations[SP_MAX_BONES][9],world[SP_MAX_BONES][9],position[SP_MAX_BONES][3];
++    for(unsigned i=0;i<count;i++) {
++        if(i&& (parent[i]<0||(unsigned)parent[i]>=i))return 0;
++        for(int k=0;k<3;k++)if(!isfinite(origin[i][k]))return 0;
++        if(!sp_rotation(driver[i],rotations[i]))return 0;
++        if(!i) {
++            for(int k=0;k<9;k++)world[i][k]=rotations[i][k];
++            for(int r=0;r<3;r++) {
++                position[i][r]=driver[i][r*4+3];
++                for(int c=0;c<3;c++)position[i][r]+=world[i][r*3+c]*origin[i][c];
++            }
++        } else {
++            unsigned p=(unsigned)parent[i];float relative[9]={0};
++            /* Remove the parent's target rotation, then articulate on source FK. */
++            for(int r=0;r<3;r++)for(int c=0;c<3;c++)for(int k=0;k<3;k++)
++                relative[r*3+c]+=rotations[p][k*3+r]*rotations[i][k*3+c];
++            for(int r=0;r<3;r++)for(int c=0;c<3;c++) {
++                world[i][r*3+c]=0;
++                for(int k=0;k<3;k++)world[i][r*3+c]+=world[p][r*3+k]*relative[k*3+c];
++            }
++            for(int r=0;r<3;r++) {
++                position[i][r]=position[p][r];
++                for(int c=0;c<3;c++)position[i][r]+=world[p][r*3+c]*(origin[i][c]-origin[p][c]);
++            }
++        }
++        for(int r=0;r<3;r++) {
++            out[i][r*4+3]=position[i][r];
++            for(int c=0;c<3;c++) {
++                out[i][r*4+c]=world[i][r*3+c];
++                out[i][r*4+3]-=world[i][r*3+c]*origin[i][c];
++            }
++            if(!isfinite(out[i][r*4+3]))return 0;
++        }
++    }
++    return 1;
++}
++#endif
+--- /dev/null
++++ b/tests/browser/test_source_pivot.py
+@@ -0,0 +1,46 @@
++"""Source-pivot kinematics; synthetic cases do not establish gameplay support."""
++import ctypes, math, shutil, subprocess, tempfile, unittest
++from pathlib import Path
++ROOT = Path(__file__).resolve().parents[2]
++@unittest.skipUnless(shutil.which('clang'), 'requires clang')
++class SourcePivotTests(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        cls.temp = tempfile.TemporaryDirectory()
++        root = Path(cls.temp.name)
++        (root/'core.c').write_text('#include "source_pivot.h"\nint solve(unsigned n,const int*p,const float*o,const float*d,float*out){return sp_reconstruct(n,p,(const float(*)[3])o,(const float(*)[12])d,(float(*)[12])out);}\nint stabilize(unsigned n,unsigned body,float*d){return sp_stabilize_body(n,body,(float(*)[12])d);}\n')
++        subprocess.run(['clang','-std=c99','-Wall','-Wextra','-Werror','-shared','-fPIC','-I'+str(ROOT/'platforms/browser'),str(root/'core.c'),'-o',str(root/'core.dylib')],check=True)
++        cls.lib = ctypes.CDLL(str(root/'core.dylib'))
++        cls.lib.solve.argtypes = [ctypes.c_uint,*([ctypes.c_void_p]*4)]
++        cls.lib.stabilize.argtypes = [ctypes.c_uint,ctypes.c_uint,ctypes.c_void_p]
++    @classmethod
++    def tearDownClass(cls): cls.temp.cleanup()
++    def solve(self, drivers, parents=(-1,0,1)):
++        out=(ctypes.c_float*36)()
++        status=self.lib.solve(3,(ctypes.c_int*3)(*parents),(ctypes.c_float*9)(0,2,0,1,1,0,1,0,0),(ctypes.c_float*36)(*sum(drivers,[])),out)
++        return status,list(out)
++    def test_neutral_is_identity(self):
++        identity=[1,0,0,0,0,1,0,0,0,0,1,0]
++        status,out=self.solve([identity]*3)
++        self.assertEqual(status,1); self.assertEqual(out,identity*3)
++    def test_joint_rotation_uses_source_pivot_and_ignores_target_translation(self):
++        identity=[1,0,0,0,0,1,0,0,0,0,1,0]
++        rotated=[0,-1,0,100,1,0,0,200,0,0,1,300]
++        status,out=self.solve([identity,rotated,rotated]); self.assertEqual(status,1)
++        def point(bone,p):
++            m=out[bone*12:(bone+1)*12]
++            return [sum(m[r*4+c]*p[c] for c in range(3))+m[r*4+3] for r in range(3)]
++        self.assertEqual(point(1,[1,1,0]),[1,1,0]);self.assertEqual(point(2,[1,0,0]),[2,1,0])
++    def test_positive_scale_discarded(self):
++        identity=[1,0,0,0,0,1,0,0,0,0,1,0]
++        status,out=self.solve([identity,[2,0,0,0,0,3,0,0,0,0,4,0],identity]);self.assertEqual(status,1);self.assertEqual(out,identity*3)
++    def test_invalid_hierarchy_reflection_and_nonfinite_rejected(self):
++        identity=[1,0,0,0,0,1,0,0,0,0,1,0]
++        self.assertEqual(self.solve([identity]*3,(-1,2,1))[0],0)
++        bad=identity.copy();bad[10]=-1;self.assertEqual(self.solve([identity,bad,identity])[0],0)
++        bad=identity.copy();bad[3]=math.nan;self.assertEqual(self.solve([identity,bad,identity])[0],0)
++    def test_stabilization_rejects_invalid_body_and_keeps_neutral(self):
++        identity=[1,0,0,0,0,1,0,0,0,0,1,0];driver=(ctypes.c_float*36)(*(identity*3))
++        self.assertEqual(self.lib.stabilize(3,0,driver),0);self.assertEqual(self.lib.stabilize(3,3,driver),0)
++        self.assertEqual(self.lib.stabilize(3,1,driver),1);self.assertEqual(list(driver),identity*3)
++if __name__=='__main__': unittest.main()

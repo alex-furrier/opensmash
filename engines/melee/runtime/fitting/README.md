@@ -106,3 +106,5 @@ This establishes fitting correctness/performance for the tested assets. It is
 not visual gameplay validation, a mobile benchmark, a GLB decoder, a DAT writer,
 or full-roster launcher acceptance. Disc verification, downloads, shader
 compilation and GPU upload are separate from these fitting measurements.
+
+The optional `melee-source-pivot.json` sidecar selects source-shaped browser fitting for the reviewed 39-joint source layout and Donkey Kong, Bowser, Pikachu or Pichu. Its hash participates in import identity and source-cache revisions. The producer validates it against the source mesh; the worker, fitter and OSSK2 browser renderer must be shipped together. Ordinary humanoid and round paths retain OSSK1 behavior. Standard DAT export rejects this strategy, and desktop/shared rendering is unsupported. Donor collision bounds and animation poses remain unchanged. Bowser fire retains its donor attachment origin, which can sit ahead of the reskin mouth.

@@ -80,9 +80,9 @@ function present(canvas){
 }
 async function select(data){
  if(!game||!ready)throw Error('The direct-C engine is not ready for selection.');ready=false;selection=data;
- const {COSTUME_SLOTS}=await import(base+'local-files.mjs');
+ const {COSTUME_ASSET_NAMES,regionalCostumeAssets}=await import(base+'local-files.mjs');
  const css=['MnSlChr.dat','MnSlChr.usd','audio/nr_select.ssm','audio/us/nr_select.ssm'];
- for(const [assets,allowed,max] of [[data.costumes||[],COSTUME_SLOTS,2*1024*1024],[data.cssAssets||[],css,16*1024*1024]]){
+ for(const [assets,allowed,max] of [[regionalCostumeAssets(data.costumes||[]),COSTUME_ASSET_NAMES,2*1024*1024],[data.cssAssets||[],css,16*1024*1024]]){
   for(const asset of assets){if(!allowed.includes(asset.filename))throw Error('Invalid replacement asset.');const bytes=new Uint8Array(await asset.blob.arrayBuffer());if(bytes.length<32||bytes.length>max)throw Error('Invalid replacement asset size.');const path='/mod/'+asset.filename;game.FS.mkdirTree(path.slice(0,path.lastIndexOf('/')));game.FS.writeFile(path,bytes);}
  }
  const c=data.launch;if(!c||!game._direct_configure(c.mode,c.stage,c.level,c.stocks,c.minutes,...c.packedPorts))throw Error('Invalid match configuration.');

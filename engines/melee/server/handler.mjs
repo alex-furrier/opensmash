@@ -77,3 +77,21 @@ export function allowedHostedRoute(method,path){
  if(method==='GET'||method==='HEAD')return /^\/api\/native-fit\/assets\/[a-f0-9]{64}\/sources\/[a-z0-9_-]+\.(?:json|rgba8|identity\.dat)$/.test(path)||/^\/engine\/[a-zA-Z0-9_.\/-]+$/.test(path)||/^\/api\/(?:costume|announcer)\/[a-zA-Z0-9_-]+$/.test(path)||/^\/api\/imports(?:\/[a-f0-9]+|\/portraits\/import-[a-f0-9]{24}\.webp)?$/.test(path)||/^\/api\/character-select\/[a-f0-9]{64}\/[0-3]\.bin$/.test(path);
  return method==='POST'&&(path==='/api/imports'||/^\/api\/native-fit\/source\/[a-z0-9_-]+$/.test(path)||path==='/api/character-select'||/^\/api\/prepare\/[a-zA-Z0-9_-]+$/.test(path));
 }
+
+// Tailnet visitors use browser-owned discs, not the operator's local setup.
+export function allowedPrivateMeleeRoute(method,path){
+ const unversioned=path.replace(/^\/engine\/v\/[a-f0-9]{16}\//,'/engine/');
+ if(/^\/engine\/sys(?:\/|[-.])/.test(unversioned))return false;
+ if((method==='GET'||method==='HEAD')&&(path==='/api/netplay/config'||path==='/api/netplay/manifest'||/^\/api\/imports\/portraits\/import-[a-f0-9]{24}-(?:tile|medium)\.webp$/.test(path)))return true;
+ return allowedHostedRoute(method,path);
+}
+export function privateMeleeRequestAllowed(req,privateOrigin){
+ const path=new URL(req.url,'http://localhost').pathname;
+ if(!privateOrigin)return true;
+ if(path==='/api/og-sprite'||path==='/api/dev/trailer-capture')return false;
+ if(!/^\/melee\/(?:api|engine)\//.test(path))return true;
+ if(!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress)||!allowedPrivateMeleeRoute(req.method,path.slice('/melee'.length)))return false;
+ try{const authority=new URL(`http://${req.headers.host}`);if(['127.0.0.1','localhost','[::1]'].includes(authority.hostname))return true;}catch{return false;}
+ if(req.headers.host!==new URL(privateOrigin).host||(req.headers.origin&&req.headers.origin!==privateOrigin))return false;
+ return allowedPrivateMeleeRoute(req.method,path.slice('/melee'.length));
+}

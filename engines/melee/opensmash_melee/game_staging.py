@@ -50,10 +50,15 @@ def stage_game(source, destination, costumes, customize):
             shutil.copytree(source, stage, copy_function=link_or_copy)
         overrides = []
         for costume, name in costumes:
-            target = stage / 'files' / name
-            target.unlink()
-            shutil.copy2(costume, target)
-            overrides.append(name)
+            # lbFileGetFullName chooses the US file for this bare-dot basename.
+            names = [name]
+            if name == 'PlCaRe.dat' and 'files/PlCaRe.usd' in files:
+                names.append('PlCaRe.usd')
+            for filename in names:
+                target = stage / 'files' / filename
+                target.unlink()
+                shutil.copy2(costume, target)
+                overrides.append(filename)
         overrides.extend(customize(stage))
         (stage / marker.name).write_text(json.dumps({'identity': identity, 'overrides': overrides}))
         if not reuse:

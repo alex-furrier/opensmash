@@ -2141,3 +2141,14 @@ body.is-native-fullscreen .intro-video-stage:has(.ssb64-native-game) { position:
 .is-native-fullscreen .melee-surface:has(.ssb64-native-game) { position:fixed; inset:0; z-index:100; overflow:hidden; }
 .is-native-fullscreen .ssb64-native-game { height:100%; }
 .is-native-fullscreen .ssb64-native-game canvas { height:100%; width:100%; object-fit:contain; }
+
+.retro-room-button {white-space:nowrap;}
+.retro-room-selection {font-size:12px;line-height:1.4;color:#ffe4a3;background:#17120d;margin:0;padding:8px 12px;text-align:center;}
+@media (max-width:600px) {
+ .retro-site-header .retro-site-nav.has-room-action .retro-site-advanced-button,
+ .retro-site-header .retro-site-nav.has-room-action .retro-social-links {display:none;}
+ .retro-site-header .retro-site-nav.has-room-action .retro-site-more {display:block;}
+}
+
+.retro-room-opponent {margin-left:12px;padding:3px 8px;border:1px solid currentColor;border-radius:3px;background:transparent;color:inherit;font:inherit;cursor:pointer;}
+.retro-room-opponent:focus-visible {outline:2px solid #ffe4a3;outline-offset:3px;}

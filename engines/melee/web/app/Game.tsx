@@ -1,3 +1,6 @@
+import {installedMatchIdentity} from '../../runtime/web/netplay/match-identity.mjs';
+import {createLaunchDiagnostics} from '../lib/launch-diagnostics.mjs';
+import {localOpponentStatus} from '../lib/local-opponent-status.mjs';
 import MeleeTouchControls from './MeleeTouchControls';
 import {resolveRenderWidth} from '../lib/render-resolution.mjs';
 import {neutralTouchPad} from '../lib/touch-pad';
@@ -8,41 +11,51 @@ import {prepareNativeCostume} from '../lib/native-fit';
 import {useEffect,useRef,useState} from 'react';
 import {plan,schema,type Settings} from '@/lib/launch';
 import type {Fighter} from '../lib/fighter';
-import {names} from '../lib/fighter';
+import {names,fighterLabel} from '../lib/fighter';
 import {connectAudio,unlockAudio,setAudioEnabled} from '@/lib/audio';
 import {stopAnnouncer} from '@/lib/announcer';
 import {claimMelee,releaseMelee} from '@/lib/melee-session';
 import {keyLabel,loadBindings,rawGamepads,sampleMeleePad,type Action} from '@/lib/controls';
 // GameCube button bits in the pad word, keyed by the control id from the bindings module.
 const bits:Record<string,number>={a:0x100,b:0x200,x:0x400,y:0x800,z:0x10,l:0x40,r:0x20,start:0x1000};
-export default function Game({fighter,settings,roster,onClose,soundOn=true,chrome=true,holdForTrailer=false,trailerReveal=false,onTrailerReady,onTrailerStatus}:{fighter:Fighter;settings:Settings;roster:Fighter[];onClose:()=>void;soundOn?:boolean;chrome?:boolean;holdForTrailer?:boolean;trailerReveal?:boolean;onTrailerReady?:()=>void;onTrailerStatus?:(status:string)=>void}){
+export default function Game({fighter,settings,roster,onClose,soundOn=true,chrome=true,holdForTrailer=false,trailerReveal=false,onTrailerReady,onTrailerStatus,room,onRematch}:{room?:any;onRematch?:()=>void;fighter:Fighter;settings:Settings;roster:Fighter[];onClose:()=>void;soundOn?:boolean;chrome?:boolean;holdForTrailer?:boolean;trailerReveal?:boolean;onTrailerReady?:()=>void;onTrailerStatus?:(status:string)=>void}){
+ const matchMode=room?.launch?.mode??settings.mode;
+ const matchTarget=room?.launch?.ports[room.assignment.player]?.target||(settings.ports[0].target&&settings.ports[0].target!=='auto'?settings.ports[0].target:fighter.target);
  useEffect(()=>{setAudioEnabled(soundOn);},[soundOn]);
- const canvas=useRef<HTMLCanvasElement>(null),[status,setStatus]=useState('Preparing '+fighter.name+'…'),[error,setError]=useState(''),[fps,setFps]=useState<number|null>(null),[attempt,setAttempt]=useState(0);
+ const canvas=useRef<HTMLCanvasElement>(null),[status,setStatus]=useState('Preparing '+fighterLabel(fighter)+'…'),[error,setError]=useState(''),[fps,setFps]=useState<number|null>(null),[attempt,setAttempt]=useState(0);
  useEffect(()=>{onTrailerStatus?.(error||status||'Preparing the VS screen…');},[error,status,onTrailerStatus]);
+ const [awaitingReady,setAwaitingReady]=useState(false);const readyClick=useRef<(()=>void)|undefined>(undefined);
  const gameWorker=useRef<Worker|undefined>(undefined);
- useEffect(()=>{if(trailerReveal)gameWorker.current?.postMessage({type:'trailer-reveal'});},[trailerReveal]);
+ const launchDiagnostics=useRef<ReturnType<typeof createLaunchDiagnostics>|undefined>(undefined);
+ useEffect(()=>{if(trailerReveal){launchDiagnostics.current?.resumeTrailer();gameWorker.current?.postMessage({type:'trailer-reveal'});}},[trailerReveal]);
  const trailerReadyCallback=useRef(onTrailerReady);trailerReadyCallback.current=onTrailerReady;
  const trailerVisible=useRef(trailerReveal);trailerVisible.current=trailerReveal;
  const touch=useRef(neutralTouchPad());
  const bindings=loadBindings(),kb=bindings.keyboard;
  useEffect(()=>{
   let worker:Worker|undefined,audioNode:AudioNode|undefined,raf=0,closed=false;const abort=new AbortController(),keys=new Set<string>(),requestedAt=Date.now();
-  let playable=settings.mode!==0, audioConnecting=false;
+  let playable=matchMode!==0, audioConnecting=false;
   let running=false,firstFrame=true,selectionAcknowledged=false,fullBootVisible=false,frameSamples:number[]=[],launchPlan:any;
   const skin='host';
+  const diagnostics=createLaunchDiagnostics();launchDiagnostics.current=diagnostics;
+  const publishDiagnostics=()=>{(window as any).meleeLaunchDiagnostics=diagnostics.snapshot();};
+  const failLaunch=(message:string)=>{if(closed||abort.signal.aborted)return;diagnostics.observe({type:'error',message});publishDiagnostics();abort.abort();running=false;clearInterval(watchdog);cancelAnimationFrame(raf);audioNode?.disconnect();stopAnnouncer();room?.connection.stop(message);worker?.terminate();setError(message);};
+  const watchdog=setInterval(()=>{if(closed)return;const error=diagnostics.expired();publishDiagnostics();if(error)failLaunch(error);},1000);
+  diagnostics.arm('Preparing fighters');
   const send=(schedule=true)=>{
    if(worker&&running){
     // Modal visibility is constant for this input sample. Querying layout for
     // every button and axis multiplies main-thread work during gameplay.
     const blocked=gameInputBlocked()||(holdForTrailer&&!trailerVisible.current);
     for(let port=0;port<4;port++){
-    const device=launchPlan?.ports[port]?.device;
+    if(room&&port!==0)continue;
+    const device=room?room.localDevice:launchPlan?.ports[port]?.device;
     if(device==='off'||device==='cpu') {worker.postMessage({type:'pad',values:[port,0,0x80808080,0,0]});continue;}
     // A port assigned to a gamepad the browser does not currently expose
     // (Chrome hides pads until a button press) would otherwise be dead. Let
     // the keyboard drive it when no port is bound to the keyboard.
     const padPresent=device?.startsWith('gamepad')&&rawGamepads().some(p=>p?.index===Number(device.slice(7)));
-    const keyboardHere=device==='keyboard'||(device?.startsWith('gamepad')&&!padPresent&&!launchPlan?.ports.some((p:any)=>p?.device==='keyboard'));
+    const keyboardHere=device==='keyboard'||(device?.startsWith('gamepad')&&!padPresent&&(!!room||!launchPlan?.ports.some((p:any)=>p?.device==='keyboard')));
     const held=(action:Action)=>!blocked&&keyboardHere&&keys.has(kb[action]);
     let buttons=0;for(const [action,bit] of Object.entries(bits))if(held(action as Action))buttons|=bit;
     let x=128+((held('right')?1:0)-(held('left')?1:0))*100;
@@ -57,7 +70,8 @@ export default function Game({fighter,settings,roster,onClose,soundOn=true,chrom
     }
     const mobile=port===0&&!blocked?touch.current:null;
     if(mobile){buttons|=mobile.buttons;if(mobile.main){x=128+mobile.x;y=128+mobile.y;}if(mobile.c){cx=128+mobile.cx;cy=128+mobile.cy;}if(mobile.buttons&0x40)l=255;if(mobile.buttons&0x20)r=255;}
-    worker.postMessage({type:'pad',values:[port,buttons,(x|(y<<8)|(cx<<16)|(cy<<24))>>>0,l|(r<<8),keyboardHere||!!pad||!!mobile?.active?1:0]});
+    if(room)worker.postMessage({type:'input',values:[0,buttons,x-128,y-128,cx-128,cy-128,l,r,1]});
+    else worker.postMessage({type:'pad',values:[port,buttons,(x|(y<<8)|(cx<<16)|(cy<<24))>>>0,l|(r<<8),keyboardHere||!!pad||!!mobile?.active?1:0]});
     }
    }if(schedule)raf=requestAnimationFrame(()=>send());
   };
@@ -65,13 +79,13 @@ export default function Game({fighter,settings,roster,onClose,soundOn=true,chrom
   const bound=new Set(Object.values(kb));
   const keydown=(e:KeyboardEvent)=>{if((holdForTrailer&&!trailerVisible.current)||gameInputBlocked()||(e.target instanceof HTMLElement&&e.target.matches('input,select,textarea,[contenteditable=true]')))return;const key=code(e);if(bound.has(key)){e.preventDefault();keys.add(key);send(false);}};
   const keyup=(e:KeyboardEvent)=>{keys.delete(code(e));send(false);};
-  const blur=()=>{keys.clear();touch.current=neutralTouchPad();for(let port=0;port<4;port++)worker?.postMessage({type:'pad',values:[port,0,0x80808080,0,launchPlan?.ports[port]?.device==='keyboard'?1:0]});};
+  const blur=()=>{keys.clear();touch.current=neutralTouchPad();if(room){worker?.postMessage({type:'input',values:[0,0,0,0,0,0,0,0,1]});return;}for(let port=0;port<4;port++)worker?.postMessage({type:'pad',values:[port,0,0x80808080,0,launchPlan?.ports[port]?.device==='keyboard'?1:0]});};
   window.addEventListener('keydown',keydown);window.addEventListener('keyup',keyup);window.addEventListener('blur',blur);
   async function start(){try{
    if(!crossOriginIsolated||!canvas.current?.transferControlToOffscreen)throw Error('This browser needs shared memory and OffscreenCanvas support. Open the local game in Chrome.');
-   const session=claimMelee(canvas.current||undefined);worker=session.worker;gameWorker.current=worker;
+   const session=claimMelee(canvas.current||undefined,!!room);worker=session.worker;gameWorker.current=worker;
    if(worker instanceof MeleeFrameWorker&&canvas.current)worker.attachSurface(canvas.current);
-   launchPlan=plan(settings,fighter,roster);
+   launchPlan=room?.launch||plan(settings,fighter,roster);
    if(new URLSearchParams(location.search).get('benchmark')==='1') {
     launchPlan.packedPorts=launchPlan.packedPorts.map((p:number,i:number)=>i<2?(p&~0xff00)|256:p);
     launchPlan.stocks=20;
@@ -100,38 +114,49 @@ export default function Game({fighter,settings,roster,onClose,soundOn=true,chrom
      }));
     })(),
    ]);
-   setStatus('Loading Melee…');if(closed)return;
+   setStatus('Loading Melee…');diagnostics.arm('Loading Melee');if(closed)return;
    const audio=session.audio;
-   const startAudio=()=>{if(audioConnecting)return;audioConnecting=true;connectAudio(audio).then(node=>{if(closed)node.disconnect();else audioNode=node;}).catch(error=>{audioConnecting=false;console.warn('[Melee audio]',error);});};
+   const startAudio=()=>{if(audioConnecting)return;audioConnecting=true;connectAudio(audio).then(node=>{if(closed||abort.signal.aborted)node.disconnect();else audioNode=node;}).catch(error=>{audioConnecting=false;console.warn('[Melee audio]',error);});};
    startAudio();
-   worker.onerror=e=>{if(!closed)setError(e.message||'The game worker stopped.');};
+   worker.onerror=e=>failLaunch(e.message||'The game worker stopped.');
    worker.onmessage=({data})=>{
-    if(closed)return;
+    if(closed||abort.signal.aborted)return;
+    diagnostics.observe(data);
     if(data.type==='frame'){if(data.bitmap)canvas.current?.getContext('bitmaprenderer')?.transferFromImageBitmap(data.bitmap);if(firstFrame){firstFrame=false;if(!holdForTrailer||trailerVisible.current)canvas.current?.focus();}}
     if(data.type==='session' && data.launch)selectionAcknowledged=true;
-    if(data.type==='frame' && settings.mode===4 && selectionAcknowledged && !fullBootVisible){fullBootVisible=true;setStatus('');}
+    if(data.type==='frame' && matchMode===4 && selectionAcknowledged && !fullBootVisible){fullBootVisible=true;setStatus('');}
     if(data.type==='status' && !fullBootVisible)setStatus(data.message);
     if(data.type==='started'){running=true;}
     if(data.type==='trailer-ready')trailerReadyCallback.current?.();
     if(data.type==='intro'){if(holdForTrailer&&!trailerVisible.current){setError('The deployed Melee runtime does not support trailer preloading. Deploy the updated engine input release, then reload this page.');return;}stopAnnouncer();setStatus('');startAudio();}
     if(data.type==='playable'){playable=true;setStatus('');startAudio();if(!gameInputBlocked())canvas.current?.focus({preventScroll:true});}
-    if(data.type==='error'){setError(previous=>previous||data.message||'Melee initialization failed without an error message.');running=false;}
+    if(data.type==='error')failLaunch(data.message||'Melee initialization failed without an error message.');
     if(data.type==='log'){console.log('[Melee]',data.text);if(playable&&data.text.includes('[opensmash] destination ready'))setStatus('');}
     if(data.type==='metrics'){
      setFps(playable&&data.completeCombatInterval!==false&&data.combatFrames>0?data.fps:null);frameSamples.push(...data.frameTimes);if(frameSamples.length>36000)frameSamples=frameSamples.slice(-36000);
      (window as any).meleePerformance={frames:data.frames,fps:data.fps,frameTimes:frameSamples};
     }
    };
-   await session.ready;if(closed)return;running=true;
-   worker.postMessage({type:'select',holdForTrailer,renderWidth:resolveRenderWidth(settings.renderWidth),requestedAt,warmReadyBeforeClick:session.readyAt<=requestedAt,character:fighter.slug,skin,fighter:launchPlan.ports[0].fighter,launch:launchPlan,costumes,cssAssets});
+   await session.ready;if(closed||abort.signal.aborted)return;diagnostics.pause();
+   let netplay;
+   if(room){
+    const verified=session.identity;if(!verified)throw Error('Runtime verification unavailable.');
+    const identity=await installedMatchIdentity(verified.verifiedEngine,launchPlan,{verifiedDisc:verified.verifiedDiscHash,installedSeed:verified.seed,freshSaves:verified.freshSaves,costumes,cssAssets});
+    if(closed)return;setStatus('Your game and fighters are verified. Press Ready.');setAwaitingReady(true);
+    await new Promise<void>(resolve=>{readyClick.current=resolve;});if(closed)return;setAwaitingReady(false);setStatus(room.assignment.testBot?'Waiting for the local opponent…':'Waiting for your friend…');
+    netplay=await room.connection.ready(identity,(state:{opponentPhase?:string})=>{if(!closed&&room.assignment.testBot)setStatus(localOpponentStatus(state));});if(closed)return;
+   }
+   if(abort.signal.aborted)return;diagnostics.arm('Starting Melee');running=true;
+   const selection={type:'select',...(netplay?{netplay}:{}),holdForTrailer,renderWidth:resolveRenderWidth(settings.renderWidth),requestedAt,warmReadyBeforeClick:session.readyAt<=requestedAt,character:fighter.slug,skin,fighter:launchPlan.ports[0].fighter,launch:launchPlan,costumes,cssAssets};
+   if(worker instanceof MeleeFrameWorker)worker.postMessage(selection,netplay?[netplay.port]:[]);else worker.postMessage(selection,netplay?[netplay.port]:[]);
    raf=requestAnimationFrame(()=>send());
-  }catch(e){if(!closed)setError((e as Error)?.message||String(e||'Melee could not start.'));}}
+  }catch(e){failLaunch((e as Error)?.message||String(e||'Melee could not start.'));}}
   // StrictMode replays setup/cleanup synchronously. Claim the warmed engine
   // only after that replay so the discarded effect cannot terminate it.
   queueMicrotask(()=>{if(!closed)void start();});
-  return()=>{closed=true;abort.abort();cancelAnimationFrame(raf);if(worker)releaseMelee(worker);audioNode?.disconnect();window.removeEventListener('keydown',keydown);window.removeEventListener('keyup',keyup);window.removeEventListener('blur',blur);touch.current=neutralTouchPad();};
- },[fighter,settings,roster,attempt,holdForTrailer]);
- return <div className="game-overlay" role="region" aria-label={'Play as '+fighter.name}><section className="game-panel">{chrome&&<header><div><h2>{fighter.name}</h2><p>{names[settings.ports[0].target && settings.ports[0].target !== 'auto' ? settings.ports[0].target : fighter.target]} moveset · {schema.modes.find(m=>m.id===settings.mode)?.label}</p></div><span className="fps" data-slow={fps!==null&&fps<58.5} title="Target: sustained 60 FPS in combat">{fps===null?'':Math.round(fps)+' FPS'}</span><button onClick={()=>{const panel=canvas.current?.closest('.intro-video-frame');if(document.fullscreenElement)void document.exitFullscreen();else void panel?.requestFullscreen();}} aria-label="Toggle fullscreen">⛶</button><button onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen();onClose();}} aria-label="Return to roster">✕</button></header>}<div className="game-screen"><canvas id="canvas" key={attempt} ref={canvas} width={960} height={720} tabIndex={0}/>{status&&!error&&<p className="game-message" role="status">{status}</p>}{error&&<div className="game-message" role="alert"><p>{error.split('\n')[0]}</p>{error.includes('\n')&&<details className="game-error-details"><summary>Details</summary><pre>{error.slice(error.indexOf('\n')+1)}</pre></details>}<button onClick={()=>{setError('');setStatus('Preparing…');setFps(null);setAttempt(n=>n+1);}}>Try again</button></div>}</div>{chrome&&<><button className="sound-game" onClick={()=>void unlockAudio()}>Enable sound</button><button className="confirm-game" onClick={()=>gameWorker.current?.postMessage({type:'confirm'})}>Confirm · A</button></>}{chrome&&<p className="game-help">{[keyLabel(kb.up),keyLabel(kb.left),keyLabel(kb.down),keyLabel(kb.right)].join(' ')} move · {keyLabel(kb.a)} attack · {keyLabel(kb.b)} special · {keyLabel(kb.x)} / {keyLabel(kb.y)} jump · {keyLabel(kb.l)} / {keyLabel(kb.r)} shield · {keyLabel(kb.z)} grab · {[kb.cup,kb.cleft,kb.cdown,kb.cright].map(keyLabel).join(' ')} smash · {keyLabel(kb.start)} start / pause<br/>Rebind keys and gamepads in Settings → Players &amp; Controllers. Press {keyLabel(kb.a)} to confirm any first-run memory card prompt.</p>}<MeleeTouchControls pad={touch}/></section></div>;
+  return()=>{closed=true;clearInterval(watchdog);publishDiagnostics();if(launchDiagnostics.current===diagnostics)launchDiagnostics.current=undefined;readyClick.current?.();readyClick.current=undefined;abort.abort();if(worker)room?.connection.stop();cancelAnimationFrame(raf);if(worker)releaseMelee(worker);audioNode?.disconnect();window.removeEventListener('keydown',keydown);window.removeEventListener('keyup',keyup);window.removeEventListener('blur',blur);touch.current=neutralTouchPad();};
+ },[fighter,settings,roster,attempt,holdForTrailer,room]);
+ return <div className="game-overlay" role="region" aria-label={'Play as '+fighterLabel(fighter)}><section className="game-panel">{chrome&&<header><div><h2>{fighterLabel(fighter)}</h2><p>{names[matchTarget]} moveset · {schema.modes.find(m=>m.id===matchMode)?.label}</p></div><span className="fps" data-slow={fps!==null&&fps<58.5} title="Target: sustained 60 FPS in combat">{fps===null?'':Math.round(fps)+' FPS'}</span><button onClick={()=>{const panel=canvas.current?.closest('.intro-video-frame');if(document.fullscreenElement)void document.exitFullscreen();else void panel?.requestFullscreen();}} aria-label="Toggle fullscreen">⛶</button><button onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen();onClose();}} aria-label={room?'Stop friend match':'Return to roster'}>{room?'Stop':'✕'}</button>{room&&onRematch&&<button onClick={onRematch}>Rematch</button>}{room?.assignment.testBot&&<span>Local simulated opponent</span>}{room&&!room.assignment.testBot&&<button onClick={()=>void navigator.clipboard.writeText(location.origin+'/melee#room='+room.assignment.room)}>Copy room link</button>}</header>}<div className="game-screen"><canvas id="canvas" key={attempt} ref={canvas} width={960} height={720} tabIndex={0}/>{status&&!error&&<div className="game-message" role="status"><p>{status}</p>{awaitingReady&&<button onClick={()=>void unlockAudio().then(()=>readyClick.current?.())}>Ready</button>}</div>}{error&&<div className="game-message" role="alert"><p>{error.split('\n')[0]}</p>{error.includes('\n')&&<details className="game-error-details"><summary>Details</summary><pre>{error.slice(error.indexOf('\n')+1)}</pre></details>}<button onClick={()=>{setError('');setStatus('Preparing…');setFps(null);setAttempt(n=>n+1);}}>Try again</button></div>}</div>{chrome&&!room&&<><button className="sound-game" onClick={()=>void unlockAudio()}>Enable sound</button><button className="confirm-game" onClick={()=>gameWorker.current?.postMessage({type:'confirm'})}>Confirm · A</button></>}{chrome&&<p className="game-help">{[keyLabel(kb.up),keyLabel(kb.left),keyLabel(kb.down),keyLabel(kb.right)].join(' ')} move · {keyLabel(kb.a)} attack · {keyLabel(kb.b)} special · {keyLabel(kb.x)} / {keyLabel(kb.y)} jump · {keyLabel(kb.l)} / {keyLabel(kb.r)} shield · {keyLabel(kb.z)} grab · {[kb.cup,kb.cleft,kb.cdown,kb.cright].map(keyLabel).join(' ')} smash · {keyLabel(kb.start)} start / pause<br/>Rebind keys and gamepads in Settings → Players &amp; Controllers. Press {keyLabel(kb.a)} to confirm any first-run memory card prompt.</p>}<MeleeTouchControls pad={touch}/></section></div>;
 }
 
 function meleeFetch(input:string, init?:RequestInit){return fetch(meleePath(input),init);}

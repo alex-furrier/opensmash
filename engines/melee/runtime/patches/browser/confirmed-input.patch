@@ -1,0 +1,482 @@
+diff --git a/platforms/browser/CMakeLists.txt b/platforms/browser/CMakeLists.txt
+index cefa680..5c03f10 100644
+--- a/platforms/browser/CMakeLists.txt
++++ b/platforms/browser/CMakeLists.txt
+@@ -33,7 +33,7 @@ list(TRANSFORM BROWSER_PC_SOURCES PREPEND ${CMAKE_SOURCE_DIR}/src/pc/)
+ file(GLOB_RECURSE GAME_OBJECTS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/build/browser/game/*.o")
+ set_source_files_properties(${GAME_OBJECTS} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
+ add_executable(melee_browser ${GAME_OBJECTS}
+- main.c dvd.c scheduler.c warmup.c presentation_globals.c presentation_memory.c pc_stubs.c
++ main.c dvd.c scheduler.c warmup.c presentation_globals.c presentation_memory.c pc_stubs.c confirmed_input.c
+  ${BROWSER_PC_SOURCES})
+ target_include_directories(melee_browser PRIVATE ${CMAKE_SOURCE_DIR}/extern/aurora/include ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/sdk_include)
+ target_link_libraries(melee_browser PRIVATE aurora::core aurora::gx aurora::gd aurora::vi aurora::pad aurora::si aurora::mtx aurora::os aurora::card aurora::thp)
+diff --git a/platforms/browser/launch.c b/platforms/browser/launch.c
+index 0dba726..8c9c692 100644
+--- a/platforms/browser/launch.c
++++ b/platforms/browser/launch.c
+@@ -46,7 +46,8 @@ void direct_mode_loaded(int kind){
+  if(kind!=GM_VS)return;
+  VsModeData* vs=gmVsMelee_GetVsData();gm_SetupRulesDefaults(&vs->start.rules);vs->start.rules.stkind=stage;
+  GameRules* rules=gmMainLib_GetGameRules();rules->mode=1;rules->stock_count=stocks;rules->stock_time_limit=minutes;
+- for(int i=0;i<GM_MAX_PLAYERS;i++){gm_SetupPlayerDefaults(&vs->start.players[i]);PlayerInitData* p=&vs->start.players[i];p->slot=i;p->slot_type=i<4?(ports[i]>>8)&255:3;if(i<4){p->ckind=(ports[i]&255)==19?18:ports[i]&255;p->color=ports[i]>>16;p->cpu_level=level;p->stocks=stocks;}}
++ /* PlayerInitData.slot overrides are one-based (gmvs.c); keep each fighter on its own port. */
++ for(int i=0;i<GM_MAX_PLAYERS;i++){gm_SetupPlayerDefaults(&vs->start.players[i]);PlayerInitData* p=&vs->start.players[i];p->slot=i+1;p->slot_type=i<4?(ports[i]>>8)&255:3;if(i<4){p->ckind=(ports[i]&255)==19?18:ports[i]&255;p->color=ports[i]>>16;p->cpu_level=level;p->stocks=stocks;}}
+  configured=1;
+ }
+ EMSCRIPTEN_KEEPALIVE unsigned direct_frame_count(void){return VIGetRetraceCount();}
+diff --git a/platforms/browser/runtime.mjs b/platforms/browser/runtime.mjs
+index 5f8c944..451cd06 100644
+--- a/platforms/browser/runtime.mjs
++++ b/platforms/browser/runtime.mjs
+@@ -6,9 +6,9 @@ const prefix=location.pathname.startsWith('/melee/')?'/melee':'';
+ const base=prefix+'/engine/';
+ const report=(type,data={},transfer=[])=>parent.postMessage({type,...data},location.origin,transfer);
+ const diagnostics=[];
+-let failed=false,rejectRuntime;
++let failed=false,rejectRuntime,confirmedInput;
+ const fail=error=>{
+- if(failed)return;failed=true;
++ if(failed)return;failed=true;confirmedInput?.stop('Runtime failed');
+  const reason=error?.stack||error?.message||(typeof error==='string'&&error.trim())||'Melee initialization failed without an error message.';
+  const message=[reason,...diagnostics].join('\n');
+  rejectRuntime?.(Error(message));report('error',{message});
+@@ -25,6 +25,7 @@ const runtimeReady=new Promise((resolve,reject)=>{resolveRuntime=resolve;rejectR
+ void runtimeReady.catch(()=>{});
+ let directSurface=false;
+ let trailerReady=false,trailerReleased=false;
++let verifiedEngine,verifiedDiscHash;
+ let options,selection,ready=false,presentPending=false,playable=false,introReported=false;
+ let started=0,lastTime=0,lastFrame=0,lastStamp=0,presented=0,combatFrames=0;
+ let audioFrames=0,audioPeak=0,audioOverruns=0,phase=0,previous=[0,0];
+@@ -107,12 +108,17 @@ function onFrame(frame){
+     }).catch(fail).finally(()=>clearTimeout(timer));
+    }
+   }else{
++   if(confirmedInput){
++    if(intro===1)Module.confirmedPreparationReady[0]=true;
++    if(Module._opensmash_preparation_state()===2)Module.confirmedPreparationReady[1]=true;
++   }else{
+    if(intro===1){
+     if(selection.holdForTrailer&&!trailerReleased){
+      if(!trailerReady){trailerReady=true;report('trailer-ready');}
+     }else Module._opensmash_finish_intro_preparation();
+    }
+    if(Module._opensmash_preparation_state()===2)Module._opensmash_finish_preparation();
++    }
+   }
+  }
+  if(intro===1)introReported=false;
+@@ -140,7 +146,20 @@ async function select(data){
+  for(const [assets,allowed,max] of [[data.costumes||[],COSTUME_SLOTS,2*1024*1024],[data.cssAssets||[],css,16*1024*1024]]){
+   for(const asset of assets){if(!allowed.includes(asset.filename))throw Error('Invalid replacement asset.');const bytes=new Uint8Array(await asset.blob.arrayBuffer());if(bytes.length<32||bytes.length>max)throw Error('Invalid replacement asset size.');const path='/mod/'+asset.filename;Module.FS.mkdirTree(path.slice(0,path.lastIndexOf('/')));Module.FS.writeFile(path,bytes);}
+  }
+- const c=data.launch;if(!c||!Module._direct_configure(c.mode,c.stage,c.level,c.stocks,c.minutes,...c.packedPorts))throw Error('Invalid match configuration.');
++ const c=data.launch;
++ if(data.netplay){
++  const {installedIdentity}=await import(base+'netplay/identity.mjs');
++  const actual=await installedIdentity(verifiedEngine,c,{verifiedDisc:verifiedDiscHash,installedSeed:Module.ENV.MELEE_SEED,freshSaves:options.freshNetplay,costumes:data.costumes||[],cssAssets:data.cssAssets||[]});
++  if(!Object.keys(actual).every(key=>data.netplay.identity?.[key]===actual[key]))throw Error('Match identity does not describe this installed game.');
++ }
++ if(!c||!Module._direct_configure(c.mode,c.stage,c.level,c.stocks,c.minutes,...c.packedPorts))throw Error('Invalid match configuration.');
++ if(data.netplay){
++  const {installConfirmedInput,messagePortChannel}=await import(base+'netplay/browser-bridge.mjs');
++  confirmedInput=installConfirmedInput(Module,{...data.netplay,channel:messagePortChannel(data.netplay.port)},
++   {onTick:row=>report('confirmed-tick',row),onError:message=>fail(Error(message))});
++  Module.confirmedPreparationReady=[false,false];
++  confirmedInput.start();
++ }
+  selection=data;ready=false;
+  Module.renderWidth=data.renderWidth;
+  report('session',{backend:'melee-pc-upstream',browser:navigator.userAgent,hardwareConcurrency:navigator.hardwareConcurrency,launch:c});report('started');report('status',{message:'Opening Melee…'});
+@@ -157,6 +176,7 @@ window.addEventListener('message',async event=>{
+    return;
+   }
+   if(data.type==='surface'){directSurface=!!data.direct;return;}
++  if(data.type==='netplay-stop'){confirmedInput?.stop('Match stopped');return;}
+   if(data.type==='pad'){setPad(data.values);return;}
+   if(data.type==='input'){if(selection)Module._direct_set_pad(...data.values);return;}
+   if(data.type==='confirm'){setPad([0,256,0x80808080,0,1]);setPad([0,0,0x80808080,0,1]);return;}
+@@ -168,22 +188,35 @@ window.addEventListener('message',async event=>{
+   await checkGraphics();
+   report('status',{message:'Checking your local Melee disc…'});
+   const {verifyDisc}=await import(base+'verify-disc.mjs');
+-  if(!data.discVerified)await verifyDisc(data.iso,bytes=>report('status',{message:'Checking your game… '+Math.floor(bytes/data.iso.size*100)+'%'}));
++  if(data.freshNetplay||!data.discVerified)await verifyDisc(data.iso,bytes=>report('status',{message:'Checking your game… '+Math.floor(bytes/data.iso.size*100)+'%'}));
++  const {ISO_SHA256}=await import(base+'disc.mjs');verifiedDiscHash=ISO_SHA256;
+   report('disc-verified');await runtimeReady;
++  if(data.freshNetplay){
++   const response=await fetch('/manifest');if(!response.ok)throw Error('Confirmed-input runtime manifest unavailable.');
++   const {verifyRuntime}=await import(base+'netplay/identity.mjs');
++   verifiedEngine=await verifyRuntime(await response.json());
++   if(Module._opensmash_confirmed_input_version?.()!==1)throw Error('Runtime lacks confirmed input.');
++  }
+   const seedBytes=fetch(base+'upstream/initial_pipeline_cache.db').then(async response=>response.ok?new Uint8Array(await response.arrayBuffer()):null).catch(()=>null);
+   Module.FS.mkdirTree('/mod');Module.FS.mkdirTree('/saves');Module.FS.mkdirTree('/cache');
+   // Persist the pipeline cache once per match (see onFrame), not on every multi-MB write.
+   Module.FS.mount(Module.FS.filesystems.IDBFS,{autoPersist:false},'/cache');
+-  Module.FS.mount(Module.FS.filesystems.IDBFS,{autoPersist:true},'/saves');
++  // Each confirmed-input room starts with a fresh memory card. Persisted solo
++  // saves can select different settings/unlocks before the first confirmed tick.
++  if(!data.freshNetplay)Module.FS.mount(Module.FS.filesystems.IDBFS,{autoPersist:true},'/saves');
+   await new Promise((resolve,reject)=>Module.FS.syncfs(true,error=>error?reject(error):resolve()));
+-  const migrated=migrateLegacySaves(Module.FS);if(migrated.length){await new Promise((resolve,reject)=>Module.FS.syncfs(false,error=>error?reject(error):resolve()));report('log',{text:'Imported existing Melee saves into upstream memory-card format.'});}
++  const migrated=data.freshNetplay?[]:migrateLegacySaves(Module.FS);if(migrated.length){await new Promise((resolve,reject)=>Module.FS.syncfs(false,error=>error?reject(error):resolve()));report('log',{text:'Imported existing Melee saves into upstream memory-card format.'});}
+   const seed=await seedBytes;if(seed)Module.FS.writeFile('/initial_pipeline_cache.db',seed);
+   Module.discFile=data.iso;Module.readDisc=createDiscCache(data.iso).read;Module.ENV.MELEE_SEED='3';
+   const args=data.args||[];if(args.includes('--seed'))Module.ENV.MELEE_SEED=args[args.indexOf('--seed')+1];
+   // Standby loads the module and files only. Native graphics/cache setup runs
+   // after Play, so its synchronous initialization cannot interrupt the roster.
+-  ready=true;report('ready-for-selection');
++  ready=true;report('ready-for-selection',{verifiedEngine,verifiedDiscHash,seed:Module.ENV.MELEE_SEED,freshSaves:!!data.freshNetplay});
+   if(!data.warm&&data.launch){const c=Array.isArray(data.launch)?{mode:data.launch[0],stage:data.launch[1],level:data.launch[2],stocks:data.launch[3],minutes:data.launch[4],packedPorts:data.launch.slice(5)}:data.launch;await select({...data,launch:c});}
+  }catch(error){fail(error);}
+ });
++// A fresh room destroys this entire engine realm, including its worker pool.
++const dispose=()=>{confirmedInput?.stop('Runtime closed');globalThis.PThread?.terminateAllThreads();};
++window.addEventListener('opensmash-runtime-close',dispose);
++window.addEventListener('pagehide',dispose);window.addEventListener('unload',dispose);
+ report('bridge-ready');
+diff --git a/src/melee/gm/gmscene.c b/src/melee/gm/gmscene.c
+index e4421ee..dd8ae77 100644
+--- a/src/melee/gm/gmscene.c
++++ b/src/melee/gm/gmscene.c
+@@ -370,11 +370,24 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
+             break;
+         }
+ 
++#ifdef __EMSCRIPTEN__
++        extern int browser_confirmed_input_enabled(void);
++        extern void browser_confirmed_input_before_tick(void);
++        extern void browser_confirmed_input_after_tick(void);
++        if (browser_confirmed_input_enabled()) pad_queue_count = 1;
++#endif
+         for (i = 0; i < pad_queue_count; i++) {
+             HSD_PerfSetStartTime();
+ #ifdef TARGET_PC
++#ifdef __EMSCRIPTEN__
++            browser_confirmed_input_before_tick();
++#endif
+             pc_net_sync();
+-            if (gm_RunSimTick(on_frame, temp_r25)) {
++            bool finished_tick = gm_RunSimTick(on_frame, temp_r25);
++#ifdef __EMSCRIPTEN__
++            browser_confirmed_input_after_tick();
++#endif
++            if (finished_tick) {
+                 break;
+             }
+             /* Rollback / sync test: re-run this tick from a restored snapshot. */
+diff --git a/src/sysdolphin/baselib/controller.c b/src/sysdolphin/baselib/controller.c
+index 61a837b..c5ded44 100644
+--- a/src/sysdolphin/baselib/controller.c
++++ b/src/sysdolphin/baselib/controller.c
+@@ -363,6 +363,10 @@ void HSD_PadRenewMasterStatus(void)
+     intr = OSDisableInterrupts();
+     if (p->qcount != 0) {
+         qread = &p->queue->stat[p->qread * 4];
++#ifdef __EMSCRIPTEN__
++        extern void browser_confirmed_input_consumed(const PADStatus*);
++        browser_confirmed_input_consumed(qread);
++#endif
+         HSD_PadRawQueueShift(p->qnum, &p->qread);
+         p->qcount -= 1;
+ 
+diff --git a/platforms/browser/confirmed_input.c b/platforms/browser/confirmed_input.c
+new file mode 100644
+index 0000000..82db9f1
+--- /dev/null
++++ b/platforms/browser/confirmed_input.c
+@@ -0,0 +1,141 @@
++/* SPDX-License-Identifier: GPL-3.0-or-later */
++/* Optional confirmed-input gate. The existing scene loop still owns each tick. */
++#include "pc/compat.h"
++#include "pc/net.h"
++#include <sysdolphin/baselib/controller.h>
++#include <sysdolphin/baselib/random.h>
++#include <emscripten.h>
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++
++enum { PAD_FIELDS = 10, PAD_VALUES = 4 * PAD_FIELDS, STATE_VALUES = 50 };
++static unsigned s_tick;
++static int s_pending, s_consumed;
++static int32_t s_expected[PAD_VALUES], s_applied[PAD_VALUES];
++extern float* direct_snapshot(void);
++extern unsigned direct_scene_kind(void);
++
++EMSCRIPTEN_KEEPALIVE int opensmash_confirmed_input_version(void) { return 1; }
++
++int browser_confirmed_input_enabled(void)
++{
++    const char* value = getenv("MELEE_BROWSER_CONFIRMED_INPUT");
++    return value && strcmp(value, "1") == 0;
++}
++
++static void pack_pad(const PADStatus* p, int32_t* out)
++{
++    out[0] = p->button; out[1] = p->stickX; out[2] = p->stickY;
++    out[3] = p->substickX; out[4] = p->substickY;
++    out[5] = p->triggerLeft; out[6] = p->triggerRight;
++    out[7] = p->analogA; out[8] = p->analogB; out[9] = p->err;
++}
++
++static void unpack_pad(const int32_t* in, PADStatus* p)
++{
++    if (in[0] < 0 || in[0] > 65535 || in[9] < -3 || in[9] > 0) abort();
++    for (int i = 1; i <= 4; i++) if (in[i] < -128 || in[i] > 127) abort();
++    for (int i = 5; i <= 8; i++) if (in[i] < 0 || in[i] > 255) abort();
++    memset(p, 0, sizeof(*p));
++    p->button = in[0]; p->stickX = in[1]; p->stickY = in[2];
++    p->substickX = in[3]; p->substickY = in[4];
++    p->triggerLeft = in[5]; p->triggerRight = in[6];
++    p->analogA = in[7]; p->analogB = in[8]; p->err = in[9];
++}
++
++/* Explicit selected state: RNG, scene kind, and upstream's four 12-float
++ * player snapshots (presence/kind/action/position/velocity/facing/damage/stocks/
++ * animation frame). Raw float bits avoid rounded text. Never a full snapshot. */
++static void selected_state(uint32_t* out)
++{
++    out[0] = *HSD_RandSeedPtr;
++    out[1] = direct_scene_kind();
++    memcpy(out + 2, direct_snapshot(), 48 * sizeof(uint32_t));
++}
++
++EM_ASYNC_JS(int, confirmed_input_wait,
++    (unsigned tick, const int32_t* local, const uint32_t* state, int32_t* result), {
++    try {
++        if (typeof Module.onConfirmedInput !== 'function') throw Error('Confirmed-input callback missing');
++        const own = Array.from(HEAP32.subarray(local >> 2, (local >> 2) + 10));
++        const selected = Array.from(HEAPU32.subarray(state >> 2, (state >> 2) + 50));
++        const pads = await Module.onConfirmedInput(tick, own, selected);
++        const limits = [[0,65535],[-128,127],[-128,127],[-128,127],[-128,127],
++            [0,255],[0,255],[0,255],[0,255],[-3,0]];
++        if (!Array.isArray(pads) || pads.length !== 4 || !pads.every(p =>
++            Array.isArray(p) && p.length === 10 && p.every((n,i) =>
++                Number.isInteger(n) && n >= limits[i][0] && n <= limits[i][1])))
++            throw Error('Invalid confirmed PADStatus');
++        HEAP32.set(pads.flat(), result >> 2);
++        return 1;
++    } catch (error) {
++        Module.onConfirmedInputError?.(String(error?.message || error));
++        return 0;
++    }
++});
++
++EM_ASYNC_JS(int, confirmed_input_applied,
++    (unsigned tick, const int32_t* pads, const uint32_t* state), {
++    try {
++        if (typeof Module.onConfirmedTick !== 'function') throw Error('Applied callback missing');
++        await Module.onConfirmedTick(tick,
++            Array.from(HEAP32.subarray(pads >> 2, (pads >> 2) + 40)),
++            Array.from(HEAPU32.subarray(state >> 2, (state >> 2) + 50)));
++        return 1;
++    } catch (error) {
++        Module.onConfirmedInputError?.(String(error?.message || error));
++        return 0;
++    }
++});
++
++void browser_confirmed_input_before_tick(void)
++{
++    if (!browser_confirmed_input_enabled()) return;
++    static const char* incompatible[] = {"MELEE_NET_RECORD", "MELEE_NET_REPLAY", "MELEE_NET_SYNCTEST"};
++    if (s_pending || pc_net_active()) abort();
++    for (unsigned i = 0; i < sizeof(incompatible) / sizeof(incompatible[0]); i++)
++        if (getenv(incompatible[i])) abort();
++    PadLibData* p = &HSD_PadLibData;
++    if (!p->queue || !p->qnum || !p->qcount) abort();
++    HSD_PadFlushQueue(HSD_PAD_FLUSH_QUEUE_LEAVE1);
++    unsigned read = p->qread;
++    unsigned capacity = p->qnum;
++    HSD_PadData* queue = p->queue;
++    int32_t local[PAD_FIELDS];
++    uint32_t state[STATE_VALUES];
++    pack_pad(&p->queue->stat[read * 4], local); /* physical controller 0 */
++    selected_state(state);
++    p->qtype = 2; /* a full queue drops new samples instead of shifting its head */
++    if (!confirmed_input_wait(s_tick, local, state, s_expected)) abort();
++    if (!p->qcount || p->qread != read || p->qtype != 2 || p->qnum != capacity || p->queue != queue) abort();
++    /* Physical samples may have filled unused tail entries while suspended.
++     * Retain the confirmed head, discard only that tail; never leave stale ticks. */
++    p->qcount = 1;
++    p->qwrite = (read + 1) % p->qnum;
++    for (int port = 0; port < 4; port++)
++        unpack_pad(s_expected + port * PAD_FIELDS, &p->queue->stat[read * 4 + port]);
++    s_consumed = 0;
++    s_pending = 1;
++}
++
++/* Called at actual raw-head consumption, before HSD clamps/converts inputs. */
++void browser_confirmed_input_consumed(const PADStatus* pads)
++{
++    if (!s_pending) return;
++    if (s_consumed) abort();
++    for (int port = 0; port < 4; port++) pack_pad(pads + port, s_applied + port * PAD_FIELDS);
++    if (memcmp(s_expected, s_applied, sizeof(s_expected))) abort();
++    s_consumed = 1;
++}
++
++void browser_confirmed_input_after_tick(void)
++{
++    if (!browser_confirmed_input_enabled()) return;
++    if (!s_pending || !s_consumed) abort();
++    uint32_t state[STATE_VALUES];
++    selected_state(state);
++    if (!confirmed_input_applied(s_tick, s_applied, state)) abort();
++    s_pending = 0;
++    if (++s_tick == 0) abort();
++}
+diff --git a/tests/browser/test_confirmed_input.py b/tests/browser/test_confirmed_input.py
+new file mode 100644
+index 0000000..e335101
+--- /dev/null
++++ b/tests/browser/test_confirmed_input.py
+@@ -0,0 +1,145 @@
++# SPDX-License-Identifier: GPL-3.0-or-later
++"""Exercise the actual browser gate against actual upstream raw-queue functions.
++
++Only JS suspension, platform services and the engine snapshot provider are mocked.
++No engine build, browser, asset or networking is needed.
++"""
++import os
++from pathlib import Path
++import re
++import subprocess
++import tempfile
++import unittest
++
++ROOT = Path(__file__).resolve().parents[2]
++
++
++def function(source, signature):
++    start = source.index(signature)
++    opening = source.index('{', start)
++    depth, end = 1, opening + 1
++    while depth:
++        depth += (source[end] == '{') - (source[end] == '}')
++        end += 1
++    return source[start:end]
++
++
++class ConfirmedInputTest(unittest.TestCase):
++    def test_actual_queue_suspension_consumption_and_fail_stop(self):
++        gate = (ROOT / 'platforms/browser/confirmed_input.c').read_text()
++        gate = re.sub(r'^#include .*\n', '', gate, flags=re.M)
++        gate = re.sub(r'EM_ASYNC_JS\(int, confirmed_input_wait,.*?^\}\);', 'int confirmed_input_wait(unsigned,const int32_t*,const uint32_t*,int32_t*);', gate, flags=re.M | re.S)
++        gate = re.sub(r'EM_ASYNC_JS\(int, confirmed_input_applied,.*?^\}\);', 'int confirmed_input_applied(unsigned,const int32_t*,const uint32_t*);', gate, flags=re.M | re.S)
++        controller = (ROOT / 'src/sysdolphin/baselib/controller.c').read_text()
++        header = (ROOT / 'src/sysdolphin/baselib/controller.h').read_text()
++        pad_header = (ROOT / 'src/sdk_include/dolphin/pad.h').read_text()
++        pad = pad_header[pad_header.index('typedef struct PADStatus {'):pad_header.index('} PADStatus;') + len('} PADStatus;')]
++        data = function(header, 'struct HSD_PadData {') + ';'
++        lib = function(header, 'struct PadLibData {') + ';'
++        queue_functions = '\n'.join(function(controller, signature) for signature in [
++            'static void HSD_PadRawQueueShift(', 'static void HSD_PadRawMerge(',
++            'void HSD_PadRenewRawStatus(', 'void HSD_PadFlushQueue('])
++        # The exact consumption prefix, including the candidate observer call.
++        master = function(controller, 'void HSD_PadRenewMasterStatus(')
++        master = master[:master.index('        for (i = 0;')] + '\n    }\n    OSRestoreInterrupts(intr);\n}'
++        program = r'''
++#include <assert.h>
++#include <stdbool.h>
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/wait.h>
++#include <unistd.h>
++#include <signal.h>
++typedef uint8_t u8; typedef int8_t s8; typedef uint16_t u16;
++typedef uint32_t u32; typedef int32_t s32; typedef float f32;
++#define EMSCRIPTEN_KEEPALIVE
++#define __EMSCRIPTEN__ 1
++struct RumbleInfo {int unused;};
++typedef struct HSD_PadData HSD_PadData;
++typedef struct PadLibData PadLibData;
++typedef struct {int unused;} HSD_PadStatus;
++typedef enum {HSD_PAD_FLUSH_QUEUE_MERGE,HSD_PAD_FLUSH_QUEUE_THROWAWAY,
++ HSD_PAD_FLUSH_QUEUE_LEAVE1,HSD_PAD_FLUSH_QUEUE_TERMINATE} HSD_FlushType;
++''' + pad + '\n' + data + '\n' + lib + r'''
++PadLibData HSD_PadLibData;
++HSD_PadStatus HSD_PadMasterStatus[4];
++HSD_PadData queue[4];
++static int fault,callbacks,waits,native_active;
++static uint32_t seed=17; uint32_t* HSD_RandSeedPtr=&seed;
++static float snapshot[48];
++float* direct_snapshot(void){return snapshot;}
++unsigned direct_scene_kind(void){return 2;}
++bool pc_net_active(void){return native_active;}
++bool OSDisableInterrupts(void){return true;}
++void OSRestoreInterrupts(bool ignored){(void)ignored;}
++void HSD_PadRumbleInterpret(void){}
++u32 PADRead(PADStatus* pads){memset(pads,0,4*sizeof(*pads));pads[0].button=0x400;return 0;}
++void PADReset(u32 ignored){(void)ignored;}
++bool OSGetResetSwitchState(void){return false;}
++const u32 pad_bit[4]={0x80000000,0x40000000,0x20000000,0x10000000};
++void HSD_PadFlushQueue(HSD_FlushType);
++''' + gate + '\n' + queue_functions + '\n' + master + r'''
++int confirmed_input_wait(unsigned tick,const int32_t* local,const uint32_t* state,int32_t* result){
++ waits++;assert(tick==s_tick);assert(local[0]==0x100);assert(state[0]==17&&state[1]==2);
++ unsigned read=HSD_PadLibData.qread;
++ for(unsigned i=0;i<12;i++)HSD_PadRenewRawStatus(false); // physical alarms during suspension
++ assert(HSD_PadLibData.qread==read); // capacity 1 and 4 preserve the actual head
++ memset(result,0,40*sizeof(*result));result[0]=0x100;result[1]=37;result[10]=0x200;result[11]=-29;
++ if(fault==1)return 0;
++ if(fault==2)result[11]=-129;
++ if(fault==3)HSD_PadLibData.qread=(read+1)%HSD_PadLibData.qnum;
++ if(fault==4)HSD_PadLibData.qcount=0;
++ return 1;
++}
++int confirmed_input_applied(unsigned tick,const int32_t* pads,const uint32_t* state){
++ callbacks++;assert(tick==s_tick);assert(pads[0]==0x100&&pads[1]==37&&pads[10]==0x200&&pads[11]==-29);
++ assert(state[0]==17&&state[1]==2);return fault==8?0:1;
++}
++void run(unsigned capacity){
++ memset(queue,0,sizeof(queue));memset(&HSD_PadLibData,0,sizeof(HSD_PadLibData));
++ HSD_PadLibData.queue=queue;HSD_PadLibData.qnum=capacity;HSD_PadLibData.qcount=1;
++ HSD_PadLibData.qwrite=1%capacity;queue[0].stat[0].button=0x100;
++ browser_confirmed_input_before_tick();
++ assert(HSD_PadLibData.qcount==1&&HSD_PadLibData.qread==0&&HSD_PadLibData.qwrite==1%capacity);
++ HSD_PadRenewMasterStatus(); // exact observer/consume prefix from controller.c
++ if(fault==5)browser_confirmed_input_consumed(queue[0].stat);
++ browser_confirmed_input_after_tick();assert(HSD_PadLibData.qcount==0);
++}
++int main(void){
++ setenv("MELEE_BROWSER_CONFIRMED_INPUT","1",1);
++ run(1);run(4);assert(callbacks==2&&waits==2&&s_tick==2);
++ for(int test=1;test<=8;test++){
++  pid_t child=fork();assert(child>=0);
++  if(child==0){fault=test;if(test==6)setenv("MELEE_NET_REPLAY","file",1);if(test==7)native_active=1;run(4);_exit(0);}
++  int status;waitpid(child,&status,0);assert(WIFSIGNALED(status)&&WTERMSIG(status)==SIGABRT);
++ }
++ unsetenv("MELEE_BROWSER_CONFIRMED_INPUT");browser_confirmed_input_before_tick();browser_confirmed_input_after_tick();
++ assert(waits==2&&callbacks==2);return 0;
++}
++'''
++        with tempfile.TemporaryDirectory(prefix='confirmed-input-') as temp:
++            source, executable = Path(temp) / 'test.c', Path(temp) / 'test'
++            source.write_text(program)
++            subprocess.run([os.environ.get('CC', 'clang'), '-std=c11', '-Wno-unused-variable', source, '-o', executable], check=True)
++            subprocess.run([executable], check=True)
++
++    def test_one_based_launcher_slots_follow_actual_match_consumer(self):
++        launcher = (ROOT / 'platforms/browser/launch.c').read_text()
++        consumer = (ROOT / 'src/melee/gm/gmvs.c').read_text()
++        assignment = re.search(r'p->slot=([^;]+);', launcher).group(0)
++        mapping = function(consumer, '    if (arg1->slot == 0)')
++        start = consumer.index('    if (arg1->slot == 0)')
++        end = consumer.index('    if (arg1->slot_type', start)
++        mapping = consumer[start:end]
++        program = '#include <assert.h>\nstruct Player {int slot;} players[4];\nint actual;\nvoid Player_SetPlayerId(int player,int port){(void)player;actual=port;}\nint main(){\n'
++        program += 'for(int i=0;i<4;i++){struct Player* p=&players[i];' + assignment + 'struct Player* arg1=p;int arg0=i;\n' + mapping + '\nassert(actual==i);}\nreturn 0;}\n'
++        with tempfile.TemporaryDirectory(prefix='confirmed-port-') as temp:
++            source, executable = Path(temp) / 'test.c', Path(temp) / 'test'
++            source.write_text(program)
++            subprocess.run([os.environ.get('CC', 'clang'), source, '-o', executable], check=True)
++            subprocess.run([executable], check=True)
++
++
++if __name__ == '__main__':
++    unittest.main()

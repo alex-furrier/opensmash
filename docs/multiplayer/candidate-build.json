@@ -1,0 +1,110 @@
+{
+  "status": "historical-built-local-multiplayer-gameplay-verified",
+  "engineBase": "5bc531aafcc941866f2c916afebc38ee75543222",
+  "sourcePatchSha256": "4c367e254cef6d56e49c19e231b0a52b6f7b1542a346c5406482380a594278d3",
+  "jobs": 2,
+  "buildSeconds": 405.282751083374,
+  "manifest": {
+    "files": [
+      {
+        "url": "/engine/verify-disc.mjs",
+        "sha256": "92127667e8668b978959a6a6b591241c822d594b02f4d83754b03b4c9eee4aad"
+      },
+      {
+        "url": "/engine/disc.mjs",
+        "sha256": "d5129518900585b9b5c48572b2cd500e5143b60c14e248b0e5a6bf27e5b7d731"
+      },
+      {
+        "url": "/engine/disc-chunks.mjs",
+        "sha256": "bfced06182eb1d9bac133e4c2b95ccb39666f7436501dceea80160935e3cd7ff"
+      },
+      {
+        "url": "/engine/local-files.mjs",
+        "sha256": "5af43731413c056dc66c2f8cdf5aa75a9bd34c4b6f722c0454cf6fbaf4988918"
+      },
+      {
+        "url": "/engine/audio-worklet.js",
+        "sha256": "7b1e66572d58e643e4969cf9c5b79f86c8b49a3b4ae1b82c6323dbc8f01f9037"
+      },
+      {
+        "url": "/engine/netplay/confirmed-input.mjs",
+        "sha256": "bf9f50e53b642d9901fb6f238b2749f04b0cf363c30130bf22c732674ba98426"
+      },
+      {
+        "url": "/engine/netplay/browser-bridge.mjs",
+        "sha256": "daf4d3c859e7bb8e6d3df9298c62ce272f5cf343b1d0a8e60b0fdcd873478fd6"
+      },
+      {
+        "url": "/engine/netplay/identity.mjs",
+        "sha256": "5dd5a8314a06aab829a7556ffc4b662e65cd100bfd19ad85c8b205fdcdc5e99e"
+      },
+      {
+        "url": "/engine/upstream/runtime.mjs",
+        "sha256": "fc41f871bf47387fd055ef8c1b383207bab56b6209aeb79708111eb8a945aad8"
+      },
+      {
+        "url": "/engine/upstream/runtime.html",
+        "sha256": "82c3551ac0edaed5d471c3218a84aad6fcd70558c3651f1336a6c186ce3682a2"
+      },
+      {
+        "url": "/engine/upstream/gpu-preflight.mjs",
+        "sha256": "7c7a55235d8e789dbca86d4070f32b27156709cd992c3e78b446a7abfce2ce5a"
+      },
+      {
+        "url": "/engine/upstream/disc-cache.mjs",
+        "sha256": "b1bed4857ac2657231a2e7fb70d768a53b919fb81a3d4a638aae74c5b0f0c6d4"
+      },
+      {
+        "url": "/engine/upstream/save-migration.mjs",
+        "sha256": "7f1f447e0afaa3bbf4f7423a755884d668358e72fa35b3ff396d4186626d6a2e"
+      },
+      {
+        "url": "/engine/upstream/initial_pipeline_cache.db",
+        "sha256": "c9f625281f817be5829d17a3950e7b5b85a0261b6dce7461723f074a800128ae"
+      },
+      {
+        "url": "/engine/upstream/melee_browser.js",
+        "sha256": "5d69f2fd4a2ddcff50cc5d04084bcd14fb9b3eefef0cde96861855aec97ceda7"
+      },
+      {
+        "url": "/engine/upstream/melee_browser.wasm",
+        "sha256": "1049dee5b8efde9e4d92b4d025d5bc10fa6d0ea4fd958fb8394bb82670098720"
+      }
+    ],
+    "launch": {
+      "mode": 0,
+      "stage": 31,
+      "level": 9,
+      "stocks": 4,
+      "minutes": 8,
+      "packedPorts": [
+        1,
+        2,
+        768,
+        768
+      ]
+    },
+    "identity": {
+      "engine": "e2be3d7be6c80ec12641ea908b2758edf644c0888bf12d8c022a2e2f77c539ce",
+      "disc": "0de05981a34156b9cedcef73c73d4244ac05cf6149ab3c9cfed917698819e464",
+      "rules": "4fc1555619a038f7093d8c665f1611269d477903c741a69d2ef78bc5b83a23e6",
+      "costumes": "stock",
+      "seed": "17"
+    }
+  },
+  "lobbySourceSha256": {
+    "engines/melee/runtime/web/netplay/identity.mjs": "5dd5a8314a06aab829a7556ffc4b662e65cd100bfd19ad85c8b205fdcdc5e99e",
+    "engines/melee/runtime/web/netplay/lobby.css": "d2a2968facc7ce4e40351fa07c08fb4200e28bc648f33478a1270a03d88af12a",
+    "engines/melee/runtime/web/netplay/confirmed-input.mjs": "bf9f50e53b642d9901fb6f238b2749f04b0cf363c30130bf22c732674ba98426",
+    "engines/melee/runtime/web/netplay/browser-bridge.mjs": "daf4d3c859e7bb8e6d3df9298c62ce272f5cf343b1d0a8e60b0fdcd873478fd6",
+    "engines/melee/runtime/web/netplay/lobby.html": "59fff1df7669fea8ea6c55f7b30108a2f5bed766ca1818cc7dd6853b2c717ee2",
+    "engines/melee/runtime/web/netplay/lobby-client.mjs": "6e0f1eefa7cd09f0f136a775ddafb0c296647f2a238cf6288a786c139f0abafa",
+    "engines/melee/tools/netplay/rooms.test.mjs": "9bf4ad79f3c44f4c1baf06b9997aa2a4692413baf7a4892dadddc26652c8ea31",
+    "engines/melee/tools/netplay/rooms.mjs": "81261e45655d870f46fd9563456398ce8546807794dd0fe81f002b0cb117ff78",
+    "engines/melee/tools/netplay/package-lock.json": "a4d2c1880c6cfa67543846a8056b380a88f462c016ff44e38b4f0bacb3fb5838",
+    "engines/melee/tools/netplay/package.json": "72fea34ead80439a4ab73ce1ec01d4bb055297443b3bd3e73ec9207b4232317b",
+    "engines/melee/tools/netplay/server.mjs": "6979fa1be719c8f5359a30db6d7028590a4d4fc0705f41221b6109604bdb75bc",
+    "engines/melee/tools/netplay/server.test.mjs": "553baae360e1f5234ff44fca42e782a6f7d72888d52b542eb65c4ce65de9a828"
+  },
+  "note": "Historical candidate for gameplay-proof.json. Current debug/touch candidate is identified in debug-touch-proof.json; compiled WASM and engine source patch unchanged."
+}

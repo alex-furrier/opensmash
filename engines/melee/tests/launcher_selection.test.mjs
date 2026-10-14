@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {applyLauncherSelection} from '../launcher/launch-plan.mjs';
+import {applyLauncherSelection,friendMatchSettings} from '../launcher/launch-plan.mjs';
 import schema from '../runtime/launch-options.json' with {type:'json'};
 import {planLaunch} from '../runtime/web/launch-options.mjs';
 const roster=[{slug:'one',target:'fox'},{slug:'two',target:'mario'}];
@@ -39,4 +39,40 @@ test('Melee trailer fixes the cast, stage and CPU slots regardless of saved sett
  assert.equal(result.ports[3].custom,false);
  assert.deepEqual(settings.ports.map(p=>p.target),['mario','sheik','young-link','auto']);
  assert.equal(new Set(result.ports.map(p=>p.fighter)).size,4);
+});
+
+test('shared-link joining translates unified devices without choosing unrelated fighters',()=>{
+ const before=structuredClone(schema.defaults);before.minutes=0;
+ const settings=applyLauncherSelection(before,{type:'friend-room',portPlan:[{kind:'cpu'},{kind:'gamepad',index:2},{kind:'none'},{kind:'none'}]});
+ assert.deepEqual(settings.ports.map(p=>p.device),['cpu','gamepad2','off','off']);
+ for(const key of ['mode','stage','level','stocks','minutes'])assert.equal(settings[key],before[key]);
+});
+
+test('friend slots retain human fighter choices from later local ports and moveset overrides',()=>{
+ const before={...structuredClone(schema.defaults),ports:[{device:'off',character:'vanilla:2'},{device:'off',character:'vanilla:2'},{device:'keyboard',character:'one',target:'marth'},{device:'gamepad2',character:'two',target:'mario'}]};
+ const normalized=friendMatchSettings(before);assert.deepEqual(normalized.ports.slice(0,2).map(p=>[p.character,p.target,p.device]),[['one','marth','keyboard'],['two','mario','gamepad0']]);
+ assert.deepEqual(planLaunch(schema,normalized,roster[0],roster,()=>0).costumes.map(c=>c.character),['one','two']);
+ assert.equal(before.ports[2].device,'keyboard');assert.equal(before.ports[3].device,'gamepad2');
+});
+test('one local human keeps their chosen fighter first and uses the configured CPU opponent',()=>{
+ const before={...structuredClone(schema.defaults),ports:[{device:'cpu',character:'two'},{device:'keyboard',character:'one'},{device:'off',character:'vanilla:2'},{device:'off',character:'vanilla:2'}]};
+ assert.deepEqual(friendMatchSettings(before).ports.slice(0,2).map(p=>p.character),['one','two']);
+ assert.throws(()=>friendMatchSettings({...before,ports:before.ports.map(p=>({...p,device:p.device==='cpu'?'off':p.device}))}),/Choose two active fighters/);
+});
+
+test('room drafts freeze both selected fighters before converting any saved solo mode',()=>{
+ for(const mode of [1,2,3,4]){
+  const saved={...structuredClone(schema.defaults),mode};saved.ports[1].character='vanilla:2';
+  const selected=applyLauncherSelection(saved,{type:'character',roomMode:'computer',selectionMode:'full-roster',character:roster[0],picks:[roster[1]],portPlan:[{kind:'keyboard'},{kind:'cpu'},{kind:'none'},{kind:'none'}]});
+  const frozen=friendMatchSettings(selected);
+  assert.equal(selected.mode,0);assert.deepEqual(frozen.ports.slice(0,2).map(p=>p.character),['one','two']);assert.equal(frozen.stage,saved.stage);
+ }
+});
+
+test('human friend drafts preserve both selected fighters across saved solo modes',()=>{
+ for(const mode of [0,1,2,3,4]){
+  const before={...structuredClone(schema.defaults),mode};
+  const selected=applyLauncherSelection(before,{type:'character',roomMode:'friend',selectionMode:'full-roster',portPlan:[{kind:'gamepad',index:0},{kind:'cpu'},{kind:'none'},{kind:'none'}],character:{slug:'one'},picks:[{slug:'two'}]});
+  const match=friendMatchSettings(selected);assert.equal(match.mode,0);assert.deepEqual(match.ports.slice(0,2).map(p=>p.character),['one','two']);
+ }
 });

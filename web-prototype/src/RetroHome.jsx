@@ -229,6 +229,7 @@ function RuntimeControls() {
 }
 
 export default function RetroHome({
+  rosterSelector,
   aboutOpen,
   advancedActive,
   authorized,
@@ -242,6 +243,9 @@ export default function RetroHome({
   isFullscreen,
   launchFlowOpen,
   onAboutChange,
+  onCreateRoom,
+  onToggleRoomOpponent,
+  roomDraft=false,
   onAdvanced,
   onCreate,
   onFullscreen,
@@ -503,7 +507,7 @@ export default function RetroHome({
             <canvas id="hero-logo-canvas" className="hero-logo-canvas" aria-hidden="true" />
           </div>
           <nav
-            className={`retro-site-nav ${keepSingleTouchActionVisible ? "has-single-collapsible-action" : ""}`}
+            className={`retro-site-nav ${onCreateRoom?"has-room-action":""} ${keepSingleTouchActionVisible ? "has-single-collapsible-action" : ""}`}
             aria-label="Site information and settings"
           >
             {gamepadCount > 0 && (
@@ -533,6 +537,8 @@ export default function RetroHome({
             >
               About
             </button>
+            {onCreateRoom&&<button className="retro-site-link retro-room-button" type="button" onClick={onCreateRoom}>{roomDraft?'Cancel room':'Create room'}</button>}
+
             {!mobileLayout && (
               <button
                 id="controls-menu-button"
@@ -548,6 +554,10 @@ export default function RetroHome({
             <details className="retro-site-more" ref={moreMenuRef}>
               <summary className="retro-site-link">More</summary>
               <div className="retro-site-more-menu" role="menu">
+                {mobileLayout&&onCreateRoom&&<>
+                  <a className="retro-site-link" role="menuitem" href="https://github.com/turtlesoupy/opensmash" target="_blank" rel="noreferrer">Github</a>
+                  <a className="retro-site-link" role="menuitem" href="https://discord.gg/qYBbGmwBhr" target="_blank" rel="noreferrer">Discord</a>
+                </>}
                 {!mobileLayout && (
                   <button className="retro-site-link" type="button" role="menuitem" onClick={openControlsFromMore}>Controls</button>
                 )}
@@ -597,6 +607,7 @@ export default function RetroHome({
             </div>
           </nav>
         </header>
+        {roomDraft&&<p className="retro-room-selection" role="status">Choose your fighter, then an opponent{onToggleRoomOpponent&&<button className="retro-room-opponent" type="button" aria-pressed={roomDraft==='computer'} onClick={onToggleRoomOpponent}>{roomDraft==='computer'?'Play with a friend':'Use local opponent'}</button>}</p>}
         <section className="intro-video-stage" aria-label="Intro video">
           <div
             ref={gameSurfaceRef}
@@ -676,6 +687,7 @@ export default function RetroHome({
           </div>
         </section>
         <div id="game-switch-row" className="is-game-switch" role="group" aria-label="Choose game" />
+        {rosterSelector}
         <div className="arena-surface"><div id="replica-grid" className="replica-grid" role="grid" aria-label="Search, create, and character roster" />{!ready && <p className="retro-roster-loading">Loading fighters…</p>}<p id="fighter-empty-state" className="fighter-empty-state" role="status" aria-live="polite" hidden /><p id="fighter-pick-prompt" className="fighter-pick-prompt" role="status" aria-live="polite" hidden /></div>
         <span id="replica-metrics" hidden>Building 200-cell grid…</span>
       </main>

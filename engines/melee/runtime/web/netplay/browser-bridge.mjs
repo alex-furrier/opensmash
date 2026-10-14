@@ -1,0 +1,74 @@
+// SPDX-License-Identifier: MIT
+import {createConfirmedInput} from './confirmed-input.mjs';
+import {createDebugInput} from './debug-opponent.mjs';
+
+async function selectedDigest(state, previousApplied) {
+  if (!Array.isArray(state) || state.length !== 50 || !state.every(n => Number.isInteger(n) && n >= 0 && n <= 0xffffffff))
+    throw Error('Invalid selected engine state');
+  const values = [...state, ...(previousApplied || [])], bytes = new ArrayBuffer(values.length * 4);
+  const view = new DataView(bytes);
+  values.forEach((n, i) => view.setUint32(i * 4, n >>> 0, true));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, '0')).join('');
+}
+
+/** Install before callMain. The runtime/room owns the assigned reliable channel.
+ * Optional acquisition/observation callbacks support owned-input gameplay proof;
+ * they never run the game or supply the remote controller. */
+export function installConfirmedInput(Module, config, {acquireOwnedPad, onTick, onError, now=()=>performance.now()} = {}) {
+  if (Module._opensmash_confirmed_input_version?.() !== 1)
+    throw Error('This Melee runtime lacks the confirmed-input boundary.');
+  if (Module.onConfirmedInput || Module.ENV.MELEE_BROWSER_CONFIRMED_INPUT)
+    throw Error('This runtime already owns an input session.');
+  if (['MELEE_NET', 'MELEE_NET_RECORD', 'MELEE_NET_REPLAY', 'MELEE_NET_SYNCTEST'].some(k => Module.ENV[k]))
+    throw Error('Confirmed input cannot share native netplay or replay ownership.');
+  if(config.debug?.scripted&&config.player!==1)throw Error('Scripted debug opponent must own player 2');
+  const debugInput=config.debug&&createDebugInput(config.debug,{playable:()=>!Module._opensmash_preparation_state||Module._opensmash_preparation_state()===4&&![1,2].includes(Module._opensmash_intro_state?.())});
+  const session = createConfirmedInput(config);
+  let pendingTick, appliedTick = -1, previousApplied, debugMetric, timing;
+  Module.onConfirmedInputError = message => { session.stop(message); onError?.(message); };
+  Module.onConfirmedInput = async (tick, local, state) => {
+    if (pendingTick !== undefined || tick !== appliedTick + 1) throw Error('Engine tick ownership mismatch');
+    const began=now();
+    const digest = await selectedDigest(state, previousApplied);
+    const acquired=now();
+    const pads = await session.synchronize(tick, async () => {let pad=acquireOwnedPad?await acquireOwnedPad(tick,local.slice()):local.slice();if(debugInput){const result=await debugInput(tick,pad,state);pad=result.pad;debugMetric=result.metric;}return pad;}, digest, Module.confirmedPreparationReady || [false, false]);
+    // Both readiness values travel with the confirmed tick, so graphics timing
+    // cannot release the simulation on different logical ticks.
+    if (pads.preparation[0]) Module._opensmash_finish_intro_preparation?.();
+    if (pads.preparation[1]) Module._opensmash_finish_preparation?.();
+    const synchronized=now();timing={began,simulationStarted:synchronized,inputDigestMs:acquired-began,inputWaitMs:synchronized-acquired};
+    pendingTick = tick;
+    return pads;
+  };
+  Module.onConfirmedTick = async (tick, pads, state) => {
+    if (tick !== pendingTick || tick !== appliedTick + 1 || !Array.isArray(pads) || pads.length !== 40)
+      throw Error('Consumed engine tick ownership mismatch');
+    const simulated=now(),digest=await selectedDigest(state,pads),digested=now();
+    await session.confirmApplied(tick,digest);
+    const finished=now(),metric={inputDigestMs:timing.inputDigestMs,inputWaitMs:timing.inputWaitMs,simulationMs:simulated-timing.simulationStarted,appliedDigestMs:digested-simulated,appliedWaitMs:finished-digested,totalMs:finished-timing.began};
+    previousApplied = pads.slice(); appliedTick = tick; pendingTick = undefined;
+    onTick?.({tick, pads: pads.slice(), selectedState: state.slice(), timing:metric, ...(debugMetric?{debug:debugMetric}:{})});
+  };
+  Module.ENV.MELEE_BROWSER_CONFIRMED_INPUT = '1';
+  return {start: () => session.start(), stop: reason => session.stop(reason)};
+}
+
+/** MessagePort is a peer transport, not a room registry. Close reports failure. */
+export function messagePortChannel(port) {
+  return {
+    send: message => port.postMessage(message),
+    subscribe(receive, disconnected) {
+      const message = ({data}) => receive(data);
+      port.addEventListener('message', message);
+      port.addEventListener('messageerror', disconnected);
+      port.addEventListener('close', disconnected);
+      port.start();
+      return () => {
+        port.removeEventListener('message', message);
+        port.removeEventListener('messageerror', disconnected);
+        port.removeEventListener('close', disconnected);
+      };
+    },
+  };
+}

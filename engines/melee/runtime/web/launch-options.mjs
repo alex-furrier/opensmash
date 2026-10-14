@@ -17,7 +17,8 @@ export function planLaunch(schema, settings, selected, roster, random = Math.ran
     return !character.startsWith('random') && (character === 'vanilla:3' || kinds[target] === 3) ? [character] : [];
   }));
   const randomCustom = (override) => {
-    const compatible = roster.filter(f => kinds[f.target] !== undefined &&
+    const compatible = roster.filter(f => f.randomReady !== false && kinds[f.target] !== undefined &&
+      (!f.supportedTargets || !override || override==='auto' || f.supportedTargets.includes(override)) &&
       (kinds[override && override !== 'auto' ? override : f.target] !== 3 || !gameWatchOccupants.size ||
        (gameWatchOccupants.size === 1 && gameWatchOccupants.has(f.slug))));
     const pool = compatible.filter(f => !taken.has(f.slug));
@@ -37,6 +38,7 @@ export function planLaunch(schema, settings, selected, roster, random = Math.ran
       : p.character === 'random' ? randomCustom(p.target) : p.character;
     const row = roster.find(f => f.slug === character);
     const target = p.target && p.target !== 'auto' ? p.target : row?.target;
+    if(p.device!=='off'&&row?.supportedTargets&&!row.supportedTargets.includes(target))throw Error('That base is not validated for '+(row.displayName||row.name)+'. Choose its character default or a supported base.');
     const fighter = character.startsWith('vanilla:') ? Number(character.slice(8)) : kinds[target];
     if (fighter === 3 && p.device !== 'off') gameWatchOccupants.add(character);
     if (!integer(fighter, 0, 25)) throw Error('Choose a valid fighter for every player.');

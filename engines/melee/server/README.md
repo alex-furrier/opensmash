@@ -95,3 +95,25 @@ and character-select binaries. These are local-container timings, not cloud
 benchmarks. The website suite has 290 passing tests; six Python cache/access tests
 cover persistence and isolation. Live GCS publication/deployment is a release step,
 not performed by the smoke test.
+
+## Private tailnet development
+
+Keep `HOST=127.0.0.1`. An explicitly approved Tailscale Serve HTTPS proxy may
+set `MELEE_PRIVATE_ORIGIN` to its single exact `https://device.tailnet.ts.net:port`
+origin. Room upgrades require that exact Origin and Host and a loopback socket;
+other origins and direct network listeners remain denied. Configure Serve for
+that port only; do not enable Funnel. Browser disc setup still requires the
+player's own local ISO/GCM, which stays in that browser. This does not add a
+ROM download endpoint or a phone hardware compatibility guarantee.
+
+Private-origin requests use the existing hosted gateway's asset/preparation route
+allowlist, plus netplay metadata and private portrait derivatives. Operator disc
+setup, raw game files, native-process APIs and engine system bundles remain
+unavailable through the website, including requests claiming a loopback Host.
+The separate loopback conversion helper retains its operator behavior. With
+private-origin mode unset, existing local website routes remain unchanged.
+
+Private-origin mode also denies the outer development-only `/api/og-sprite`
+and `/api/dev/trailer-capture` endpoints before cache invalidation, upload or
+native rendering/transcoding. Those tools remain available in ordinary local
+development when private-origin mode is unset.

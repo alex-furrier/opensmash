@@ -3,7 +3,7 @@ import {unlockAudio} from './audio.ts';
 import {MeleeFrameWorker} from './melee-frame-worker.ts';
 import {meleePath} from './paths.ts';
 /** One loaded runtime waits for Play; native graphics setup stays out of browsing. */
-type Session={worker:Worker;audio:SharedArrayBuffer;ready:Promise<void>;verified:Promise<void>;readyAt:number;cancel:()=>void};
+type Session={worker:Worker;audio:SharedArrayBuffer;ready:Promise<void>;verified:Promise<void>;readyAt:number;identity?:{verifiedEngine:string;verifiedDiscHash:string;seed:string;freshSaves:boolean};cancel:()=>void};
 let standby:Session|undefined;
 const currentSession=():Session|undefined=>standby;
 let localDisc:File|undefined;
@@ -122,7 +122,7 @@ export async function selectLocalDisc(file:File,restored=false){
 const sessions=new WeakMap<Worker,Session>();
 const canReparentRuntime=()=>typeof (document.documentElement as HTMLElement&{moveBefore?:unknown}).moveBefore==='function'||new URLSearchParams(location.search).get('presentation')==='bitmap';
 
-export function warmMelee(surface?:HTMLCanvasElement){
+export function warmMelee(surface?:HTMLCanvasElement,freshNetplay=false){
  if((!surface&&!canReparentRuntime())||standby||!crossOriginIsolated||typeof SharedArrayBuffer==='undefined'||(usesLocalDisc()&&!localDisc))return;
  const disc=localDisc;
  const worker=new MeleeFrameWorker(meleePath('/engine/upstream/runtime.html'),surface) as Worker;
@@ -134,10 +134,10 @@ export function warmMelee(surface?:HTMLCanvasElement){
  const ready=new Promise<void>((ok,fail)=>{resolve=ok;reject=fail;});
  void ready.catch(()=>{});
  const fail=(error:Error)=>{reject(error);rejectVerify(error);};
- const session={worker,audio,ready,verified,readyAt:0,cancel:()=>fail(Error('Game closed'))};
+ const session:Session={worker,audio,ready,verified,readyAt:0,cancel:()=>fail(Error('Game closed'))};
  standby=session;sessions.set(worker,session);
  worker.addEventListener('message',({data})=>{
-  if(data.type==='ready-for-selection'){session.readyAt=Date.now();resolve();}
+  if(data.type==='ready-for-selection'){session.identity={verifiedEngine:data.verifiedEngine,verifiedDiscHash:data.verifiedDiscHash,seed:data.seed,freshSaves:data.freshSaves};session.readyAt=Date.now();resolve();}
   if(data.type==='disc-verified'&&disc){verifiedDiscs.add(disc);verify();}
   if(data.type==='error')fail(Error(data.message||'Melee initialization failed without an error message.'));
   if(data.type==='frame'&&!worker.onmessage)data.bitmap?.close();
@@ -146,16 +146,17 @@ export function warmMelee(surface?:HTMLCanvasElement){
  const query=new URLSearchParams(location.search);
  worker.postMessage({type:'start',warm:true,character:'pending',skin:'host',localGame:!usesLocalDisc(),
   iso:disc,discVerified:!!disc&&verifiedDiscs.has(disc),
-  profile:query.get('profile'),benchmark:query.get('benchmark'),audio});
+  profile:query.get('profile'),benchmark:query.get('benchmark'),audio,...(freshNetplay?{freshNetplay:true,args:['--seed','17']}: {})});
 }
 
-export function claimMelee(surface?:HTMLCanvasElement):Session{
+export function claimMelee(surface?:HTMLCanvasElement,freshNetplay=false):Session{
+ if(freshNetplay){standby?.cancel();standby?.worker.terminate();standby=undefined;}
  // Safari cannot reparent a warmed iframe without reloading it. Recreate the
  // runtime in its final parent, retaining the already verified local File.
  if(surface?.parentElement&&!('moveBefore' in surface.parentElement)&&new URLSearchParams(location.search).get('presentation')!=='bitmap'){
   standby?.cancel();standby?.worker.terminate();standby=undefined;
  }
- warmMelee(surface);
+ warmMelee(surface,freshNetplay);
  if(!standby)throw Error('This browser needs shared memory support.');
  const session=standby;standby=undefined;return session;
 }

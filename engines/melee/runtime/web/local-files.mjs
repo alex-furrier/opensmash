@@ -11,6 +11,14 @@ export function costumeSlot(bytes) {
   slot.set(bytes);new DataView(slot.buffer).setUint32(0,slot.length);
   return slot;
 }
+
+// Upstream's red Captain Falcon basename ends in a dot: US settings load
+// PlCaRe.usd, while other settings load the canonical PlCaRe.dat export.
+export const COSTUME_ASSET_NAMES=[...COSTUME_SLOTS,'PlCaRe.usd'];
+export function regionalCostumeAssets(assets){
+  return assets.flatMap(asset=>asset.filename==='PlCaRe.dat'
+    ? [asset,{...asset,filename:'PlCaRe.usd'}] : [asset]);
+}
 export function mountSizedFile(FS, parent, name, url, size, readRange = xhrRange) {
   if (!Number.isSafeInteger(size) || size < 0) throw Error('Invalid file length');
   const chunkSize = 1024 * 1024, chunks = new Map();

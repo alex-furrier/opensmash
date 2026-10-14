@@ -1,0 +1,537 @@
+{
+  "status": "all-eight-local-browser-cases-passed",
+  "browser": "155.0.8059.39",
+  "engineIdentity": {
+    "engine": "e2be3d7be6c80ec12641ea908b2758edf644c0888bf12d8c022a2e2f77c539ce",
+    "disc": "0de05981a34156b9cedcef73c73d4244ac05cf6149ab3c9cfed917698819e464",
+    "rules": "4fc1555619a038f7093d8c665f1611269d477903c741a69d2ef78bc5b83a23e6",
+    "costumes": "stock",
+    "seed": "17"
+  },
+  "sourcePatchSha256": "4c367e254cef6d56e49c19e231b0a52b6f7b1542a346c5406482380a594278d3",
+  "wasmSha256": "1049dee5b8efde9e4d92b4d025d5bc10fa6d0ea4fd958fb8394bb82670098720",
+  "results": [
+    {
+      "scenario": "reference",
+      "workerPeaks": [
+        4,
+        4
+      ],
+      "readyBarrier": true,
+      "presentation": [
+        {
+          "frames": 3921,
+          "playable": 1,
+          "audioFrames": 2122720,
+          "audioPeak": 0.9580205678939819
+        },
+        {
+          "frames": 3921,
+          "playable": 1,
+          "audioFrames": 2123200,
+          "audioPeak": 0.8794488906860352
+        }
+      ],
+      "holds": [
+        [],
+        []
+      ],
+      "ticks": [
+        4000,
+        4000
+      ],
+      "traceHashes": [
+        "51a47f9be5bc0f86cb4f15e51c6d75246394cde199c115c5f158400873857dc8",
+        "51a47f9be5bc0f86cb4f15e51c6d75246394cde199c115c5f158400873857dc8"
+      ],
+      "acquisitionHashes": [
+        "3273a403d6e065b3e2d7b21478c44009f60b951bb3f9d6d3f770b3f5e28ba515",
+        "db6ecc8bb98eba39b848ca1fd476587de709180778ba698dbce1da718de62e6f"
+      ],
+      "delayHashes": [
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      ],
+      "errors": [
+        [],
+        []
+      ],
+      "pageErrors": [
+        [],
+        []
+      ],
+      "milestones": [
+        {
+          "present": 3749,
+          "movement": 252.9718017578125,
+          "attack": true,
+          "firstAttackTick": 453,
+          "stockLoss": true,
+          "respawn": true
+        },
+        {
+          "present": 3749,
+          "movement": 208.68109130859375,
+          "attack": true,
+          "firstAttackTick": 543,
+          "stockLoss": true,
+          "respawn": true
+        }
+      ],
+      "passed": true,
+      "workerShutdownMs": 1974,
+      "workersAfterStop": [
+        0,
+        0
+      ],
+      "disconnectedBoth": true,
+      "observedFighterKinds": [
+        3,
+        1
+      ]
+    },
+    {
+      "scenario": "hold",
+      "workerPeaks": [
+        4,
+        4
+      ],
+      "readyBarrier": true,
+      "presentation": [
+        {
+          "frames": 3921,
+          "playable": 1,
+          "audioFrames": 2124320,
+          "audioPeak": 0.9006973505020142
+        },
+        {
+          "frames": 3921,
+          "playable": 1,
+          "audioFrames": 2123680,
+          "audioPeak": 0.9006973505020142
+        }
+      ],
+      "holds": [
+        [],
+        [
+          {
+            "tick": 573,
+            "before": 573,
+            "after": 573,
+            "ms": 80.875
+          }
+        ]
+      ],
+      "ticks": [
+        4000,
+        4000
+      ],
+      "traceHashes": [
+        "51a47f9be5bc0f86cb4f15e51c6d75246394cde199c115c5f158400873857dc8",
+        "51a47f9be5bc0f86cb4f15e51c6d75246394cde199c115c5f158400873857dc8"
+      ],
+      "acquisitionHashes": [
+        "3273a403d6e065b3e2d7b21478c44009f60b951bb3f9d6d3f770b3f5e28ba515",
+        "db6ecc8bb98eba39b848ca1fd476587de709180778ba698dbce1da718de62e6f"
+      ],
+      "delayHashes": [
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      ],
+      "errors": [
+        [],
+        []
+      ],
+      "pageErrors": [
+        [],
+        []
+      ],
+      "milestones": [
+        {
+          "present": 3749,
+          "movement": 252.9718017578125,
+          "attack": true,
+          "firstAttackTick": 453,
+          "stockLoss": true,
+          "respawn": true
+        },
+        {
+          "present": 3749,
+          "movement": 208.68109130859375,
+          "attack": true,
+          "firstAttackTick": 543,
+          "stockLoss": true,
+          "respawn": true
+        }
+      ],
+      "passed": true,
+      "workerShutdownMs": 1960,
+      "workersAfterStop": [
+        0,
+        0
+      ],
+      "disconnectedBoth": true,
+      "observedFighterKinds": [
+        3,
+        1
+      ]
+    },
+    {
+      "scenario": "jitter",
+      "workerPeaks": [
+        4,
+        4
+      ],
+      "readyBarrier": true,
+      "presentation": [
+        {
+          "frames": 3918,
+          "playable": 1,
+          "audioFrames": 2125440,
+          "audioPeak": 0.8799694776535034
+        },
+        {
+          "frames": 3918,
+          "playable": 1,
+          "audioFrames": 2126560,
+          "audioPeak": 0.9491699934005737
+        }
+      ],
+      "holds": [
+        [],
+        []
+      ],
+      "ticks": [
+        4000,
+        4000
+      ],
+      "traceHashes": [
+        "0222b3ccb48e5d793a1ca20b6b56049eb437c9efc439dc2aad5090495db19ede",
+        "0222b3ccb48e5d793a1ca20b6b56049eb437c9efc439dc2aad5090495db19ede"
+      ],
+      "acquisitionHashes": [
+        "587f46c5656d9e454eea14294e1861d5f00bb828934379bcd71c11c0f0d84ed4",
+        "4b75f1a5f32a4f3d2a4c2c4ae1a70f026a8c0947ea209f0a80bc576fcaf005e2"
+      ],
+      "delayHashes": [
+        "481f2b10bb8fea2c5a9e1938754050b2d96c3e94da299447c2551cf9e21f86c9",
+        "2a23d99df06889d81e984d741405c5f696ecea9e69668f479a346f436362b1e0"
+      ],
+      "errors": [
+        [],
+        []
+      ],
+      "pageErrors": [
+        [],
+        []
+      ],
+      "milestones": [
+        {
+          "present": 3746,
+          "movement": 252.9718017578125,
+          "attack": true,
+          "firstAttackTick": 456,
+          "stockLoss": true,
+          "respawn": true
+        },
+        {
+          "present": 3746,
+          "movement": 208.68109130859375,
+          "attack": true,
+          "firstAttackTick": 546,
+          "stockLoss": true,
+          "respawn": true
+        }
+      ],
+      "passed": true,
+      "workerShutdownMs": 1953,
+      "workersAfterStop": [
+        0,
+        0
+      ],
+      "disconnectedBoth": true,
+      "observedFighterKinds": [
+        3,
+        1
+      ]
+    },
+    {
+      "scenario": "input-negative",
+      "workerPeaks": [
+        4,
+        4
+      ],
+      "readyBarrier": true,
+      "presentation": [
+        {
+          "frames": 495,
+          "playable": 1,
+          "audioFrames": 315840,
+          "audioPeak": 0.814763605594635
+        },
+        {
+          "frames": 495,
+          "playable": 1,
+          "audioFrames": 316800,
+          "audioPeak": 0.8245600461959839
+        }
+      ],
+      "holds": [
+        [],
+        []
+      ],
+      "ticks": [
+        582,
+        582
+      ],
+      "traceHashes": [
+        "e1cdc7efd3ed779e6fd9498d51d2cad8b9befd95a04e62bb361280fae5a8e49d",
+        "e1cdc7efd3ed779e6fd9498d51d2cad8b9befd95a04e62bb361280fae5a8e49d"
+      ],
+      "acquisitionHashes": [
+        "c697dec4bea58490be7e25320f2897db4717962f5371538db4ba26b4574be7aa",
+        "094eb5fe03491d94a8221c99762872d2443b631106f7b12fef18bbbaffeb8f71"
+      ],
+      "delayHashes": [
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      ],
+      "errors": [
+        [],
+        [
+          "Error: Applied selected state mismatch"
+        ]
+      ],
+      "pageErrors": [
+        [],
+        []
+      ],
+      "mutations": [
+        [],
+        [
+          {
+            "tick": 582,
+            "before": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "after": [
+              256,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      ],
+      "passed": true,
+      "meaning": "actual applied owned input changed after acceptance",
+      "workerShutdownMs": 1660,
+      "workersAfterStop": [
+        0,
+        0
+      ],
+      "disconnectedBoth": true
+    },
+    {
+      "scenario": "rng-negative",
+      "workerPeaks": [
+        4,
+        4
+      ],
+      "readyBarrier": true,
+      "presentation": [
+        {
+          "frames": 0,
+          "playable": 0,
+          "audioFrames": 0,
+          "audioPeak": 0
+        },
+        {
+          "frames": 0,
+          "playable": 0,
+          "audioFrames": 0,
+          "audioPeak": 0
+        }
+      ],
+      "holds": [
+        [],
+        []
+      ],
+      "ticks": [
+        0,
+        0
+      ],
+      "traceHashes": [
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      ],
+      "acquisitionHashes": [
+        "52bf710c09feb02ba20594bcc1573d2117b6d128240016faf9ebb69cacb8aabb",
+        "cbd1a5541f5594cff7b422f141c52efad6c3b81562a8416f054fae4ece2a04ff"
+      ],
+      "delayHashes": [
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      ],
+      "errors": [
+        [
+          "Error: Selected state mismatch"
+        ],
+        [
+          "Error: Selected state mismatch"
+        ]
+      ],
+      "pageErrors": [
+        [],
+        []
+      ],
+      "mutations": [
+        [],
+        []
+      ],
+      "passed": true,
+      "meaning": "actual startup RNG changed after Ready identity validation",
+      "workerShutdownMs": 1549,
+      "workersAfterStop": [
+        0,
+        0
+      ],
+      "disconnectedBoth": true
+    },
+    {
+      "scenario": "disconnect",
+      "passed": true,
+      "confirmedTicks": 900,
+      "traceHash": "8db460964e5a92a8ffd3185420bc8edd12cdf1b56a7004bb3e52fafde173ee01",
+      "meaning": "actual client closed while its next owned input was held; peer made no further progress"
+    },
+    {
+      "scenario": "fresh",
+      "recovery": {
+        "samePages": true,
+        "oldConfirmedTicks": [
+          200,
+          200
+        ],
+        "newRoom": true,
+        "oldWorkersClosed": true
+      },
+      "workerPeaks": [
+        4,
+        4
+      ],
+      "readyBarrier": true,
+      "presentation": [
+        {
+          "frames": 3912,
+          "playable": 1,
+          "audioFrames": 2123360,
+          "audioPeak": 0.8100027441978455
+        },
+        {
+          "frames": 3912,
+          "playable": 1,
+          "audioFrames": 2124800,
+          "audioPeak": 0.8714589476585388
+        }
+      ],
+      "holds": [
+        [],
+        []
+      ],
+      "ticks": [
+        4000,
+        4000
+      ],
+      "traceHashes": [
+        "3bf9ebfaddff5b18ece1dec26ed14e350ce8e05704a6c0d03032ed1e414106d2",
+        "3bf9ebfaddff5b18ece1dec26ed14e350ce8e05704a6c0d03032ed1e414106d2"
+      ],
+      "acquisitionHashes": [
+        "5d25594c935b4fe28b7aa4fbab1ebf1e2a65b32d2139318196b69d000f2924c3",
+        "eb56c6607ca4c93bedc07632ab29b5f3f791852f7e2c497e779a886e444e3497"
+      ],
+      "delayHashes": [
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      ],
+      "errors": [
+        [],
+        []
+      ],
+      "pageErrors": [
+        [],
+        []
+      ],
+      "milestones": [
+        {
+          "present": 3740,
+          "movement": 0,
+          "attack": false,
+          "stockLoss": false,
+          "respawn": false
+        },
+        {
+          "present": 3740,
+          "movement": 0,
+          "attack": false,
+          "stockLoss": false,
+          "respawn": false
+        }
+      ],
+      "passed": true,
+      "workerShutdownMs": 1970,
+      "workersAfterStop": [
+        0,
+        0
+      ],
+      "disconnectedBoth": true,
+      "observedFighterKinds": [
+        3,
+        1
+      ]
+    },
+    {
+      "scenario": "solo",
+      "passed": true,
+      "ownership": {
+        "enabled": null,
+        "inputCallback": false,
+        "appliedCallback": false,
+        "scene": 2
+      },
+      "frames": 300,
+      "playable": 1,
+      "setupConfirmations": 1
+    }
+  ],
+  "limitations": [
+    "Selected 50-word state and actual applied PADStatus parity are checked; complete game state equivalence and rollback are unproven.",
+    "Loopback Chrome only; application-message hold and ordered seeded jitter are not TCP packet loss or WAN testing.",
+    "Fresh recovery is a neutral-input cohort; gameplay milestones are required in reference, hold and jitter cohorts.",
+    "Solo is a 300-rendered-frame smoke check; complete timed-match/results transitions and full solo regression coverage are unproven."
+  ],
+  "retainedFailedAttempts": [
+    "Early attack landed during fighter Entry; corrected test waits for both fighters in Wait before scripting independent attacks.",
+    "Negative control cleanup tried an already disabled Stop button; corrected driver preserves fail-stop.",
+    "Worker closure was checked after only 100ms; explicit pool termination plus bounded actual target closure established shutdown in approximately 1.5 seconds.",
+    "Solo driver omitted controller acknowledgement for initial memory-card setup; it progressed in setup scene42 until timeout. Existing confirm input corrected the driver; final smoke passed.",
+    "Initial character/stage labels misread upstream enums; corrected to Donkey Kong versus Fox on Battlefield and reran all eight scenarios under the final runtime identity."
+  ],
+  "traceMeaning": "Actual consumed four-port PADStatus plus selected 50-word state at each logical tick; observed fighter kinds 3 (Donkey Kong) and 1 (Fox)."
+}

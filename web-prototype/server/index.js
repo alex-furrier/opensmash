@@ -1,3 +1,4 @@
+import {privateMeleeRequestAllowed} from '../../engines/melee/server/handler.mjs';
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
@@ -34,7 +35,16 @@ import { bakedRosterEntries } from "../shared/baked-roster.js";
 import { ROMS_BY_SHA1, UNSUPPORTED_ROMS_BY_SHA1 } from "../shared/rom-catalog.js";
 import { ACTIVE_JOB_STATUSES } from "./job-protocol.js";
 
+const PORT = Number(process.env.PORT || 4174);
+const HOST = process.env.HOST || (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
+if((process.env.MELEE_NETPLAY_ENGINE_ROOT||process.env.MELEE_SIMULATED_PEER_ISO||process.env.MELEE_PRIVATE_ORIGIN)&&!['127.0.0.1','localhost','::1'].includes(HOST))throw Error('Friend runtime requires a loopback HOST.');
+if(process.env.MELEE_PRIVATE_ORIGIN){const {privateFriendOrigin}=await import('../../engines/melee/server/friend-rooms.mjs');privateFriendOrigin(process.env.MELEE_PRIVATE_ORIGIN);}
 const handleMelee = createEmbeddedMeleeHandler();
+let friendRuntime=null,attachFriendRooms;
+if(process.env.MELEE_NETPLAY_ENGINE_ROOT){
+  const [runtime,rooms]=await Promise.all([import('../../engines/melee/server/launcher-runtime.mjs'),import('../../engines/melee/server/friend-rooms.mjs')]);
+  friendRuntime=await runtime.createLauncherRuntime(process.env.MELEE_NETPLAY_ENGINE_ROOT);attachFriendRooms=rooms.attachFriendRooms;
+}
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const {
   pipelineProjectRoot: PIPELINE_PROJECT_ROOT,
@@ -147,8 +157,6 @@ const fighterJobs = createFighterJobs({
   reservedSlugs: async () => (await bakedRoster()).slugs,
 });
 
-const PORT = Number(process.env.PORT || 4174);
-const HOST = process.env.HOST || (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const authService = createAuthService({ isProduction: IS_PRODUCTION });
 // Bump the cookie name whenever the validation contract changes. This also
@@ -826,6 +834,10 @@ async function handleRequest(req, res, vite) {
   res.setHeader('Cross-Origin-Opener-Policy','same-origin');
   res.setHeader('Cross-Origin-Embedder-Policy','require-corp');
 
+  if(!privateMeleeRequestAllowed(req,process.env.MELEE_PRIVATE_ORIGIN))return json(res,404,{error:'Not found'});
+  if(pathname==='/melee/api/netplay/config'&&req.method==='GET')return json(res,200,{enabled:!!friendRuntime,...(simulatedPeer?{simulatedOpponent:true}:{})});
+  if(friendRuntime?.handle(req,res))return;
+
   // Firebase's hosted sign-in helper, served from our origin (see auth.js).
   // It carries no cookies either way and is never edge-cached.
   if (isAuthHandlerPath(pathname)) {
@@ -1381,8 +1393,10 @@ if (!IS_PRODUCTION && process.env.SERVE_BUILT_FRONTEND !== '1') {
     appType: "spa",
     server: {
       middlewareMode: true,
+      host: HOST,
+      ws: {host: HOST},
       // A gameplay validation session must survive unrelated workspace edits.
-      ...(process.env.VITE_HMR === '0' ? { hmr: false, ws: { port: PORT + 1 } } : {}),
+      ...(process.env.VITE_HMR === '0' ? { hmr: false, ws: { port: PORT + 1, host: HOST } } : {}),
       // Dev only: extra hostnames allowed to reach the Vite middleware, e.g.
       // an ngrok tunnel for phone testing (VITE_ALLOWED_HOSTS=.ngrok-free.app).
       ...(process.env.VITE_ALLOWED_HOSTS
@@ -1409,6 +1423,16 @@ const server = http.createServer((req, res) => {
     else res.destroy();
   });
 });
+let simulatedPeer;
+if(process.env.MELEE_SIMULATED_PEER_ISO){
+ if(!Number.isInteger(PORT)||PORT<1||PORT>65535)throw Error('Local opponent requires a fixed valid website port.');
+ if(!friendRuntime||!process.env.MELEE_PLAYWRIGHT_MODULE)throw Error('Local opponent needs the verified friend runtime and an existing Playwright module.');
+ const {createRequire}=await import('node:module');
+ const {createSimulatedPeer}=await import('../../engines/melee/server/simulated-peer.mjs');
+ simulatedPeer=createSimulatedPeer({chromium:createRequire(import.meta.url)(process.env.MELEE_PLAYWRIGHT_MODULE).chromium,origin:`http://${HOST.includes(':')?'['+HOST+']':HOST}:${PORT}`,iso:process.env.MELEE_SIMULATED_PEER_ISO,observeTicks:false,onObservation:event=>{if(event.type==='phase')console.info('[local opponent]',event.phase);else if(['combat-performance','startup-performance','browser-error','browser-console','error'].includes(event.type)||event.type==='frame-stall'&&event.durationMs>100)console.info('[local opponent diagnostic]',JSON.stringify(event));}});
+}
+const friendRooms=friendRuntime&&attachFriendRooms(server,{engine:friendRuntime.engine,host:HOST,simulatedPeer,privateOrigin:process.env.MELEE_PRIVATE_ORIGIN});
+if(friendRuntime)process.once('SIGINT',()=>{friendRooms?.close();void Promise.all([simulatedPeer?.close()]).then(()=>process.exit());});
 server.keepAliveTimeout = 65_000;
 server.headersTimeout = 66_000;
 
@@ -1419,5 +1443,5 @@ await authService.init();
 await fighterJobs.init();
 await bakedRoster().catch((error) => console.warn(`Baked roster unavailable at boot: ${error.message}`));
 server.listen(PORT, HOST, () => {
-  console.log(`OpenSmash web: http://${HOST}:${PORT}`);
+  console.log(`OpenSmash web: http://${HOST}:${server.address().port}`);
 });

@@ -11,7 +11,7 @@ from .glb import GLB
 from .character_build import archive_previous_build,run_stage
 ROOT=Path(__file__).resolve().parents[1]
 FILES={'rigged.glb':64<<20,'portrait_raw.png':16<<20,'stock_raw.png':8<<20,'emblem_raw.png':8<<20,'announcer.wav':16<<20}
-OPTIONAL_FILES={'emblem_stencil.png':8<<20,'melee-source.json':32<<20,'melee-source.rgba8':4<<20,'melee-source.identity.dat':4<<20,'melee-source-ready.json':4096}
+OPTIONAL_FILES={'melee-source-pivot.json':2<<20,'emblem_stencil.png':8<<20,'melee-source.json':32<<20,'melee-source.rgba8':4<<20,'melee-source.identity.dat':4<<20,'melee-source-ready.json':4096,'portrait_tile.png':8<<20,'portrait_medium.png':8<<20}
 from .targets import PLAYABLE
 TARGETS=set(PLAYABLE)
 class NoRedirect(HTTPRedirectHandler):
@@ -62,15 +62,42 @@ def import_source(link,destination,origins,fetch=download):
         (destination/filename).write_bytes(raw)
     mesh=GLB(destination/'rigged.glb').mesh()
     if len(mesh['positions'])>65535 or len(mesh['triangles'])>100000 or len(mesh['names'])>256:raise ValueError('This mesh is too large for the character importer.')
-    for filename in ['portrait_raw.png','stock_raw.png','emblem_raw.png']:
+    for filename in ['portrait_raw.png','stock_raw.png','emblem_raw.png',*[n for n in ['portrait_tile.png','portrait_medium.png'] if n in names]]:
         with Image.open(destination/filename) as im:
             if im.format!='PNG' or im.width*im.height>16_777_216:raise ValueError('Invalid character art.')
             im.verify()
     # ASCII-escaped JSON also reads correctly in older Windows locale encodings.
     (destination/'character.json').write_text(json.dumps({'name':name,'display':name,'short':short})+'\n',encoding='utf-8')
     # Identity is content-based. Never persist the bearer URL in the public roster.
-    signature=json.dumps({'name':name,'short':short,'files':{n:e['sha256'] for n,e in manifest['files'].items() if n in FILES or n=='emblem_stencil.png'}},sort_keys=True)
+    signature=json.dumps({'name':name,'short':short,'files':{n:e['sha256'] for n,e in manifest['files'].items() if n in FILES or n in ('emblem_stencil.png','melee-source-pivot.json')}},sort_keys=True)
     return {'name':name,'short':short,'signature':hashlib.sha256(signature.encode()).hexdigest()}
+
+def import_local_source(entry,roster_path,destination):
+    """Adapt an operator-selected private export to the existing source validator.
+
+    Only the export allowlist is read; roster intake references are never followed.
+    Local paths are not accepted by the HTTP import endpoint.
+    """
+    slug=entry.get('slug','')
+    if not isinstance(slug,str) or not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,63}',slug):raise ValueError('Invalid private roster slug.')
+    directory=Path(roster_path).resolve().parent/'exports'/slug
+    if directory.is_symlink() or directory.resolve()!=directory or Path(entry.get('source_directory',''))!=directory:
+        raise ValueError('Private roster sources must be direct export directories.')
+    assets={}
+    for name,limit in {**FILES,**OPTIONAL_FILES}.items():
+        path=directory/name
+        if name not in FILES and not path.exists():continue
+        if path.is_symlink() or not path.is_file() or not 0<path.stat().st_size<=limit:raise ValueError('Invalid private source asset.')
+        with path.open('rb') as stream:raw=stream.read(limit+1)
+        if not 0<len(raw)<=limit:raise ValueError('Private source asset exceeds the import size limit.')
+        assets[name]=raw
+    if hashlib.sha256(assets['rigged.glb']).hexdigest()!=entry.get('source_sha256'):raise ValueError('Private roster model integrity check failed.')
+    base='https://private.invalid/engine/character-source/'+'0'*48+'/'
+    manifest={'format':'opensmash-source-v1','name':entry.get('name'),'short':entry.get('short'),
+              'files':{name:{'url':name,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest()} for name,raw in assets.items()}}
+    def fetch(url,limit):
+        return json.dumps(manifest).encode() if url==base+'manifest.json' else assets[url.removeprefix(base)]
+    return import_source(base+'manifest.json',destination,{'https://private.invalid'},fetch)
 
 class ImportManager:
     def __init__(self,catalog,lock,origins=None,workspace=ROOT,queue_limit=1):
@@ -79,6 +106,7 @@ class ImportManager:
         self.workspace=Path(workspace);self.root=self.workspace/'build/character-imports';self.root.mkdir(parents=True,exist_ok=True)
         self.index=self.root/'roster.json';self.jobs={};self.pool=ThreadPoolExecutor(max_workers=1);self.state_lock=threading.Lock()
         self.rows=json.loads(self.index.read_text()) if self.index.exists() else []
+        self.private_rows=None
         self.catalog.update({r['slug']:r for r in self.rows})
     def start(self,url,target,source_only=False):
         url=source_url(url,self.origins)
@@ -95,6 +123,7 @@ class ImportManager:
             row=self.catalog.get(slug)
             if not isinstance(slug,str) or not row or not row.get('imported'):raise ValueError('Only characters you imported can be removed.')
             self.rows=[r for r in self.rows if r['slug']!=slug]
+            if self.private_rows is not None:self.private_rows=[r for r in self.private_rows if r['slug']!=slug]
             atomic_write(self.index,(json.dumps(self.rows,indent=2)+'\n').encode());del self.catalog[slug]
             ident='web-v1-'+hashlib.sha256(slug.encode()).hexdigest()[:16]
             for folder in [self.workspace/'build/characters'/ident,self.workspace/'assets/characters'/ident]:
@@ -105,19 +134,67 @@ class ImportManager:
                 shutil.rmtree(folder,onexc=retry)
                 if folder.exists():folder.rename(self.root/(folder.parent.name+'-'+ident+'-removed-'+uuid.uuid4().hex))
             (self.root/(slug+'.webp')).unlink(missing_ok=True)
+            for variant in ['tile','medium']:(self.root/(slug+'-'+variant+'.webp')).unlink(missing_ok=True)
         return row
-    def work(self,job,url,target,source_only=False):
+    def portraits(self,source,slug,derivatives=False):
+        result={}
+        variants=[('raw',(180,172),'portrait')]
+        if derivatives:variants.extend([('tile',(90,86),'portraitTile'),('medium',(256,256),'portraitMedium')])
+        for variant,size,key in variants:
+            portrait=source/('portrait_'+variant+'.png')
+            filename=slug+('' if variant=='raw' else '-'+variant)+'.webp'
+            with Image.open(portrait if portrait.exists() else source/'portrait_raw.png') as im:
+                im.thumbnail(size);im.convert('RGB').save(self.root/filename,'WEBP',quality=95)
+            result[key]=f'/api/imports/portraits/{filename}'
+        return result
+
+    def load_local_roster(self,path):
+        path=Path(path).expanduser().resolve()
+        if path.stat().st_size>64<<10:raise ValueError('Private roster manifest exceeds the size limit.')
+        manifest=json.loads(path.read_text())
+        if manifest.get('version')!=1 or manifest.get('private') is not True or not isinstance(manifest.get('characters'),list):raise ValueError('Invalid private roster manifest.')
+        rows=manifest['characters']
+        if len(rows)>64:raise ValueError('Private roster exceeds the character limit.')
+        ready=[r for r in rows if r.get('status') in ('validated_local_source','actual_native_game_smoke_passed')]
+        if len({r.get('slug') for r in ready})!=len(ready):raise ValueError('Duplicate private roster slug.')
+        active=[]
+        for entry in ready:
+            target=entry.get('target')
+            if target not in TARGETS:raise ValueError('Unsupported private roster moveset.')
+            default=entry.get('defaultTarget',target)
+            supported=entry.get('supportedTargets',[target])
+            if default!=target or not isinstance(supported,list) or not supported or len(supported)>len(TARGETS) or any(not isinstance(t,str) or t not in TARGETS for t in supported) or len(set(supported))!=len(supported) or default not in supported:
+                raise ValueError('Invalid validated private roster movesets.')
+            category=entry.get('rosterCategory','high-school')
+            if category not in ('high-school','family'):raise ValueError('Invalid private roster category.')
+            display=entry.get('display') or entry.get('name')
+            if not isinstance(display,str) or not display.strip() or len(display)>80:raise ValueError('Invalid private roster display name.')
+            job={'id':uuid.uuid4().hex}
+            self.work(job,None,target,True,lambda destination:import_local_source(entry,path,destination))
+            if job['state']!='complete':raise ValueError(f"Private roster import failed for {entry['slug']}: {job['message']}")
+            # Presentation metadata never changes the source signature or slug.
+            job['fighter']['displayName']=display.strip()
+            job['fighter'].update(defaultTarget=default,supportedTargets=list(supported),rosterCategory=category)
+            active.append(job['fighter'])
+        atomic_write(self.index,(json.dumps(self.rows,indent=2)+'\n').encode())
+        self.private_rows=active
+        return list(active)
+
+    def work(self,job,url,target,source_only=False,source_loader=None):
         def progress(message):job.update(state='working',message=message)
         try:
             progress('Downloading and checking your character…')
             with tempfile.TemporaryDirectory(prefix='source-',dir=self.root) as temp:
-                source=Path(temp);info=import_source(url,source,self.origins)
+                source=Path(temp);info=source_loader(source) if source_loader else import_source(url,source,self.origins)
                 slug='import-'+hashlib.sha256((info['signature']+('' if source_only else target)).encode()).hexdigest()[:24]
                 with self.lock:
                     existing=self.catalog.get(slug)
                     ident='web-v1-'+hashlib.sha256(slug.encode()).hexdigest()[:16]
                     retained=self.workspace/'assets/characters'/ident
                     if existing and all((retained/name).is_file() for name in [*FILES,'character.json']):
+                        if source_loader:
+                            existing.update(self.portraits(source,slug,derivatives=True))
+                            atomic_write(self.index,(json.dumps(self.rows,indent=2)+'\n').encode())
                         if source_only and existing['target']!=target:
                             existing['target']=target
                             atomic_write(self.index,(json.dumps(self.rows,indent=2)+'\n').encode())
@@ -137,9 +214,7 @@ class ImportManager:
                     except Exception:
                         shutil.copytree(source,self.root/('failed-source-'+job['id']),dirs_exist_ok=True)
                         raise
-                    art=self.root/(slug+'.webp')
-                    with Image.open(source/'portrait_raw.png') as im:im.thumbnail((180,172));im.convert('RGB').save(art,'WEBP',quality=90)
-                    row={'slug':slug,'name':info['name'],'short':info['short'],'target':target,'portrait':f'/api/imports/portraits/{slug}.webp','imported':True}
+                    row={'slug':slug,'name':info['name'],'short':info['short'],'target':target,'imported':True,**self.portraits(source,slug,derivatives=source_loader is not None)}
                     self.rows=[r for r in self.rows if r['slug']!=slug]
                     self.rows.append(row);atomic_write(self.index,(json.dumps(self.rows,indent=2)+'\n').encode());self.catalog[slug]=row
                 job.update(state='complete',message='Character is ready.',fighter=row)

@@ -12,6 +12,7 @@ COPY pipeline/engines/melee/web/lib /workspace/pipeline/engines/melee/web/lib
 COPY pipeline/engines/melee/web/public/catalog.json /workspace/pipeline/engines/melee/web/public/catalog.json
 COPY pipeline/engines/melee/runtime/launch-options.json /workspace/pipeline/engines/melee/runtime/launch-options.json
 COPY pipeline/engines/melee/runtime/web/launch-options.mjs /workspace/pipeline/engines/melee/runtime/web/launch-options.mjs
+COPY pipeline/engines/melee/runtime/web/netplay /workspace/pipeline/engines/melee/runtime/web/netplay
 RUN pnpm build
 
 FROM node:22-bookworm-slim
@@ -28,6 +29,7 @@ COPY --from=build /workspace/pipeline/web-prototype/dist ./dist
 COPY pipeline/web-prototype/server ./server
 COPY pipeline/engines/melee/server /workspace/pipeline/engines/melee/server
 COPY pipeline/engines/melee/tools /workspace/pipeline/engines/melee/tools
+RUN npm --prefix /workspace/pipeline/engines/melee/tools/netplay ci --ignore-scripts
 COPY pipeline/engines/melee/opensmash_melee /workspace/pipeline/engines/melee/opensmash_melee
 COPY pipeline/engines/melee/runtime /workspace/pipeline/engines/melee/runtime
 COPY pipeline/engines/melee/web/public/catalog.json /workspace/pipeline/engines/melee/web/public/catalog.json

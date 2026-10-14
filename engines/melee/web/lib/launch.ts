@@ -2,9 +2,10 @@ import {preferences} from '@/lib/desktop';
 import schema from '../../runtime/launch-options.json';
 import {planLaunch} from '../../runtime/web/launch-options.mjs';
 import type {Fighter} from './fighter';
+import {resolvePortMovesets} from './moveset-preference.mjs';
 import {normalizeRenderWidth} from './render-resolution.mjs';
 export {schema};
-export type Settings=Omit<typeof schema.defaults,'ports'> & {renderWidth?:number;ports:(typeof schema.defaults.ports[number] & {target?:string})[]};
+export type Settings=Omit<typeof schema.defaults,'ports'> & {renderWidth?:number;movesetPreferenceVersion?:number;ports:(typeof schema.defaults.ports[number] & {target?:string})[]};
 export const defaults=()=>({...structuredClone(schema.defaults),renderWidth:0});
 // The alpha shipped with a single Peach CPU on Battlefield as the default; saved copies of
 // those opponents follow the new random lineup while keeping player 1's own controller.
@@ -13,8 +14,7 @@ export function loadSettings():Settings {try{
  const saved=JSON.parse(preferences.getItem('melee-launch-v1')||'{}');
  {
   const requested=new URLSearchParams(location.search).get('moveset');
-  const target=requested&&schema.targets.some(t=>t.slug===requested)?requested:saved.ports?.[0]?.target||'auto';
-  saved.ports=(saved.ports||defaults().ports).map((p:any)=>({...p,target:target}));
+  saved.ports=resolvePortMovesets(saved,requested,schema.targets,saved.ports||defaults().ports);
  }
  if(Array.isArray(saved.ports)&&JSON.stringify(saved.ports.slice(1))===legacyOpponents){
   saved.ports=[saved.ports[0],...defaults().ports.slice(1)];
