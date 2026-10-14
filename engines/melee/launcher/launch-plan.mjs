@@ -16,7 +16,7 @@ export function applyLauncherSelection(settings, action) {
   const picks=[action.character,...(action.picks||[])].filter(Boolean);
   const mode=action.roomMode==='computer'||action.roomMode==='friend'?0:action.type==='start'?4:action.type==='select'?2:settings.mode;
   const selectedPorts=selectionPorts(action.portPlan,action.selectionMode,mode);
-  return {...settings,mode,ports:settings.ports.map((port,index)=>{
+  return {...settings,mode,...(action.ownedControllers?{ownedControllerIds:action.portPlan.map(slot=>slot?.kind==='gamepad'?slot.id:null)}:{}),ports:settings.ports.map((port,index)=>{
     const slot=action.portPlan[index];
     const device=slot?.kind==='gamepad'?`gamepad${slot.index}`:slot?.kind==='keyboard'?'keyboard':slot?.kind==='none'?'off':'cpu';
     const chosen=picks[selectedPorts.indexOf(index)];

@@ -1,3 +1,4 @@
+import {reconcileControllers,lockControllerChoice,unlockControllerChoice,controllerLaunchChoices,isPrimaryController} from '../shared/controller-selection.js';
 import {reconcileSelection,selectFighter,readyFighters} from '../shared/local-fighter-selection.js';
 import {startMenuPointer} from './menu-pointer.js';
 import { n64Keyboard } from '../shared/n64-keyboard.js';
@@ -442,45 +443,58 @@ const pickPrompt = document.getElementById('fighter-pick-prompt');
 let pendingPicks = [];
 let pendingPickSlots = "";
 
+let hostLoadButton;
 let localSelection;
+let controllerSelection;
+let clickingOwner;
+function ownedState(){controllerSelection=reconcileControllers(controllerSelection,Array.from(navigator.getGamepads?.()||[]));return controllerSelection;}
+window.addEventListener('gamepaddisconnected',event=>{controllerSelection=reconcileControllers(controllerSelection,Array.from(navigator.getGamepads?.()||[]).filter(p=>p&&p.index!==event.gamepad.index));selectionRenderKey='';renderLocalSelection();});
 let selectionRenderKey='';
 function localState() {
-  const slots=APP_BRIDGE?.selectionSlots?.()||['1P'];
+  const slots=APP_BRIDGE?.explicitLocalSelection?['1P']:(APP_BRIDGE?.selectionSlots?.()||['1P']);
   localSelection=reconcileSelection(localSelection,slots,APP_BRIDGE?.selectionContext?.());
   return localSelection;
 }
 function renderLocalSelection() {
+  if(hostLoadButton)hostLoadButton.hidden=APP_BRIDGE?.experience!=='melee';
   const panel=document.getElementById('local-fighter-selection');
   if(!panel)return;
   panel.hidden=!APP_BRIDGE?.explicitLocalSelection||document.body.classList.contains('is-game-running');
   if(panel.hidden)return;
   const state=localState();
-  const key=JSON.stringify(state);
+  const key=JSON.stringify([state,ownedState()]);
   if(key===selectionRenderKey)return;
   selectionRenderKey=key;
-  const focusedSlot=document.activeElement?.dataset.selectionSlot;
-  const heading=document.createElement('p');heading.textContent='Choose fighters, then play locally';
-  const choices=state.slots.map(slot=>{
-    const button=document.createElement('button');button.type='button';button.dataset.selectionSlot=slot;
-    button.textContent=`${slot}: ${state.picks[slot]?.displayName||'Choose fighter'}`;
-    button.setAttribute('aria-pressed',String(slot===state.active));
-    button.onclick=()=>{localSelection={...localState(),active:slot};renderLocalSelection();};
-    return button;
-  });
+  const owned=ownedState();
+  const picks=owned.devices.length?controllerLaunchChoices(owned):readyFighters(state);
   const play=document.createElement('button');play.type='button';play.textContent='Play locally';
-  play.disabled=!readyFighters(state);play.onclick=()=>{const picks=readyFighters(localState());if(picks)launch(picks[0],picks);};
-  const hint=document.createElement('small');hint.textContent='P1 controller: left stick moves cursor · A / × selects · B / ○ goes back · right stick scrolls';
-  panel.replaceChildren(heading,...choices,play,hint);
-  if(focusedSlot)choices.find(button=>button.dataset.selectionSlot===focusedSlot)?.focus({preventScroll:true});
+  play.disabled=!picks;play.onclick=()=>{const current=ownedState();const ready=current.devices.length?controllerLaunchChoices(current):readyFighters(localState());if(ready)requestLaunch({...ready[0],localPicks:ready});};
+  const hint=document.createElement('small');
+  hint.textContent=owned.connectedCount>2?'Up to two local controllers are supported.':owned.connectedCount>1?'Other modes support one controller. Disconnect the second controller to play.':'';
+  hint.hidden=!hint.textContent;
+  panel.replaceChildren(play,hint);
   window.characterGrid?.clearPicks?.();
-  for(const [slot,pick] of Object.entries(state.picks))window.characterGrid?.markPick?.(pick.selectionName||pick.slug,slot);
+  if(owned.devices.length){for(const device of owned.devices)if(device.locked)window.characterGrid?.markPick?.(device.choice.selectionName||device.choice.slug,`${device.port+1}P`);}
+  else for(const [slot,pick] of Object.entries(state.picks))window.characterGrid?.markPick?.(pick.selectionName||pick.slug,slot);
+
 }
 setInterval(renderLocalSelection,250);
 startMenuPointer({
   enabled:()=>APP_BRIDGE?.experience==='melee'&&!document.querySelector('.game-overlay[data-melee-input-owned="true"],.native-game,.boot-screen'),
+  controllers:()=>ownedState().devices,
   controllerIndex:()=>APP_BRIDGE?.menuControllerIndex,
-  back:()=>{
+  click:(target,owner)=>{
+    const primary=isPrimaryController(ownedState(),owner);
+    if(!primary&&(!APP_BRIDGE?.explicitLocalSelection||!target.closest('.replica-select-control')))return;
+    clickingOwner=owner;
+    try{if(primary)target.focus({preventScroll:true});target.click();}finally{clickingOwner=null;}
+  },
+  back:owner=>{
     const modal=Array.from(document.querySelectorAll('dialog[open],[role="dialog"]')).find(element=>element.getClientRects().length&&getComputedStyle(element).visibility!=='hidden');
+    if(APP_BRIDGE?.explicitLocalSelection&&ownedState().devices.length){
+      if(!isPrimaryController(ownedState(),owner)||!modal){controllerSelection=unlockControllerChoice(ownedState(),owner);renderLocalSelection();return;}
+    }
+
     const buttons=Array.from(modal?.querySelectorAll('button')||[]).filter(button=>button.getClientRects().length&&getComputedStyle(button).visibility!=='hidden');
     const close=buttons.find(button=>/Close|Back/.test(button.getAttribute('aria-label')||''))||buttons.find(button=>/^(Back|Cancel|Close)$/.test(button.textContent.trim()));
     if(close)close.click();
@@ -531,6 +545,8 @@ function collectPick(fighter, slots) {
 function launch(fighter, selectedPicks) {
   if (!gameFrame || !videoFrame) return;
   pendingFighter = null;
+  selectedPicks=selectedPicks||fighter.localPicks;
+  if(selectedPicks?.[0]?.index!==undefined){const current=controllerLaunchChoices(ownedState());if(!current||JSON.stringify(current)!==JSON.stringify(selectedPicks)){showPickPrompt('Controllers changed. Choose fighters again.');return;}}
   let picks = [];
   const slots = APP_BRIDGE?.selectionSlots?.()
     ?? Array.from({ length: APP_BRIDGE?.humanPortCount?.() ?? 1 }, (_, i) => `${i + 1}P`);
@@ -552,7 +568,7 @@ function launch(fighter, selectedPicks) {
   controlEmbeddedTrailer(introVideo, 'pauseVideo');
   gameFrame.title = `${fighter.displayName} — Smash.fun`;
   const source = APP_BRIDGE?.launch
-    ? APP_BRIDGE.launch({ type: fighter.actionType || 'character', slug: fighter.slug, picks: picks.map(pick => pick.slug),targets:[fighter,...picks].map(pick=>pick.target) })
+    ? APP_BRIDGE.launch({ type: fighter.actionType || 'character', slug: fighter.slug, picks: picks.map(pick => pick.slug),targets:[fighter,...picks].map(pick=>pick.target),...(selectedPicks?{selectionMode:'humans-only'}:{}),...(selectedPicks?.[0]?.index!==undefined?{ownedControllers:true,selectionMode:'humans-only',portPlan:Array.from({length:4},(_,i)=>selectedPicks[i]?{kind:'gamepad',index:selectedPicks[i].index,id:selectedPicks[i].id}:{kind:'cpu'})}:{}) })
     : engineUrl(fighter);
   if (!source || source === 'about:blank') {
     window.characterGrid?.select(null);
@@ -2969,6 +2985,11 @@ window.addEventListener('pointerup', event => finishCartridgePointer(event));
 grid?.addEventListener('characterselect', event => {
   const fighter = fighterFromSelection(event.detail);
   if (fighter) {
+    if(APP_BRIDGE?.explicitLocalSelection){
+      if(ownedState().devices.length){const owner=clickingOwner||ownedState().devices[0];controllerSelection=lockControllerChoice(ownedState(),owner,{...fighter,target:APP_BRIDGE?.baseFor?.(fighter.slug,`${owner.port+1}P`)});}
+      else {const state=localState();localSelection=selectFighter(state,{...fighter,target:APP_BRIDGE?.baseFor?.(fighter.slug,state.active)});}
+      renderLocalSelection();return;
+    }
     // With a verified ROM and no controls step ahead the pick boots straight
     // into the engine, whose VS card announces the matchup; voicing it here
     // too would play the name twice.
@@ -3014,12 +3035,12 @@ gameFrame?.addEventListener('load', () => {
 window.gameLauncher = Object.freeze({
   clearPicks,
   selectionSlot(slug) {
-    if(APP_BRIDGE?.explicitLocalSelection)return localState().active;
+    if(APP_BRIDGE?.explicitLocalSelection){const devices=ownedState().devices;return devices.length?`${(devices.find(d=>d.choice?.slug===slug)?.port||0)+1}P`:localState().active;}
     const slots=APP_BRIDGE?.selectionSlots?.()||['1P'];
     if(pendingPickSlots&&pendingPickSlots!==JSON.stringify([slots,APP_BRIDGE?.selectionContext?.()]))clearPicks();
     return pendingPicks.find(pick=>pick.slug===slug)?.slot||slots[pendingPicks.length]||slots[0];
   },
-  updatePickTarget(slug,target) {if(APP_BRIDGE?.explicitLocalSelection){const state=localState(),pick=state.picks[state.active];if(pick?.slug===slug){localSelection={...state,picks:{...state.picks,[state.active]:{...pick,target}}};renderLocalSelection();}return;}const pick=pendingPicks.find(pick=>pick.slug===slug);if(pick)pick.target=target;},
+  updatePickTarget(slug,target,slot) {if(APP_BRIDGE?.explicitLocalSelection&&ownedState().devices.length){controllerSelection={...ownedState(),devices:ownedState().devices.map(d=>`${d.port+1}P`===slot&&d.choice?.slug===slug?{...d,choice:{...d.choice,target}}:d)};renderLocalSelection();return;}if(APP_BRIDGE?.explicitLocalSelection){const state=localState(),pick=state.picks[state.active];if(pick?.slug===slug){localSelection={...state,picks:{...state.picks,[state.active]:{...pick,target}}};renderLocalSelection();}return;}const pick=pendingPicks.find(pick=>pick.slug===slug);if(pick)pick.target=target;},
   get running() { return Boolean(videoFrame?.classList.contains('is-game-running')); },
   get verified() { return hasVerifiedRom(); },
   get mobileControls() { return usesMobileControls(); },
@@ -3074,3 +3095,20 @@ window.gameLauncher = Object.freeze({
 
 // Models begin loading in ensureFlowRenderer when a launch/control flow opens.
 syncRomResetButton();
+
+// Optional host source shares the local disc validator and cache.
+if(APP_BRIDGE?.hostDiscConfigured?.()&&uploadButton){
+ const button=document.createElement('button');button.type='button';button.className=uploadButton.className;button.textContent='Load from host';button.hidden=APP_BRIDGE?.experience!=='melee';hostLoadButton=button;uploadButton.after(button);
+ let operation;
+ button.onclick=async()=>{
+  if(operation){operation.abort();return;}
+  const controller=new AbortController();operation=controller;
+  const fighter=pendingFighter;
+  button.textContent='Cancel download';uploadButton.disabled=true;
+  try{await APP_BRIDGE.loadHostDisc(controller.signal,message=>{flowCopy.textContent=message;});if(!controller.signal.aborted&&fighter&&!overlay.hidden){closeLaunchFlow(true);requestLaunch(fighter);}}
+  catch(error){showRomError(controller.signal.aborted?'Download cancelled. Try again or choose a local disc.':error.message);}
+  finally{if(operation===controller){operation=null;button.textContent='Load from host';uploadButton.disabled=false;}}
+ };
+ cancelButton?.addEventListener('click',()=>operation?.abort());
+ window.addEventListener('pagehide',()=>operation?.abort());
+}

@@ -1,3 +1,5 @@
+import {downloadHostDisc,hostDiscSource} from './host-disc-download.mjs';
+import {ISO_SIZE} from '../../runtime/web/disc.mjs';
 import {cacheDisc,restoreCachedDisc,removeCachedDisc} from './disc-cache.ts';
 import {unlockAudio} from './audio.ts';
 import {MeleeFrameWorker} from './melee-frame-worker.ts';
@@ -43,6 +45,7 @@ export function suspendMelee(){
  }
 }
 export async function clearLocalDisc(){
+ hostDownload?.abort();
  ++discRevision;restoreStarted=true;cacheAbort?.abort();
  localDisc=undefined;
  suspendMelee();
@@ -66,9 +69,13 @@ async function restoreDiscFromStorage(){
   else updateDisc({state:'missing',ready:false,message:'Choose your Melee disc.'});
  }catch(e){if(revision===discRevision)updateDisc({state:'error',ready:false,message:`Could not restore your disc. Choose it again. ${(e as Error).message}`});}
 }
-export async function selectLocalDisc(file:File,restored=false){
+export async function selectLocalDisc(file:File,restored=false,signal?:AbortSignal){
+ if(!restored&&hostDownload&&signal!==hostDownload.signal)hostDownload.abort();
  const revision=++discRevision;restoreStarted=true;cacheAbort?.abort();
  const controller=new AbortController();cacheAbort=controller;
+ const cancel=()=>{if(revision===discRevision){++discRevision;controller.abort();localDisc=undefined;standby?.cancel();standby?.worker.terminate();standby=undefined;updateDisc({state:'missing',ready:false,message:'Download cancelled. Choose a disc or try again.'});}};
+ signal?.addEventListener('abort',cancel,{once:true});
+ if(signal?.aborted){cancel();signal.throwIfAborted();}
  // Opening the audio device can block on some hosts. Do it during disc setup,
  // before gameplay, and reuse the context when the match connects its ring.
  void unlockAudio().catch(()=>{});
@@ -77,6 +84,7 @@ export async function selectLocalDisc(file:File,restored=false){
  updateDisc({state:'checking',ready:false,message:'Checking your local disc…'});
  let session:Session|undefined,listener:((event:MessageEvent)=>void)|undefined;
  try{
+  signal?.throwIfAborted();
   if(!crossOriginIsolated||typeof SharedArrayBuffer==='undefined')throw Error('This browser needs shared memory support.');
   if(canReparentRuntime()){
    warmMelee();session=currentSession();
@@ -88,11 +96,11 @@ export async function selectLocalDisc(file:File,restored=false){
    await session.verified;
   }else{
    const {checkGraphics}=await import(/* @vite-ignore */ meleePath('/engine/upstream/gpu-preflight.mjs'));
-   await checkGraphics();
+   await checkGraphics();signal?.throwIfAborted();
    // Verify without allocating a standby WASM runtime that Safari cannot move.
    // Launch will allocate exactly one runtime inside its final game surface.
    const {verifyDisc}=await import(/* @vite-ignore */ meleePath('/engine/verify-disc.mjs'));
-   await verifyDisc(file,(bytes:number)=>{if(revision===discRevision)updateDisc({state:'checking',ready:false,message:`Checking your game… ${Math.floor(bytes/file.size*100)}%`});});
+   await verifyDisc(file,(bytes:number)=>{signal?.throwIfAborted();if(revision===discRevision)updateDisc({state:'checking',ready:false,message:`Checking your game… ${Math.floor(bytes/file.size*100)}%`});});
    verifiedDiscs.add(file);
   }
   if(revision!==discRevision)return;
@@ -117,7 +125,7 @@ export async function selectLocalDisc(file:File,restored=false){
    updateDisc({state:'error',ready:false,message:(error as Error).message});
   }
   throw error;
- }finally{if(session&&listener)session.worker.removeEventListener('message',listener);}
+ }finally{signal?.removeEventListener('abort',cancel);if(session&&listener)session.worker.removeEventListener('message',listener);}
 }
 const sessions=new WeakMap<Worker,Session>();
 const canReparentRuntime=()=>typeof (document.documentElement as HTMLElement&{moveBefore?:unknown}).moveBefore==='function'||new URLSearchParams(location.search).get('presentation')==='bitmap';
@@ -169,3 +177,19 @@ export function releaseMelee(worker:Worker){
 if((import.meta as any).hot)(import.meta as any).hot.dispose(()=>{
  standby?.cancel();standby?.worker.terminate();standby=undefined;
 });
+
+const configuredHostDisc=(import.meta as any).env?.VITE_MELEE_DISC_SOURCE||'';
+export const hostDiscConfigured=()=>!!configuredHostDisc.trim();
+let hostDownload:AbortController|undefined;
+export async function selectHostDisc(signal:AbortSignal,onProgress:(message:string)=>void=()=>{}){
+ if(hostDownload)throw Error('A game download is already running.');
+ const controller=new AbortController();hostDownload=controller;
+ const cancel=()=>controller.abort(signal.reason);signal.addEventListener('abort',cancel,{once:true});
+ if(signal.aborted)cancel();
+ const timeout=setTimeout(()=>controller.abort(Error('Download timed out. Try again.')),20*60*1000);
+ try{
+  await restoreLocalDisc();controller.signal.throwIfAborted();if(localDiscReady())return;
+  const url=hostDiscSource(configuredHostDisc,location.href);
+  await downloadHostDisc({url,size:ISO_SIZE,signal:controller.signal,onProgress:(bytes:number)=>onProgress(`Downloading your game… ${Math.floor(bytes/ISO_SIZE*100)}%`),acceptFile:(file:File,signal:AbortSignal)=>selectLocalDisc(file,false,signal)});
+ }finally{clearTimeout(timeout);signal.removeEventListener('abort',cancel);if(hostDownload===controller)hostDownload=undefined;}
+}

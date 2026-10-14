@@ -246,6 +246,7 @@ export default function RetroHome({
   onCreateRoom,
   onToggleRoomOpponent,
   roomDraft=false,
+  roomDisabled=false,
   onAdvanced,
   onCreate,
   onFullscreen,
@@ -537,7 +538,7 @@ export default function RetroHome({
             >
               About
             </button>
-            {onCreateRoom&&<button className="retro-site-link retro-room-button" type="button" onClick={onCreateRoom}>{roomDraft?'Cancel room':'Create room'}</button>}
+            {onCreateRoom&&<button className="retro-site-link retro-room-button" type="button" disabled={roomDisabled} onClick={onCreateRoom}>{roomDraft?'Cancel room':'Create room'}</button>}
 
             {!mobileLayout && (
               <button

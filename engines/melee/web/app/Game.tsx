@@ -56,8 +56,10 @@ export default function Game({fighter,settings,roster,onClose,soundOn=true,chrom
     // A port assigned to a gamepad the browser does not currently expose
     // (Chrome hides pads until a button press) would otherwise be dead. Let
     // the keyboard drive it when no port is bound to the keyboard.
-    const padPresent=device?.startsWith('gamepad')&&rawGamepads().some(p=>p?.index===Number(device.slice(7)));
-    const keyboardHere=device==='keyboard'||(device?.startsWith('gamepad')&&!padPresent&&(!!room||!launchPlan?.ports.some((p:any)=>p?.device==='keyboard')));
+    const ownedIds=!room&&(settings as any).ownedControllerIds;
+    const ownedPad=(p:any)=>p?.connected&&p.index===Number(device.slice(7))&&(!ownedIds||p.id===ownedIds[port]);
+    const padPresent=device?.startsWith('gamepad')&&rawGamepads().some(ownedPad);
+    const keyboardHere=device==='keyboard'||(device?.startsWith('gamepad')&&!ownedIds&&!padPresent&&(!!room||!launchPlan?.ports.some((p:any)=>p?.device==='keyboard')));
     const held=(action:Action)=>!blocked&&keyboardHere&&keys.has(kb[action]);
     let buttons=0;for(const [action,bit] of Object.entries(bits))if(held(action as Action))buttons|=bit;
     let x=128+((held('right')?1:0)-(held('left')?1:0))*100;
@@ -65,7 +67,7 @@ export default function Game({fighter,settings,roster,onClose,soundOn=true,chrom
     let cx=128+((held('cright')?1:0)-(held('cleft')?1:0))*100;
     let cy=128+((held('cup')?1:0)-(held('cdown')?1:0))*100;
     let l=0,r=0;
-    const pad=device?.startsWith('gamepad')?rawGamepads().find(p=>p?.index===Number(device.slice(7))):null;
+    const pad=device?.startsWith('gamepad')?rawGamepads().find(ownedPad):null;
     if(pad&&!blocked){
      const sample=sampleMeleePad(pad);
      buttons|=sample[2];x=128+sample[3];y=128+sample[4];cx=128+sample[5];cy=128+sample[6];l=sample[7];r=sample[8];
