@@ -46,7 +46,7 @@ async function controllerClick(locator){
  }
  await page.evaluate(()=>{window.proofPads[0].axes=[0,0,0,0];window.proofPads[0].buttons[0]={pressed:true,value:1};});await page.waitForTimeout(80);await page.evaluate(()=>window.proofPads[0].buttons[0]={pressed:false,value:0});await page.waitForTimeout(50);
 }
-await page.getByRole('button',{name:'Settings',exact:true}).click();await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:true,value:1});await page.waitForTimeout(100);await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:false,value:0});assert.equal(await page.locator('[role="dialog"]').count(),0,'B backs out of menu');
+await page.getByRole('button',{name:'Settings',exact:true}).click();await page.locator('.modal-page.is-visible .advanced-screen').waitFor();await page.waitForTimeout(500);await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:true,value:1});await page.waitForTimeout(100);await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:false,value:0});await page.locator('[role="dialog"]:visible').waitFor({state:'hidden',timeout:3000});assert.equal(await page.locator('[role="dialog"]:visible').count(),0,'B backs out of menu');
 const scrollBefore=await page.evaluate(()=>scrollY);await page.evaluate(()=>window.proofPads[0].axes[3]=1);await page.waitForTimeout(250);await page.evaluate(()=>window.proofPads[0].axes[3]=0);assert.ok(await page.evaluate(before=>scrollY>before,scrollBefore),'right stick scrolls website');
 // Restore distinct picks, then inspect the real select request and game snapshot.
 await page.locator('#local-fighter-selection button').first().click();
