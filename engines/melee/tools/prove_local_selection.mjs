@@ -1,6 +1,6 @@
 // Opt-in private local acceptance; no disc, roster or evidence is stored in Git.
 import {createRequire} from 'node:module';import assert from 'node:assert/strict';import {writeFile} from 'node:fs/promises';
-const args=process.argv.slice(2),option=name=>args[args.indexOf('--'+name)+1];
+const args=process.argv.slice(2),option=name=>{const index=args.indexOf('--'+name);return index<0?undefined:args[index+1];};
 const origin=option('origin'),iso=option('iso'),output=option('output');
 if(!origin||!iso||!output||!process.env.MELEE_PLAYWRIGHT_MODULE)throw Error('Supply --origin, --iso, --output and MELEE_PLAYWRIGHT_MODULE.');
 const {mkdir}=await import('node:fs/promises');await mkdir(output,{recursive:true});
@@ -48,6 +48,11 @@ async function controllerClick(locator){
 }
 await page.getByRole('button',{name:'Settings',exact:true}).click();await page.locator('.modal-page.is-visible .advanced-screen').waitFor();await page.waitForTimeout(500);await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:true,value:1});await page.waitForTimeout(100);await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:false,value:0});await page.locator('[role="dialog"]:visible').waitFor({state:'hidden',timeout:3000});assert.equal(await page.locator('[role="dialog"]:visible').count(),0,'B backs out of menu');
 const scrollBefore=await page.evaluate(()=>scrollY);await page.evaluate(()=>window.proofPads[0].axes[3]=1);await page.waitForTimeout(250);await page.evaluate(()=>window.proofPads[0].axes[3]=0);assert.ok(await page.evaluate(before=>scrollY>before,scrollBefore),'right stick scrolls website');
+// Native lifecycle surface fixture exercises the same website gate; no native gameplay claim.
+await page.evaluate(()=>{const gate=document.createElement('section');gate.className='native-game';gate.id='proof-native-gate';document.body.append(gate);});await page.waitForTimeout(80);
+await page.evaluate(()=>{window.proofPads[0].axes=[1,1,0,1];window.proofPads[0].buttons[1]={pressed:true,value:1};});await page.waitForTimeout(150);
+assert.equal(await page.locator('.menu-controller-cursor').isVisible(),false,'native match gate hides website pointer');
+await page.evaluate(()=>{document.getElementById('proof-native-gate').remove();window.proofPads[0].axes=[0,0,0,0];window.proofPads[0].buttons[1]={pressed:false,value:0};});await page.waitForTimeout(80);
 // Restore distinct picks, then inspect the real select request and game snapshot.
 await page.locator('#local-fighter-selection button').first().click();
 await page.locator(`[data-roster-character="${picks[0].slug}"] .replica-select-control`).evaluate(el=>el.click());
@@ -66,6 +71,7 @@ assert.ok(runtime(),'real engine frame');
 const select=await runtime().evaluate(()=>window.proofEvents.find(e=>e.type==='select'));
 assert.ok(select?.launch);assert.deepEqual(select.launch.ports.slice(0,2).map(p=>p.character),picks.map(p=>p.slug));
 const snapshot=()=>runtime().evaluate(()=>{const m=window.Module,p=m._direct_snapshot()>>>2;return {frame:m._direct_frame_count(),scene:m._direct_scene_kind(),state:Array.from(HEAPF32.subarray(p,p+48))};});
+// CKind -> Ft_Kind: pinned upstream src/melee/ft/forward.h enumerations.
 const before=await snapshot();await writeFile(output+'/runtime-start.json',JSON.stringify({select,before},null,2));for(let port=0;port<2;port++){assert.equal(before.state[port*12],1);assert.equal(before.state[port*12+1],[2,3,1,24,4,5,6,17,0,18,16,8,9,12,10,15,13,14,19,7,22,20,21,26,23,25][select.launch.ports[port].fighter]);}
 await page.evaluate(()=>{window.proofPads[0].axes[0]=1;window.proofPads[1].axes[0]=-1;});
 await runtime().waitForFunction(frame=>window.Module._direct_frame_count()>=frame,before.frame+90,{timeout:20000});

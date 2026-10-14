@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {reconcileSelection,selectFighter,readyFighters} from './local-fighter-selection.js';
+import {reconcileSelection,selectFighter,readyFighters,p1MenuController} from './local-fighter-selection.js';
 import {pointerStep} from '../visual/menu-pointer.js';
 test('two owned selections are required and replacements preserve the other player',()=>{
  let s=reconcileSelection(null,['1P','2P'],'a');
@@ -19,4 +19,10 @@ test('pointer deadzone, edge buttons, bounds, scroll and blocked match input',()
  assert.equal(pointerStep(next,pad,.1,100,100).click,false);
  const blocked=pointerStep(s,pad,.1,100,100,false);assert.equal(blocked.click,false);assert.equal(blocked.scroll,0);
  assert.equal(pointerStep(s,{...pad,connected:false},.1,100,100).click,false);
+});
+
+test('only physical P1 can own the website cursor',()=>{
+ assert.equal(p1MenuController([{kind:'keyboard'},{kind:'gamepad',index:0}]),undefined);
+ assert.equal(p1MenuController([{kind:'none'},{kind:'gamepad',index:1}]),undefined);
+ assert.equal(p1MenuController([{kind:'gamepad',index:2},{kind:'gamepad',index:0}]),2);
 });

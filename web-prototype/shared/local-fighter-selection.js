@@ -12,3 +12,5 @@ export function selectFighter(state, fighter) {
 export function readyFighters(state) {
  return state.slots.length&&state.slots.every(slot=>state.picks[slot])?state.slots.map(slot=>state.picks[slot]):null;
 }
+
+export function p1MenuController(plan) {return plan[0]?.kind==='gamepad'?plan[0].index:undefined;}
