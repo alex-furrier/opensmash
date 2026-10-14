@@ -1,3 +1,4 @@
+import {assertOwnedPadPhase} from './proof/owned-pad-phase.mjs';
 // Opt-in private local acceptance; no disc, roster or evidence is stored in Git.
 import {createRequire} from 'node:module';import assert from 'node:assert/strict';import {writeFile} from 'node:fs/promises';
 const args=process.argv.slice(2),option=name=>{const index=args.indexOf('--'+name);return index<0?undefined:args[index+1];};
@@ -46,7 +47,7 @@ async function controllerClick(locator){
  }
  await page.evaluate(()=>{window.proofPads[0].axes=[0,0,0,0];window.proofPads[0].buttons[0]={pressed:true,value:1};});await page.waitForTimeout(80);await page.evaluate(()=>window.proofPads[0].buttons[0]={pressed:false,value:0});await page.waitForTimeout(50);
 }
-await page.getByRole('button',{name:'Settings',exact:true}).click();await page.locator('.modal-page.is-visible .advanced-screen').waitFor();await page.waitForTimeout(500);await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:true,value:1});await page.waitForTimeout(100);await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:false,value:0});await page.locator('[role="dialog"]:visible').waitFor({state:'hidden',timeout:3000});assert.equal(await page.locator('[role="dialog"]:visible').count(),0,'B backs out of menu');
+await page.getByRole('button',{name:'Settings',exact:true}).click();await page.locator('.modal-page.is-visible .advanced-screen').waitFor();await page.getByRole('button',{name:'Players & Controllers',exact:true}).click();await page.waitForTimeout(500);await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:true,value:1});await page.waitForTimeout(100);await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:false,value:0});await page.getByRole('button',{name:'Players & Controllers',exact:true}).waitFor();await page.waitForTimeout(100);await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:true,value:1});await page.waitForTimeout(100);await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:false,value:0});await page.locator('[role="dialog"]:visible').waitFor({state:'hidden',timeout:3000});assert.equal(await page.locator('[role="dialog"]:visible').count(),0,'B backs out of menu');
 const beforeBase=await page.locator('#local-fighter-selection').innerText();
 await page.locator(`[data-roster-character="${picks[0].slug}"] .replica-base-button`).evaluate(el=>el.click());await page.locator('dialog.melee-base-picker[open]').waitFor();await page.waitForTimeout(100);assert.equal(await page.locator('dialog[open] .menu-controller-cursor').count(),1,'controller cursor renders in native dialog top layer');
 await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:true,value:1});await page.waitForTimeout(100);await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:false,value:0});await page.locator('dialog.melee-base-picker').waitFor({state:'detached'});
@@ -77,14 +78,23 @@ assert.ok(select?.launch);assert.deepEqual(select.launch.ports.slice(0,2).map(p=
 const snapshot=()=>runtime().evaluate(()=>{const m=window.Module,p=m._direct_snapshot()>>>2;return {frame:m._direct_frame_count(),scene:m._direct_scene_kind(),state:Array.from(HEAPF32.subarray(p,p+48))};});
 // CKind -> Ft_Kind: pinned upstream src/melee/ft/forward.h enumerations.
 const before=await snapshot();await writeFile(output+'/runtime-start.json',JSON.stringify({select,before},null,2));for(let port=0;port<2;port++){assert.equal(before.state[port*12],1);assert.equal(before.state[port*12+1],[2,3,1,24,4,5,6,17,0,18,16,8,9,12,10,15,13,14,19,7,22,20,21,26,23,25][select.launch.ports[port].fighter]);}
-await page.evaluate(()=>{window.proofPads[0].axes[0]=1;window.proofPads[1].axes[0]=-1;});
-await runtime().waitForFunction(frame=>window.Module._direct_frame_count()>=frame,before.frame+90,{timeout:20000});
+const ownedPhases=[];
+for(const [port,direction] of [[0,1],[1,-1]]) {
+ await page.evaluate(()=>window.proofPads.forEach(p=>p.axes=[0,0,0,0]));
+ const neutral=await snapshot();await runtime().waitForFunction(frame=>window.Module._direct_frame_count()>=frame,neutral.frame+15,{timeout:20000});
+ await runtime().evaluate(()=>{window.proofEvents=window.proofEvents.filter(e=>e.type!=='pad');});
+ const start=await snapshot();await page.evaluate(({port,direction})=>window.proofPads[port].axes[0]=direction,{port,direction});
+ await runtime().waitForFunction(frame=>window.Module._direct_frame_count()>=frame,start.frame+90,{timeout:20000});
+ const end=await snapshot(),events=await runtime().evaluate(()=>window.proofEvents);
+ const samples=assertOwnedPadPhase(events,port,direction);
+ assert.ok(direction*(end.state[port*12+3]-start.state[port*12+3])>5,`port ${port} moves in its owned direction`);
+ ownedPhases.push({port,direction,start,end,samples});
+}
 const after=await snapshot();await page.evaluate(()=>window.proofPads.forEach(p=>p.axes=[0,0,0,0]));
-for(const port of [0,1])assert.ok(Math.abs(after.state[port*12+3]-before.state[port*12+3])>5,`port ${port} moves from its own pad`);
 assert.equal(await page.locator('.menu-controller-cursor').isVisible(),false,'website input disabled during match');
 await page.getByRole('button',{name:'Return to roster',exact:true}).click();await page.locator('#local-fighter-selection').waitFor();
 const returned=await page.locator('#local-fighter-selection').innerText();assert.ok(returned.includes('1P: '+picks[0].name));assert.ok(returned.includes('2P: '+picks[1].name));
 await page.locator('#local-fighter-selection button').nth(1).click();await page.locator(`[data-roster-character="${picks[0].slug}"] .replica-select-control`).evaluate(el=>el.click());
 assert.ok((await page.locator('#local-fighter-selection').innerText()).includes('2P: '+picks[0].name));
-await writeFile(output+'/game.json',JSON.stringify({select,before,after,returned,distinctNativeSlots:true,independentOwnedPads:true,websiteCursorDisabledInMatch:true,errors},null,2));
+await writeFile(output+'/game.json',JSON.stringify({select,before,after,ownedPhases,returned,distinctNativeSlots:true,independentOwnedPads:true,websiteCursorDisabledInMatch:true,errors},null,2));
 await browser.close();

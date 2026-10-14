@@ -481,7 +481,8 @@ startMenuPointer({
   controllerIndex:()=>APP_BRIDGE?.menuControllerIndex,
   back:()=>{
     const modal=Array.from(document.querySelectorAll('dialog[open],[role="dialog"]')).find(element=>element.getClientRects().length&&getComputedStyle(element).visibility!=='hidden');
-    const close=modal?.querySelector('button[aria-label*="Close"],button[aria-label*="Back"]')||Array.from(modal?.querySelectorAll('button')||[]).find(button=>/^(Back|Cancel|Close)$/.test(button.textContent.trim()));
+    const buttons=Array.from(modal?.querySelectorAll('button')||[]).filter(button=>button.getClientRects().length&&getComputedStyle(button).visibility!=='hidden');
+    const close=buttons.find(button=>/Close|Back/.test(button.getAttribute('aria-label')||''))||buttons.find(button=>/^(Back|Cancel|Close)$/.test(button.textContent.trim()));
     if(close)close.click();
     else if(videoFrame?.classList.contains('is-game-running'))closeGame();
     else {const state=localState();localSelection={...state,picks:{...state.picks,[state.active]:undefined}};renderLocalSelection();}
