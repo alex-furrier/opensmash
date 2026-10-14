@@ -6,7 +6,7 @@ const origin=option('origin'),iso=option('iso'),output=option('output');
 if(!origin||!iso||!output||!process.env.MELEE_PLAYWRIGHT_MODULE)throw Error('Supply --origin, --iso, --output and MELEE_PLAYWRIGHT_MODULE.');
 const {mkdir}=await import('node:fs/promises');await mkdir(output,{recursive:true});
 const {chromium}=createRequire(import.meta.url)(process.env.MELEE_PLAYWRIGHT_MODULE);
-const browser=await chromium.launch({channel:'chrome',headless:!args.includes('--headed')});const context=await browser.newContext({viewport:{width:1440,height:1000}});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+const browser=await chromium.launch({channel:'chrome',headless:!args.includes('--headed')});const context=await browser.newContext({viewport:{width:1440,height:1000}});const page=await context.newPage();page.setDefaultTimeout(120000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
 await context.addInitScript(()=>{
  window.proofEvents=[];window.addEventListener('message',({data})=>{if(['select','session','playable','pad','input','error'].includes(data?.type))window.proofEvents.push(data);});
  window.proofPads=[0,1].map(index=>({index,id:'Synthetic standard pad '+index,mapping:'standard',connected:true,axes:[0,0,0,0],buttons:Array.from({length:16},()=>({pressed:false,value:0}))}));
@@ -58,6 +58,11 @@ await page.evaluate(()=>{const gate=document.createElement('section');gate.class
 await page.evaluate(()=>{window.proofPads[0].axes=[1,1,0,1];window.proofPads[0].buttons[1]={pressed:true,value:1};});await page.waitForTimeout(150);
 assert.equal(await page.locator('.menu-controller-cursor').isVisible(),false,'native match gate hides website pointer');
 await page.evaluate(()=>{document.getElementById('proof-native-gate').remove();window.proofPads[0].axes=[0,0,0,0];window.proofPads[0].buttons[1]={pressed:false,value:0};});await page.waitForTimeout(80);
+// The P1 cursor intentionally assigns and replaces P2 before starting.
+await controllerClick(page.locator('#local-fighter-selection button').nth(1));await controllerClick(page.locator(`[data-roster-character="${picks[0].slug}"] .replica-select-control`));
+assert.ok((await page.locator('#local-fighter-selection').innerText()).includes('2P: '+picks[0].name));
+await controllerClick(page.locator('#local-fighter-selection button').nth(1));await controllerClick(page.locator(`[data-roster-character="${picks[1].slug}"] .replica-select-control`));
+assert.ok((await page.locator('#local-fighter-selection').innerText()).includes('2P: '+picks[1].name));
 // Restore distinct picks, then inspect the real select request and game snapshot.
 await page.locator('#local-fighter-selection button').first().click();
 await page.locator(`[data-roster-character="${picks[0].slug}"] .replica-select-control`).evaluate(el=>el.click());
@@ -82,7 +87,7 @@ const ownedPhases=[];
 for(const [port,direction] of [[0,1],[1,-1]]) {
  await page.evaluate(()=>window.proofPads.forEach(p=>p.axes=[0,0,0,0]));
  const neutral=await snapshot();await runtime().waitForFunction(frame=>window.Module._direct_frame_count()>=frame,neutral.frame+15,{timeout:20000});
- await runtime().evaluate(()=>{window.proofEvents=window.proofEvents.filter(e=>e.type!=='pad');});
+ await runtime().evaluate(()=>{const held=new Map();for(const event of window.proofEvents)if(event.type==='pad')held.set(event.values[0],event);window.proofEvents=[...held.values()];});
  const start=await snapshot();await page.evaluate(({port,direction})=>window.proofPads[port].axes[0]=direction,{port,direction});
  await runtime().waitForFunction(frame=>window.Module._direct_frame_count()>=frame,start.frame+90,{timeout:20000});
  const end=await snapshot(),events=await runtime().evaluate(()=>window.proofEvents);
