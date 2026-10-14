@@ -29,3 +29,15 @@ export function invalidateControllerChoices(state){
  let nextGeneration=state.nextGeneration;
  return {...state,devices:state.devices.map(d=>({...d,generation:nextGeneration++,choice:null,locked:false})),nextGeneration};
 }
+
+export function controllerOwner(state,owner){return state.devices.find(d=>owns(d,owner)&&d.port===owner.port);}
+export function setControllerChoiceTarget(state,owner,slug,target){
+ const device=controllerOwner(state,owner);if(!device||device.choice?.slug!==slug)return state;
+ return {...state,devices:state.devices.map(d=>d===device?{...d,choice:{...d.choice,target}}:d)};
+}
+
+export function baseSelectionOwner(state,slug,actor){
+ if(actor)return controllerOwner(state,actor);
+ const matches=state.devices.filter(d=>d.choice?.slug===slug);
+ return matches.length===1?matches[0]:state.devices[0];
+}

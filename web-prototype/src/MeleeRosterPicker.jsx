@@ -20,7 +20,7 @@ export default function MeleeRosterPicker({pick,value,onChange,onClose}){
  const labels=new Map(MELEE_TARGETS.map(row=>[row.value,row.label]));
  const defaultTarget=pick.character.defaultTarget||pick.character.target;
  const options=supportedBases(pick.character).filter(target=>labels.has(target));
- return <dialog ref={dialog} className="melee-base-picker" aria-labelledby="melee-base-title" onCancel={event=>{event.preventDefault();close.current();}} onClick={event=>{if(event.target===event.currentTarget)close.current();}}>
+ return <dialog ref={dialog} data-controller-owner={pick.owner?`${pick.owner.key}:${pick.owner.generation}`:undefined} className="melee-base-picker" aria-labelledby="melee-base-title" onCancel={event=>{event.preventDefault();close.current();}} onClick={event=>{if(event.target===event.currentTarget)close.current();}}>
   <header><div><p>{pick.slot} · {pick.character.name}</p><h2 id="melee-base-title">Choose a base fighter</h2></div><button type="button" aria-label="Close base picker" onClick={onClose}>×</button></header>
   <div className="melee-base-options" role="group" aria-label="Validated base fighters">{options.map(target=><button type="button" key={target} aria-pressed={(value==='auto'?defaultTarget:value)===target} onClick={()=>onChange(target===defaultTarget?'auto':target)}>
    {labels.get(target)}{target===defaultTarget?' · Default':''}

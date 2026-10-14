@@ -84,18 +84,26 @@ support still needs testing. At this checkpoint imports/caches use existing
 ignored checkout paths; PR #2's custom storage-root flags are a separate candidate,
 not options to pass to the current gameplay branch without checking support.
 
-## Optional host download
+## Optional app-owned disc download
 
-Set `VITE_MELEE_DISC_SOURCE` to an authorized HTTPS game-file URL (or an HTTP
-loopback URL) when building the frontend to show **Load from host**. It is unset
-by default. The source must allow browser access and send the exact full disc
-`Content-Length`. No serving route is added by this option.
+For the existing approved private app, set `MELEE_HOST_DISC_FILE` in the server
+environment to the owned ISO's private filesystem path. Keep `HOST` on loopback
+and retain the existing `MELEE_PRIVATE_ORIGIN` and network mapping. The file
+stays outside the Git checkout. Startup checks its exact size and pinned SHA-256.
+
+The website discovers this capability at `/melee/api/disc-source` and uses the
+app-relative `/melee/api/disc` URL for **Load from host**. No frontend hostname or
+build-time source setting is needed. Only GET and HEAD for that single file are
+supported; queries, alternate paths and ranges cannot select other files.
+Without the server file setting, the download remains unavailable.
 
 The download stages in browser storage, then uses the same pinned disc verifier
 and cache as the file picker. Cancel, retry and local-file fallback are available;
 failed downloads leave the previous saved copy intact. A cached launch restores
-and verifies the existing copy before requesting host bytes. This option does
-not grant permission to distribute a disc or change network access.
+and verifies the existing copy before requesting host bytes. Restarting the app
+with the same private environment preserves this configuration. Enabling this
+option serves ISO bytes to the app's existing authorized audience; it does not
+change who can access the app.
 
 ## Existing private HTTPS topology
 

@@ -1,9 +1,10 @@
 import {useEffect,useRef,useState} from 'react';
-import {hostDiscConfigured,selectHostDisc} from './melee-session';
+import {hostDiscConfigured,selectHostDisc,discoverHostDisc} from './melee-session';
 export default function HostDiscButton(){
+ const [available,setAvailable]=useState(hostDiscConfigured);
  const operation=useRef<AbortController|null>(null),[busy,setBusy]=useState(false),[status,setStatus]=useState('');
- useEffect(()=>()=>operation.current?.abort(),[]);
- if(!hostDiscConfigured())return null;
+ useEffect(()=>{let active=true;void discoverHostDisc().then(()=>{if(active)setAvailable(hostDiscConfigured());});return()=>{active=false;operation.current?.abort();};},[]);
+ if(!available)return null;
  async function load(){
   if(operation.current)return;
   const controller=new AbortController();operation.current=controller;setBusy(true);setStatus('Checking your saved game…');

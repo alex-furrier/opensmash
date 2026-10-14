@@ -1,4 +1,4 @@
-import {reconcileControllers,lockControllerChoice,unlockControllerChoice,controllerLaunchChoices,isPrimaryController,invalidateControllerChoices} from '../shared/controller-selection.js';
+import {reconcileControllers,lockControllerChoice,unlockControllerChoice,controllerLaunchChoices,isPrimaryController,invalidateControllerChoices,controllerOwner,setControllerChoiceTarget,baseSelectionOwner} from '../shared/controller-selection.js';
 import {reconcileSelection,selectFighter,readyFighters} from '../shared/local-fighter-selection.js';
 import {startMenuPointer} from './menu-pointer.js';
 import { n64Keyboard } from '../shared/n64-keyboard.js';
@@ -486,14 +486,20 @@ startMenuPointer({
   controllerIndex:()=>APP_BRIDGE?.menuControllerIndex,
   click:(target,owner)=>{
     const primary=isPrimaryController(ownedState(),owner);
-    if(!primary&&(!APP_BRIDGE?.explicitLocalSelection||!target.closest('.replica-select-control')))return;
+    const device=controllerOwner(ownedState(),owner),slug=target.closest('[data-roster-character]')?.dataset.rosterCharacter;
+    if(!device)return;
+    const ownBase=target.closest('.replica-base-button')&&device?.choice?.slug===slug;
+    const ownDialog=target.closest('dialog[data-controller-owner]')?.dataset.controllerOwner===`${owner.key}:${owner.generation}`;
+    if(!primary&&(!APP_BRIDGE?.explicitLocalSelection||!(target.closest('.replica-select-control')||ownBase||ownDialog)))return;
     clickingOwner=owner;
     try{if(primary)target.focus({preventScroll:true});target.click();}finally{clickingOwner=null;}
   },
   back:owner=>{
     const modal=Array.from(document.querySelectorAll('dialog[open],[role="dialog"]')).find(element=>element.getClientRects().length&&getComputedStyle(element).visibility!=='hidden');
     if(APP_BRIDGE?.explicitLocalSelection&&ownedState().devices.length){
-      if(!isPrimaryController(ownedState(),owner)||!modal){controllerSelection=unlockControllerChoice(ownedState(),owner);renderLocalSelection();return;}
+      const dialogOwner=modal?.dataset.controllerOwner,ownDialog=dialogOwner===`${owner.key}:${owner.generation}`;
+      if(dialogOwner&&!ownDialog)return;
+      if(!modal||(!isPrimaryController(ownedState(),owner)&&!ownDialog)){controllerSelection=unlockControllerChoice(ownedState(),owner);renderLocalSelection();return;}
     }
 
     const buttons=Array.from(modal?.querySelectorAll('button')||[]).filter(button=>button.getClientRects().length&&getComputedStyle(button).visibility!=='hidden');
@@ -3038,12 +3044,15 @@ gameFrame?.addEventListener('load', () => {
 window.gameLauncher = Object.freeze({
   clearPicks,
   selectionSlot(slug) {
-    if(APP_BRIDGE?.explicitLocalSelection){const devices=ownedState().devices;return devices.length?`${(devices.find(d=>d.choice?.slug===slug)?.port||0)+1}P`:localState().active;}
+    if(APP_BRIDGE?.explicitLocalSelection){const state=ownedState(),owner=baseSelectionOwner(state,slug,clickingOwner);return owner?`${owner.port+1}P`:localState().active;}
     const slots=APP_BRIDGE?.selectionSlots?.()||['1P'];
     if(pendingPickSlots&&pendingPickSlots!==JSON.stringify([slots,APP_BRIDGE?.selectionContext?.()]))clearPicks();
     return pendingPicks.find(pick=>pick.slug===slug)?.slot||slots[pendingPicks.length]||slots[0];
   },
-  updatePickTarget(slug,target,slot) {if(APP_BRIDGE?.explicitLocalSelection&&ownedState().devices.length){controllerSelection={...ownedState(),devices:ownedState().devices.map(d=>`${d.port+1}P`===slot&&d.choice?.slug===slug?{...d,choice:{...d.choice,target}}:d)};renderLocalSelection();return;}if(APP_BRIDGE?.explicitLocalSelection){const state=localState(),pick=state.picks[state.active];if(pick?.slug===slug){localSelection={...state,picks:{...state.picks,[state.active]:{...pick,target}}};renderLocalSelection();}return;}const pick=pendingPicks.find(pick=>pick.slug===slug);if(pick)pick.target=target;},
+  selectionOwner(slug){const state=ownedState(),owner=baseSelectionOwner(state,slug,clickingOwner);return owner?{key:owner.key,generation:owner.generation,port:owner.port}:null;},
+  baseSelectionContext(slug){if(!APP_BRIDGE?.explicitLocalSelection)return {slot:window.gameLauncher.selectionSlot(slug),owner:null};const state=ownedState(),owner=baseSelectionOwner(state,slug,clickingOwner);return {slot:owner?`${owner.port+1}P`:localState().active,owner:owner?{key:owner.key,generation:owner.generation,port:owner.port}:null};},
+  selectionOwnerValid(owner){return !!controllerOwner(ownedState(),owner);},
+  updatePickTarget(slug,target,slot,owner) {if(APP_BRIDGE?.explicitLocalSelection&&ownedState().devices.length){controllerSelection=setControllerChoiceTarget(ownedState(),owner,slug,target);renderLocalSelection();return;}if(APP_BRIDGE?.explicitLocalSelection){const state=localState(),pick=state.picks[state.active];if(pick?.slug===slug){localSelection={...state,picks:{...state.picks,[state.active]:{...pick,target}}};renderLocalSelection();}return;}const pick=pendingPicks.find(pick=>pick.slug===slug);if(pick)pick.target=target;},
   get running() { return Boolean(videoFrame?.classList.contains('is-game-running')); },
   get verified() { return hasVerifiedRom(); },
   get mobileControls() { return usesMobileControls(); },
@@ -3100,7 +3109,9 @@ window.gameLauncher = Object.freeze({
 syncRomResetButton();
 
 // Optional host source shares the local disc validator and cache.
-if(APP_BRIDGE?.hostDiscConfigured?.()&&uploadButton){
+async function mountHostDiscAction(){
+ await APP_BRIDGE?.discoverHostDisc?.();
+ if(!APP_BRIDGE?.hostDiscConfigured?.()||!uploadButton||hostLoadButton)return;
  const button=document.createElement('button');button.type='button';button.className=uploadButton.className;button.textContent='Load from host';button.hidden=APP_BRIDGE?.experience!=='melee';hostLoadButton=button;uploadButton.after(button);
  button.onclick=async()=>{
   if(hostLoadOperation){hostLoadOperation.abort();return;}
@@ -3113,3 +3124,5 @@ if(APP_BRIDGE?.hostDiscConfigured?.()&&uploadButton){
  };
  window.addEventListener('pagehide',()=>hostLoadOperation?.abort());
 }
+
+void mountHostDiscAction();

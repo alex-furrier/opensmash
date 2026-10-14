@@ -39,6 +39,12 @@ const PORT = Number(process.env.PORT || 4174);
 const HOST = process.env.HOST || (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
 if((process.env.MELEE_NETPLAY_ENGINE_ROOT||process.env.MELEE_SIMULATED_PEER_ISO||process.env.MELEE_PRIVATE_ORIGIN)&&!['127.0.0.1','localhost','::1'].includes(HOST))throw Error('Friend runtime requires a loopback HOST.');
 if(process.env.MELEE_PRIVATE_ORIGIN){const {privateFriendOrigin}=await import('../../engines/melee/server/friend-rooms.mjs');privateFriendOrigin(process.env.MELEE_PRIVATE_ORIGIN);}
+const {createHostDisc,HOST_DISC_PATH,HOST_DISC_CONFIG_PATH}=await import('../../engines/melee/server/host-disc.mjs');
+let hostDisc;
+if(process.env.MELEE_HOST_DISC_FILE){
+ if(!['127.0.0.1','localhost','::1'].includes(HOST)||!process.env.MELEE_PRIVATE_ORIGIN)throw Error('Host disc requires the existing private origin and a loopback HOST.');
+ hostDisc=await createHostDisc({file:process.env.MELEE_HOST_DISC_FILE});
+}
 const handleMelee = createEmbeddedMeleeHandler();
 let friendRuntime=null,attachFriendRooms;
 if(process.env.MELEE_NETPLAY_ENGINE_ROOT){
@@ -835,6 +841,8 @@ async function handleRequest(req, res, vite) {
   res.setHeader('Cross-Origin-Embedder-Policy','require-corp');
 
   if(!privateMeleeRequestAllowed(req,process.env.MELEE_PRIVATE_ORIGIN))return json(res,404,{error:'Not found'});
+  if(pathname===HOST_DISC_CONFIG_PATH&&req.method==='GET'&&!url.search)return json(res,200,hostDisc?.metadata||{available:false});
+  if(pathname===HOST_DISC_PATH){if(!hostDisc)return json(res,404,{error:'Game download is not configured.'});await hostDisc.respond(req,res);return;}
   if(pathname==='/melee/api/netplay/config'&&req.method==='GET')return json(res,200,{enabled:!!friendRuntime,...(simulatedPeer?{simulatedOpponent:true}:{})});
   if(friendRuntime?.handle(req,res))return;
 
@@ -1432,7 +1440,7 @@ if(process.env.MELEE_SIMULATED_PEER_ISO){
  simulatedPeer=createSimulatedPeer({chromium:createRequire(import.meta.url)(process.env.MELEE_PLAYWRIGHT_MODULE).chromium,origin:`http://${HOST.includes(':')?'['+HOST+']':HOST}:${PORT}`,iso:process.env.MELEE_SIMULATED_PEER_ISO,observeTicks:false,onObservation:event=>{if(event.type==='phase')console.info('[local opponent]',event.phase);else if(['combat-performance','startup-performance','browser-error','browser-console','error'].includes(event.type)||event.type==='frame-stall'&&event.durationMs>100)console.info('[local opponent diagnostic]',JSON.stringify(event));}});
 }
 const friendRooms=friendRuntime&&attachFriendRooms(server,{engine:friendRuntime.engine,host:HOST,simulatedPeer,privateOrigin:process.env.MELEE_PRIVATE_ORIGIN});
-if(friendRuntime)process.once('SIGINT',()=>{friendRooms?.close();void Promise.all([simulatedPeer?.close()]).then(()=>process.exit());});
+process.once('SIGINT',()=>{friendRooms?.close();void Promise.all([simulatedPeer?.close(),hostDisc?.close()]).then(()=>process.exit());});
 server.keepAliveTimeout = 65_000;
 server.headersTimeout = 66_000;
 
