@@ -3100,7 +3100,9 @@ window.gameLauncher = Object.freeze({
 syncRomResetButton();
 
 // Optional host source shares the local disc validator and cache.
-if(APP_BRIDGE?.hostDiscConfigured?.()&&uploadButton){
+async function mountHostDiscAction(){
+ await APP_BRIDGE?.discoverHostDisc?.();
+ if(!APP_BRIDGE?.hostDiscConfigured?.()||!uploadButton||hostLoadButton)return;
  const button=document.createElement('button');button.type='button';button.className=uploadButton.className;button.textContent='Load from host';button.hidden=APP_BRIDGE?.experience!=='melee';hostLoadButton=button;uploadButton.after(button);
  button.onclick=async()=>{
   if(hostLoadOperation){hostLoadOperation.abort();return;}
@@ -3113,3 +3115,5 @@ if(APP_BRIDGE?.hostDiscConfigured?.()&&uploadButton){
  };
  window.addEventListener('pagehide',()=>hostLoadOperation?.abort());
 }
+
+void mountHostDiscAction();

@@ -1,5 +1,5 @@
 import {downloadHostDisc,hostDiscSource} from './host-disc-download.mjs';
-import {ISO_SIZE} from '../../runtime/web/disc.mjs';
+import {ISO_SIZE,ISO_SHA256} from '../../runtime/web/disc.mjs';
 import {cacheDisc,restoreCachedDisc,removeCachedDisc} from './disc-cache.ts';
 import {unlockAudio} from './audio.ts';
 import {MeleeFrameWorker} from './melee-frame-worker.ts';
@@ -178,7 +178,15 @@ if((import.meta as any).hot)(import.meta as any).hot.dispose(()=>{
  standby?.cancel();standby?.worker.terminate();standby=undefined;
 });
 
-const configuredHostDisc=(import.meta as any).env?.VITE_MELEE_DISC_SOURCE||'';
+let configuredHostDisc=(import.meta as any).env?.VITE_MELEE_DISC_SOURCE||'';
+let hostDiscovery:Promise<void>|undefined;
+export function discoverHostDisc():Promise<void>{
+ if(configuredHostDisc||hostDiscovery)return hostDiscovery||Promise.resolve();
+ hostDiscovery=fetch(meleePath('/api/disc-source'),{cache:'no-store'}).then(async response=>{
+  if(!response.ok)return;const source=await response.json();
+  if(source.available===true&&source.url==='/melee/api/disc'&&source.size===ISO_SIZE&&source.sha256===ISO_SHA256){configuredHostDisc=source.url;}
+ }).catch(()=>{}).finally(()=>{hostDiscovery=undefined;});return hostDiscovery;
+}
 export const hostDiscConfigured=()=>!!configuredHostDisc.trim();
 let hostDownload:AbortController|undefined;
 export async function selectHostDisc(signal:AbortSignal,onProgress:(message:string)=>void=()=>{}){
@@ -189,6 +197,7 @@ export async function selectHostDisc(signal:AbortSignal,onProgress:(message:stri
  const timeout=setTimeout(()=>controller.abort(Error('Download timed out. Try again.')),20*60*1000);
  try{
   await restoreLocalDisc();controller.signal.throwIfAborted();if(localDiscReady())return;
+  await discoverHostDisc();controller.signal.throwIfAborted();
   const url=hostDiscSource(configuredHostDisc,location.href);
   await downloadHostDisc({url,size:ISO_SIZE,signal:controller.signal,onProgress:(bytes:number)=>onProgress(`Downloading your game… ${Math.floor(bytes/ISO_SIZE*100)}%`),acceptFile:(file:File,signal:AbortSignal)=>selectLocalDisc(file,false,signal)});
  }finally{clearTimeout(timeout);signal.removeEventListener('abort',cancel);if(hostDownload===controller)hostDownload=undefined;}
