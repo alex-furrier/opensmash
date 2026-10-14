@@ -12,6 +12,8 @@ export function startMenuPointer({enabled,controllerIndex,back}) {
  let state={x:innerWidth/2,y:innerHeight/2,down:true,back:true},last=performance.now(),padIdentity;
  function frame(now){
   if(!enabled()){cursor.hidden=true;state.down=true;state.back=true;padIdentity=null;last=now;requestAnimationFrame(frame);return;}
+  const dialog=document.querySelector('dialog[open]'),surface=dialog||document.body;
+  if(cursor.parentNode!==surface){surface.append(cursor);if(dialog){const box=dialog.getBoundingClientRect();state.x=box.x+box.width/2;state.y=box.y+box.height/2;}}
   const index=controllerIndex();
   const pad=index===undefined?null:navigator.getGamepads?.()[index];
   const identity=pad?.connected?`${pad.index}:${pad.id}`:null;
