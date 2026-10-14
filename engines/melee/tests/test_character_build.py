@@ -1,5 +1,6 @@
 """Failures retain evidence and retries can rebuild under the same identity."""
 import subprocess
+import errno
 import tempfile
 import unittest
 from pathlib import Path
@@ -33,6 +34,15 @@ class CharacterBuildTests(unittest.TestCase):
                 self.assertEqual(run.call_args.kwargs['encoding'],'utf-8')
                 self.assertEqual(run.call_args.kwargs['env']['PYTHONIOENCODING'],'utf-8')
             self.assertIn('Milhões',log.read_text());self.assertIn('Source-shape check',log.read_text())
+
+    def test_source_archive_can_cross_filesystems_without_touching_legacy_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);sources=root/'private-sources';source=sources/'fixture';source.mkdir(parents=True);(source/'rigged.glb').write_bytes(b'original')
+            output=root/'code/build/characters/fixture';output.mkdir(parents=True);(output/'keep.dat').write_bytes(b'legacy')
+            with patch('os.rename',side_effect=OSError(errno.EXDEV,'different filesystems')):
+                moved=archive_previous_build(root/'code','fixture',source/'rigged.glb',source_root=sources,archive_root=root/'private-cache/archives',source_only=True)
+            self.assertFalse(source.exists());self.assertEqual(moved.read_bytes(),b'original');self.assertTrue(moved.is_relative_to(root/'private-cache/archives'))
+            self.assertEqual((output/'keep.dat').read_bytes(),b'legacy')
 
     def test_timeout_keeps_partial_output_and_identifies_stage(self):
         with tempfile.TemporaryDirectory() as directory:

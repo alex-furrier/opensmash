@@ -49,6 +49,19 @@ class NativeSourceTest(unittest.TestCase):
             sidecar.unlink();restored=prepare(self.root,self.source,'obama')
             self.assertEqual(restored['base'],ordinary['base']);self.assertTrue(restored['cached']);self.assertEqual(run.call_count,3)
 
+    def test_custom_cache_root_preserves_revision_identity_and_leaves_default_storage_empty(self):
+        custom=self.root/'private-cache'
+        with patch('opensmash_melee.native_source.subprocess.run',side_effect=self.build) as run:
+            ordinary=prepare(self.root,self.source,'obama')
+            before=set((self.root/'build/native-fit/local/revisions').iterdir())
+            relocated=prepare(self.root,self.source,'obama',cache_root=custom)
+            self.assertEqual(relocated['base'],ordinary['base']);self.assertFalse(relocated['cached'])
+            self.assertTrue(prepare(self.root,self.source,'obama',cache_root=custom)['cached'])
+            self.assertEqual(set((self.root/'build/native-fit/local/revisions').iterdir()),before);self.assertEqual(run.call_count,2)
+            revision=relocated['base'].split('/')[-3]
+            self.assertTrue((custom/revision/'sources/obama.json').is_file())
+            command=run.call_args.args[0];self.assertEqual(command[1],str(self.root/'tools/prepare_native_fit_local.py'));self.assertEqual(run.call_args.kwargs['cwd'],self.root)
+
     def test_portable_build_package_needs_no_conversion(self):
         import shutil
         with patch('opensmash_melee.native_source.subprocess.run', side_effect=self.build):

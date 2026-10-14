@@ -320,7 +320,7 @@ def stage_character_select(game, entries, *, cache=None):
         path.write_bytes(data)
 
 
-def catalog_identities(root, catalog, costumes, *, source_root=None):
+def catalog_identities(root, catalog, costumes, *, source_root=None, imported_source_root=None):
     from .costume_variant import SCHEMA
     import hashlib
     if not isinstance(costumes, list) or len(costumes) > 8:
@@ -346,6 +346,6 @@ def catalog_identities(root, catalog, costumes, *, source_root=None):
             if not source.is_relative_to(Path(source_root).resolve()):raise ValueError('Invalid source character path')
         else:
             if source_root is not None:ident=cache_id(row['slug'],row['target'],row.get('original_target',row['target']))
-            source=Path(root) / 'assets/characters' / ident
+            source=(Path(imported_source_root) if row.get('imported') and imported_source_root is not None else Path(root)/'assets/characters')/ident
         entries.append((fighter, color, source))
     return entries

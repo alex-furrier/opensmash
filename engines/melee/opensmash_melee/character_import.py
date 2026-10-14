@@ -100,15 +100,24 @@ def import_local_source(entry,roster_path,destination):
     return import_source(base+'manifest.json',destination,{'https://private.invalid'},fetch)
 
 class ImportManager:
-    def __init__(self,catalog,lock,origins=None,workspace=ROOT,queue_limit=1):
+    def __init__(self,catalog,lock,origins=None,workspace=ROOT,queue_limit=1,*,source_root=None,cache_root=None):
         self.queue_limit=queue_limit
         self.catalog=catalog;self.lock=lock;self.origins=set(origins or ['https://smash.fun','https://www.smash.fun'])
-        self.workspace=Path(workspace);self.root=self.workspace/'build/character-imports';self.root.mkdir(parents=True,exist_ok=True)
+        self.workspace=Path(workspace)
+        self.source_root=Path(source_root).expanduser().resolve() if source_root is not None else self.workspace/'assets/characters'
+        self.root=Path(cache_root).expanduser().resolve() if cache_root is not None else self.workspace/'build/character-imports'
+        self.custom_storage=self.source_root.resolve()!=(self.workspace/'assets/characters').resolve() or self.root.resolve()!=(self.workspace/'build/character-imports').resolve()
+        self.selection_root=self.root/'character-select' if self.custom_storage else self.workspace/'build/character-select'
+        self.announcer_root=self.root/'announcer-cache' if self.custom_storage else self.workspace/'build/announcer-cache'
+        self.root.mkdir(parents=True,exist_ok=True)
         self.index=self.root/'roster.json';self.jobs={};self.pool=ThreadPoolExecutor(max_workers=1);self.state_lock=threading.Lock()
         self.rows=json.loads(self.index.read_text()) if self.index.exists() else []
         self.private_rows=None
         self.catalog.update({r['slug']:r for r in self.rows})
+    def check_storage_mode(self,source_only):
+        if self.custom_storage and not source_only:raise ValueError('Custom import storage requires source-only browser imports. Legacy costume conversion uses checkout-local storage.')
     def start(self,url,target,source_only=False):
+        self.check_storage_mode(source_only)
         url=source_url(url,self.origins)
         if target not in TARGETS:raise ValueError('Choose one of the supported Melee targets.')
         with self.state_lock:
@@ -126,7 +135,8 @@ class ImportManager:
             if self.private_rows is not None:self.private_rows=[r for r in self.private_rows if r['slug']!=slug]
             atomic_write(self.index,(json.dumps(self.rows,indent=2)+'\n').encode());del self.catalog[slug]
             ident='web-v1-'+hashlib.sha256(slug.encode()).hexdigest()[:16]
-            for folder in [self.workspace/'build/characters'/ident,self.workspace/'assets/characters'/ident]:
+            folders=[self.source_root/ident] if self.custom_storage else [self.workspace/'build/characters'/ident,self.source_root/ident]
+            for folder in folders:
                 # Windows refuses to delete files with open handles or the read-only bit; clear the bit, then park anything left over.
                 def retry(fn,path,exc):
                     try:os.chmod(path,stat.S_IWRITE);fn(path)
@@ -183,6 +193,7 @@ class ImportManager:
     def work(self,job,url,target,source_only=False,source_loader=None):
         def progress(message):job.update(state='working',message=message)
         try:
+            self.check_storage_mode(source_only)
             progress('Downloading and checking your character…')
             with tempfile.TemporaryDirectory(prefix='source-',dir=self.root) as temp:
                 source=Path(temp);info=source_loader(source) if source_loader else import_source(url,source,self.origins)
@@ -190,7 +201,7 @@ class ImportManager:
                 with self.lock:
                     existing=self.catalog.get(slug)
                     ident='web-v1-'+hashlib.sha256(slug.encode()).hexdigest()[:16]
-                    retained=self.workspace/'assets/characters'/ident
+                    retained=self.source_root/ident
                     if existing and all((retained/name).is_file() for name in [*FILES,'character.json']):
                         if source_loader:
                             existing.update(self.portraits(source,slug,derivatives=True))
@@ -199,7 +210,7 @@ class ImportManager:
                             existing['target']=target
                             atomic_write(self.index,(json.dumps(self.rows,indent=2)+'\n').encode())
                         job.update(state='complete',message='Character is ready.',fighter=existing);return
-                    archive_previous_build(self.workspace,ident)
+                    archive_previous_build(self.workspace,ident,source_root=self.source_root,archive_root=self.root/'previous-builds',source_only=self.custom_storage)
                     commands=[('Fitting character',['tools/build_character.py',str(source),'--id',ident,'--target',target]),
                               ('Preparing textures and artwork',['tools/upgrade_character_surfaces.py',ident]),
                               ('Building playable costume',['tools/build_browser_skin_costume.py',ident])]
@@ -207,7 +218,7 @@ class ImportManager:
                         if source_only:
                             from .__main__ import import_character
                             progress('Preparing character source…')
-                            import_character(source,self.workspace/'assets/characters'/ident)
+                            import_character(source,self.source_root/ident)
                         for stage,args in ([] if source_only else commands):
                             progress(stage+'…');job['stage']=stage
                             run_stage(args,self.workspace,self.root/(job['id']+'.log'),stage,target)

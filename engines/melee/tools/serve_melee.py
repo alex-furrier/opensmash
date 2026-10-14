@@ -19,6 +19,8 @@ from opensmash_melee.costume_variant import costume_variant, SCHEMA
 from opensmash_melee.materials import upgrade_cached_lighting
 from opensmash_melee.__main__ import atomic_write
 from opensmash_melee.character_build import archive_previous_build,run_stage
+SOURCE_CACHE_ROOT = ROOT/'build/native-fit/local/revisions'
+SOURCE_CACHE_CUSTOM = False
 GAME = ROOT / 'assets/game'
 CHARACTERS = Path(os.environ.get('OPENSMASH_CHARACTER_ROOT', ROOT.parents[1] / 'play/ui')).expanduser().resolve()
 SYS = ROOT / 'build/browser-engine/moderngekko-web/vendor/dolphin/Data/Sys'
@@ -196,7 +198,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             native_asset=re.fullmatch(r'/api/native-fit/assets/([a-f0-9]{64})/sources/([a-z0-9][a-z0-9_-]{0,63}\.(?:json|rgba8|identity\.dat))',route)
             if native_asset:
-                return self.file(ROOT/'build/native-fit/local/revisions'/native_asset[1]/'sources'/native_asset[2])
+                return self.file(SOURCE_CACHE_ROOT/native_asset[1]/'sources'/native_asset[2])
             if route == '/api/native/status' and NATIVE:
                 return self.json(NATIVE.status())
             if route == '/api/setup':
@@ -208,14 +210,14 @@ class Handler(BaseHTTPRequestHandler):
                 if slug not in CATALOG:
                     raise FileNotFoundError(slug)
                 ident = 'web-v1-' + hashlib.sha256(slug.encode()).hexdigest()[:16]
-                imported = ROOT / 'assets/characters' / ident / 'announcer.wav'
+                imported = IMPORTS.source_root / ident / 'announcer.wav'
                 return self.file(imported if imported.is_file() else descendant(CHARACTERS, slug + '/announcer.wav'))
             if route == '/api/imports':
                 roster=parse_qs(urlsplit(self.path).query).get('roster')
                 if roster==['available']:
                     available=[]
                     for row in CATALOG.values():
-                        source=ROOT/'assets/characters'/cache_id(row['slug'],row['target'],row['target']) if row.get('imported') else CHARACTERS/row['slug']
+                        source=IMPORTS.source_root/cache_id(row['slug'],row['target'],row['target']) if row.get('imported') else CHARACTERS/row['slug']
                         if all((source/name).is_file() for name in ['rigged.glb','portrait_raw.png','stock_raw.png','emblem_raw.png','announcer.wav']):available.append(row)
                     return self.json(available)
                 active=roster==['active']
@@ -238,7 +240,7 @@ class Handler(BaseHTTPRequestHandler):
                 name = route.removeprefix('/api/character-select/')
                 if not re.fullmatch(r'[a-f0-9]{64}/[0-3]\.bin', name):
                     raise FileNotFoundError(name)
-                return self.file(descendant(ROOT / 'build/character-select', name))
+                return self.file(descendant(IMPORTS.selection_root, name))
             if route.startswith('/api/costume/'):
                 slug = route[len('/api/costume/'):]
                 if slug not in CATALOG:
@@ -320,10 +322,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json({'error':'This character is unavailable.'},404)
             row=CATALOG[slug]
             source=CHARACTERS/slug
-            if row.get('imported'):source=ROOT/'assets/characters'/cache_id(slug,row['target'],row['target'])
+            if row.get('imported'):source=IMPORTS.source_root/cache_id(slug,row['target'],row['target'])
             try:
                 from opensmash_melee.native_source import prepare
-                return self.json(prepare(ROOT,source,slug,restore=getattr(self,'restore_native_source',None)))
+                return self.json(prepare(ROOT,source,slug,restore=getattr(self,'restore_native_source',None),cache_root=SOURCE_CACHE_ROOT if SOURCE_CACHE_CUSTOM else None))
             except (ValueError,OSError) as error:
                 return self.json({'error':str(error)},422)
         if self.path == '/api/setup/clear':
@@ -380,12 +382,14 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError('Invalid lineup request')
                 body = json.loads(self.rfile.read(length))
                 from opensmash_melee.character_select import catalog_identities, character_select_assets
+                IMPORTS.check_storage_mode(body.get('sourceOnly') is True)
                 entries = catalog_identities(ROOT, CATALOG, body.get('costumes'),
-                                             source_root=CHARACTERS if body.get('sourceOnly') is True else None)
+                                             source_root=CHARACTERS if body.get('sourceOnly') is True else None,
+                                             imported_source_root=IMPORTS.source_root)
                 with LOCK:
-                    assets = character_select_assets(GAME, entries, cache=ROOT / 'build/announcer-cache')
+                    assets = character_select_assets(GAME, entries, cache=IMPORTS.announcer_root)
                     key = hashlib.sha256(b''.join(assets.values())).hexdigest()
-                    folder = ROOT / 'build/character-select' / key
+                    folder = IMPORTS.selection_root / key
                     folder.mkdir(parents=True, exist_ok=True)
                     result = []
                     for index, (name, data) in enumerate(assets.items()):
@@ -417,6 +421,7 @@ class Handler(BaseHTTPRequestHandler):
         slug = unquote(urlsplit(self.path).path).removeprefix('/api/prepare/')
         if not self.path.startswith('/api/prepare/') or slug not in CATALOG:
             return self.send_error(404)
+        if IMPORTS.custom_storage:return self.json({'error':'Custom import storage requires source-only browser imports; legacy conversion is unavailable.'},409)
         query = parse_qs(urlsplit(self.path).query)
         try: color = int(query.get('color', ['0'])[0])
         except ValueError: return self.send_error(400)
@@ -432,7 +437,7 @@ class Handler(BaseHTTPRequestHandler):
         with preparation_lock(ident), PREPARATION_SLOTS:
             if not (output / f'Pl{code}Nr.dat').is_file():
                 source = CHARACTERS / slug
-                if row.get('imported'): source = ROOT/'assets/characters'/cache_id(slug,row['target'],row['target'])
+                if row.get('imported'): source = IMPORTS.source_root/cache_id(slug,row['target'],row['target'])
                 if not (source / 'rigged.glb').is_file():
                     return self.json({'error':'Character source is missing. Reinstall the character library or import the character again.'},422)
                 try:
@@ -503,7 +508,13 @@ if __name__ == '__main__':
     parser.add_argument('--import-origin', action='append', default=[], help='Additional exact source-export origin for local development')
     parser.add_argument('--private-roster', type=Path, help='Local private roster manifest; imports only validated export directories')
     parser.add_argument('--trace-io', action='store_true', help='Record local asset request timings for startup profiling')
+    parser.add_argument('--private-source-root',type=Path,help='Retained source-only browser imports; default assets/characters in the checkout')
+    parser.add_argument('--import-cache-root',type=Path,help='Import index, portraits and logs; default build/character-imports')
+    parser.add_argument('--source-cache-root',type=Path,help='Prepared native source revisions; default build/native-fit/local/revisions')
     args = parser.parse_args()
+    if args.source_cache_root is not None:
+        SOURCE_CACHE_ROOT=args.source_cache_root.expanduser().resolve()
+        SOURCE_CACHE_CUSTOM=True
     startup_started = time.monotonic()
     def startup_log(message):
         if args.desktop:
@@ -524,7 +535,7 @@ if __name__ == '__main__':
         pack(SYS, BUILD / 'sys-bundle.bin')
     startup_log('Loading character import service')
     from opensmash_melee.character_import import ImportManager
-    IMPORTS=ImportManager(CATALOG,LOCK,['https://smash.fun','https://www.smash.fun',*args.import_origin])
+    IMPORTS=ImportManager(CATALOG,LOCK,['https://smash.fun','https://www.smash.fun',*args.import_origin],source_root=args.private_source_root,cache_root=args.import_cache_root)
     if args.private_roster:IMPORTS.load_local_roster(args.private_roster)
     startup_log('Character import service ready')
     if args.desktop:
