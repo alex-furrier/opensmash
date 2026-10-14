@@ -8,7 +8,7 @@ import {meleeRosterPresentation} from '../shared/melee-roster.js';
 import {MeleeSettings,MeleeDiscSettings as MeleeRomSettings,resetMeleePreferences} from '../../engines/melee/launcher/Settings';
 import {loadSharedRom} from './shared-game-files.js';
 import {loadSettings as loadMeleeSettings} from '../../engines/melee/web/lib/launch';
-import {restoreLocalDisc,localDiscReady,selectLocalDisc,subscribeLocalDisc,retainMelee} from '../../engines/melee/web/lib/melee-session';
+import {restoreLocalDisc,localDiscReady,selectLocalDisc,subscribeLocalDisc,retainMelee,hostDiscConfigured,selectHostDisc} from '../../engines/melee/web/lib/melee-session';
 import {desktop as meleeDesktop} from '../../engines/melee/web/lib/desktop';
 import {pollService as pollMeleeService} from '../../engines/melee/web/lib/service-poll';
 import {selectionPorts as meleeSelectionPorts} from '../../engines/melee/launcher/launch-plan.mjs';
@@ -409,7 +409,7 @@ export default function App() {
       behavior: demoMode ? "instant" : "smooth",
     }));
     bootEngineAfterScroll(() => {
-      setEngine({experience:'melee',id:crypto.randomUUID(),action:{...action,selectionMode:action.selectionMode||advancedOptions.selectionMode,portPlan:controllerPlan(advancedOptions,gamepads)}});
+      setEngine({experience:'melee',id:crypto.randomUUID(),action:{...action,selectionMode:action.selectionMode||advancedOptions.selectionMode,portPlan:action.portPlan||controllerPlan(advancedOptions,gamepads)}});
     });
   }
 
@@ -715,13 +715,14 @@ export default function App() {
   const [rosterUi,setRosterUi]=useState(()=>{try{const saved=JSON.parse(meleePreferences.getItem(rosterChoiceKey)||'{}');return {roster:rosterScopes.includes(saved.roster)?saved.roster:'high-school',choices:saved.choices||{}};}catch{return {roster:'high-school',choices:{}};}});
   const [basePick,setBasePick]=useState(null);
   function saveRosterUi(next){setRosterUi(next);try{meleePreferences.setItem(rosterChoiceKey,JSON.stringify(next));}catch{}}
-  function selectRoster(roster){window.gameLauncher?.clearPicks();setBasePick(null);saveRosterUi({...rosterUi,roster});}
+  function selectRoster(roster){window.gameLauncher?.clearPicks({invalidateControllers:true});setBasePick(null);saveRosterUi({...rosterUi,roster});}
   function chooseRosterBase(target){
     const choices=rememberBase(rosterUi.choices,basePick.character,basePick.slot,target);
-    saveRosterUi({...rosterUi,choices});window.gameLauncher?.updatePickTarget(basePick.character.slug,target);setBasePick(null);
+    saveRosterUi({...rosterUi,choices});window.gameLauncher?.updatePickTarget(basePick.character.slug,target,basePick.slot);setBasePick(null);
   }
   useEffect(()=>{if(!isMelee)setBasePick(null);},[isMelee]);
   const [roomDraft,setRoomDraft]=useState(false),[roomCapabilities,setRoomCapabilities]=useState({enabled:false,simulatedOpponent:false});
+  useEffect(()=>{if(gamepads.length>1)setRoomDraft(false);},[gamepads.length]);
   useEffect(()=>{if(!isMelee){setRoomDraft(false);setRoomCapabilities({enabled:false,simulatedOpponent:false});return;}const abort=new AbortController();fetch('/melee/api/netplay/config',{signal:abort.signal}).then(r=>r.ok?r.json():null).then(c=>{if(!abort.signal.aborted)setRoomCapabilities({enabled:c?.enabled===true,simulatedOpponent:c?.simulatedOpponent===true});}).catch(()=>{});return()=>abort.abort();},[isMelee]);
   useEffect(()=>{
     if(!isMelee){setLocalMeleeRoster([]);return;}
@@ -740,7 +741,7 @@ export default function App() {
     ? (isMelee ? meleeDemoGridOrder : demoGridOrder)(characters.filter((character) => character.visibility !== "private" && !character.mine))
     : (isMelee?meleeGridRoster(mergeCharactersBySlug(meleeCatalog,characters),localMeleeRoster,availableMeleeRoster,rosterUi.roster,checkingMeleeSources):characters)), [characters, demoMode, isMelee,localMeleeRoster,availableMeleeRoster,rosterUi.roster,checkingMeleeSources]);
   const gridJobs = demoMode ? [] : fighterJobs;
-  useEffect(()=>{window.gameLauncher?.clearPicks();setBasePick(null);},[gridCharacters]);
+  useEffect(()=>{window.gameLauncher?.clearPicks({invalidateControllers:true});setBasePick(null);},[gridCharacters]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1145,7 +1146,7 @@ export default function App() {
     try { n64Keyboard?.save(n64Keyboard.defaults()); } catch { /* storage blocked */ }
     window.openSmashControllerRemap?.clearAllProfiles?.();
     resetMeleePreferences();
-    window.gameLauncher?.clearPicks();setBasePick(null);setRosterUi({roster:'high-school',choices:{}});
+    window.gameLauncher?.clearPicks({invalidateControllers:true});setBasePick(null);setRosterUi({roster:'high-school',choices:{}});
   }
 
   async function requestLaunch(action) {
@@ -1299,7 +1300,7 @@ export default function App() {
     return result;
   }
 
-  function launchVisualAction({ type, slug, picks = [],targets = [] }) {
+  function launchVisualAction({ type, slug, picks = [],targets = [],portPlan,selectionMode,ownedControllers }) {
     const action = type === "trailer-intro"
       ? { type: "start", trailerIntro: true, trailerRecording }
       : type === "character"
@@ -1307,7 +1308,7 @@ export default function App() {
           type,
           character: gridCharacters.find((character) => character.slug === slug),
           picks: picks.map((pickSlug) => gridCharacters.find((character) => character.slug === pickSlug)),
-          targets,
+          targets,portPlan,selectionMode,ownedControllers,
         }
       : { type };
     if (type === "character" && (!action.character || action.picks.some((pick) => !pick) || (isMelee&&!meleeSelectionAvailable([action.character,...action.picks],{demo:demoMode})))) {
@@ -1684,6 +1685,8 @@ export default function App() {
           .filter((entry) => entry?.kind === "keyboard" || entry?.kind === "gamepad").length;
       },
       isAuthorized() { return isMelee ? meleeDiscReady : authorized; },
+      hostDiscConfigured,
+      loadHostDisc:selectHostDisc,
       async restoreDisc(onStatus) {
         if(meleeDesktop())return meleeDiscReady;
         const unsubscribe=subscribeLocalDisc(status=>onStatus?.(status.message));
@@ -1731,7 +1734,8 @@ export default function App() {
           immersive={immersive}
           isFullscreen={isFullscreen || immersive}
           launchFlowOpen={overlayMusicActive}
-          onCreateRoom={isMelee&&!demoMode&&roomCapabilities.enabled&&!engine?()=>setRoomDraft(current=>current?false:'friend'):undefined}
+          roomDisabled={isMelee&&gamepads.length>1}
+          onCreateRoom={isMelee&&!demoMode&&roomCapabilities.enabled&&!engine?()=>{if((navigator.getGamepads?.()||[]).filter(p=>p?.connected).length<=1)setRoomDraft(current=>current?false:'friend');}:undefined}
           onToggleRoomOpponent={roomCapabilities.simulatedOpponent?()=>setRoomDraft(current=>current==='computer'?'friend':'computer'):undefined}
           roomDraft={roomDraft}
           onAboutChange={setAboutOpen}

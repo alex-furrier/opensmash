@@ -1,4 +1,6 @@
+import HostDiscButton from '../web/lib/HostDiscButton';
 import FriendMatch from './FriendMatch';
+import {useGamepads,readGamepads} from '../../../web-prototype/src/gamepads.js';
 import {useEffect,useState} from 'react';
 import Game from '../web/app/Game';
 import NativeGame from '../web/app/NativeGame';
@@ -14,6 +16,8 @@ import './launcher.css';
 export const roster=catalog as Fighter[];
 export default function MeleeExperience({action,localPortPlan,onClose,soundOn=true,trailerReveal=false,onTrailerReady,onTrailerStatus}:{action:any;localPortPlan?:any;onClose:()=>void;soundOn?:boolean;trailerReveal?:boolean;onTrailerReady?:()=>void;onTrailerStatus?:(status:string)=>void}){
  const joiningFriend=action.type==='friend-room';
+ const multipleControllers=useGamepads().length>1;
+ const chooseMode=(mode:'solo'|'friend'|'computer')=>{if(mode==='solo'||readGamepads().length<=1)setLaunchMode(mode);};
  const [friendAvailable,setFriendAvailable]=useState<boolean|undefined>();
  const [simulatedAvailable,setSimulatedAvailable]=useState(false);
  useEffect(()=>{const abort=new AbortController();fetch('/melee/api/netplay/config',{signal:abort.signal}).then(r=>r.ok?r.json():null).then(value=>{if(!abort.signal.aborted){setFriendAvailable(value?.enabled===true);setSimulatedAvailable(value?.simulatedOpponent===true);}}).catch(()=>{if(!abort.signal.aborted)setFriendAvailable(false);});return()=>abort.abort();},[]);
@@ -54,6 +58,7 @@ export default function MeleeExperience({action,localPortPlan,onClose,soundOn=tr
    }else if(file)await selectLocalDisc(file);
   }catch(e){setError((e as Error).message);}
  }
+ if(!desktop()&&multipleControllers&&(joiningFriend||launchMode==='friend'||launchMode==='computer'))return <section className="melee-setup"><small>Other modes support one controller. Disconnect the second controller to play.</small><button onClick={onClose}>Return to roster</button></section>;
  if(!desktop()&&joiningFriend&&ready&&resolved){
   if(friendAvailable===undefined)return <section className="melee-setup"><p>Checking friend rooms…</p></section>;
   if(!friendAvailable)return <section className="melee-setup"><p>Friend rooms are not configured on this host.</p><button onClick={onClose}>Return to roster</button></section>;
@@ -61,9 +66,9 @@ export default function MeleeExperience({action,localPortPlan,onClose,soundOn=tr
  }
  if(ready&&!resolved)return <section className="melee-setup"><h2>Preparing fighters</h2><p role={error?'alert':'status'}>{error||preparationStatus}</p></section>;
  if(!fighter)return <section className="melee-setup" role="alert"><p>This character has not been prepared for Melee yet.</p><button onClick={onClose}>Return to roster</button></section>;
- if(!ready)return <section className="melee-setup"><h2>Play Melee</h2><p role="status">{status}</p><small>Your disc is never uploaded. A local copy is saved in this browser for future visits.</small>{(error||setupError)&&<p role="alert">{error||setupError}</p>}{desktop()?<button onClick={()=>void choose()}>Choose disc</button>:<label>Choose disc<input type="file" accept=".iso,.gcm" onChange={e=>void choose(e.target.files?.[0])}/></label>}<button onClick={onClose}>Return to roster</button></section>;
+ if(!ready)return <section className="melee-setup"><h2>Play Melee</h2>{!desktop()&&<HostDiscButton/>}<p role="status">{status}</p><small>Your disc is never uploaded. A local copy is saved in this browser for future visits.</small>{(error||setupError)&&<p role="alert">{error||setupError}</p>}{desktop()?<button onClick={()=>void choose()}>Choose disc</button>:<label>Choose disc<input type="file" accept=".iso,.gcm" onChange={e=>void choose(e.target.files?.[0])}/></label>}<button onClick={onClose}>Return to roster</button></section>;
  if(!desktop()&&friendAvailable===undefined)return <section className="melee-setup"><p>Checking friend rooms…</p></section>;
- if(!desktop()&&friendAvailable&&!launchMode)return <section className="melee-setup"><h2>Play Melee</h2><p>Use your selected fighters and match settings.</p><button onClick={()=>setLaunchMode('solo')}>Play locally</button><button onClick={()=>setLaunchMode('friend')}>Play with a friend</button>{simulatedAvailable&&<button onClick={()=>setLaunchMode('computer')}>Play against computer</button>}<button onClick={onClose}>Return to roster</button></section>;
+ if(!desktop()&&friendAvailable&&!launchMode)return <section className="melee-setup"><h2>Play Melee</h2><p>Use your selected fighters and match settings.</p>{multipleControllers&&<small>Other modes support one controller. Disconnect the second controller to play.</small>}<button onClick={()=>chooseMode('solo')}>Play locally</button><button disabled={multipleControllers} onClick={()=>chooseMode('friend')}>Play with a friend</button>{simulatedAvailable&&<button disabled={multipleControllers} onClick={()=>chooseMode('computer')}>Play against computer</button>}<button onClick={onClose}>Return to roster</button></section>;
  if(!desktop()&&friendAvailable&&(launchMode==='friend'||launchMode==='computer'))return <FriendMatch fighter={fighter} settings={settings} localPortPlan={localPortPlan} roster={fighters} onClose={onClose} soundOn={soundOn} simulated={launchMode==='computer'} automatic={action.roomMode==='computer'||action.roomMode==='friend'}/>;
  return desktop()?<NativeGame fighter={fighter} settings={settings} roster={fighters} onClose={onClose}/>:<Game fighter={fighter} settings={settings} roster={fighters} onClose={onClose} soundOn={soundOn} chrome={!action.meleeTrailer} holdForTrailer={!!action.meleeTrailer} trailerReveal={trailerReveal} onTrailerReady={onTrailerReady} onTrailerStatus={onTrailerStatus}/>;
 }

@@ -7,29 +7,31 @@ export function pointerStep(previous, pad, dt, width, height, enabled=true) {
   down,back,click:connected&&down&&!previous.down,goBack:connected&&back&&!previous.back,
   scroll:connected?axis(3)*900*dt:0,used:connected&&(!!axis(0)||!!axis(1)||down||back||!!axis(3))};
 }
-export function startMenuPointer({enabled,controllerIndex,back}) {
- const cursor=document.createElement('span');cursor.className='menu-controller-cursor';cursor.hidden=true;cursor.setAttribute('aria-hidden','true');document.body.append(cursor);
- let state={x:innerWidth/2,y:innerHeight/2,down:true,back:true},last=performance.now(),padIdentity;
+export function startMenuPointer({enabled,controllers,controllerIndex,click,back}) {
+ const states=new Map();let last=performance.now();
  function frame(now){
-  if(!enabled()){cursor.hidden=true;state.down=true;state.back=true;padIdentity=null;last=now;requestAnimationFrame(frame);return;}
+  const active=enabled(),owners=active?(controllers?.()||[{key:'primary',generation:0,index:controllerIndex(),port:0}]):[];
+  const keys=new Set(owners.map(o=>`${o.key}:${o.generation}`));
+  for(const [key,value] of states)if(!keys.has(key)){value.cursor.remove();states.delete(key);}
+  const pads=active?Array.from(navigator.getGamepads?.()||[]):[];
   const dialog=document.querySelector('dialog[open]'),surface=dialog||document.body;
-  if(cursor.parentNode!==surface){surface.append(cursor);if(dialog){const box=dialog.getBoundingClientRect();state.x=box.x+box.width/2;state.y=box.y+box.height/2;}}
-  const index=controllerIndex();
-  const pad=index===undefined?null:navigator.getGamepads?.()[index];
-  const identity=pad?.connected?`${pad.index}:${pad.id}`:null;
-  // Reconnecting or enabling while holding a button must not produce a click.
-  if(identity!==padIdentity){state.down=!!pad?.buttons?.[0]?.pressed;state.back=!!pad?.buttons?.[1]?.pressed;padIdentity=identity;}
-  state=pointerStep(state,pad,Math.min((now-last)/1000,.05),innerWidth,innerHeight,enabled());last=now;
-  if(!enabled()||!pad?.connected)cursor.hidden=true;
-  else if(state.used)cursor.hidden=false;
-  cursor.style.transform=`translate(${state.x}px,${state.y}px)`;
-  const hit=document.elementFromPoint(state.x,state.y);
-  if(state.scroll){let scroll=hit;while(scroll&&!(scroll.scrollHeight>scroll.clientHeight&&/(auto|scroll)/.test(getComputedStyle(scroll).overflowY)))scroll=scroll.parentElement;if(scroll)scroll.scrollBy(0,state.scroll);else window.scrollBy(0,state.scroll);}
-  if(state.click){const target=hit?.closest('button,a,input,select,textarea,[role="button"]');if(target&&!target.disabled){target.focus({preventScroll:true});target.click();}}
-  if(state.goBack)back();
-  requestAnimationFrame(frame);
+  for(const owner of owners){
+   const key=`${owner.key}:${owner.generation}`,pad=pads.find(p=>p?.connected&&p.index===owner.index&&(!owner.id||p.id===owner.id));
+   if(!pad)continue;
+   let entry=states.get(key);
+   if(!entry){const cursor=document.createElement('span');cursor.className='menu-controller-cursor';cursor.dataset.player=String(owner.port+1);cursor.textContent=`${owner.port+1}P`;cursor.setAttribute('aria-hidden','true');surface.append(cursor);entry={cursor,state:{x:innerWidth/2+owner.port*36,y:innerHeight/2,down:!!pad.buttons?.[0]?.pressed,back:!!pad.buttons?.[1]?.pressed}};states.set(key,entry);}
+   const {cursor}=entry;
+   cursor.dataset.player=String(owner.port+1);cursor.textContent=`${owner.port+1}P`;
+   if(cursor.parentNode!==surface){surface.append(cursor);if(dialog){const box=dialog.getBoundingClientRect();entry.state.x=box.x+box.width/2;entry.state.y=box.y+box.height/2;}}
+   const state=entry.state=pointerStep(entry.state,pad,Math.min((now-last)/1000,.05),innerWidth,innerHeight,true);
+   cursor.hidden=!!dialog&&owner.port!==0;cursor.style.transform=`translate(${state.x}px,${state.y}px)`;
+   const hit=document.elementFromPoint(state.x,state.y);
+   if(state.scroll&&owner.port===0){let scroll=hit;while(scroll&&!(scroll.scrollHeight>scroll.clientHeight&&/(auto|scroll)/.test(getComputedStyle(scroll).overflowY)))scroll=scroll.parentElement;if(scroll)scroll.scrollBy(0,state.scroll);else window.scrollBy(0,state.scroll);}
+   if(state.click&&!cursor.hidden){const target=hit?.closest('button,a,input,select,textarea,[role="button"]');if(target&&!target.disabled)click(target,owner);}
+   if(state.goBack)back(owner);
+  }
+  last=now;requestAnimationFrame(frame);
  }
  requestAnimationFrame(frame);
- // A real pointer takes visual ownership immediately.
- document.addEventListener('pointermove',()=>{cursor.hidden=true;},{passive:true});
+ document.addEventListener('pointermove',()=>{for(const {cursor} of states.values())cursor.hidden=true;},{passive:true});
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 // gamepadconnected fires once per pad from then on. A slow poll covers pads
 // that were pressed before our listener existed; Chrome allocates wrapper
 // objects on every getGamepads() call, so keep it infrequent.
-const POLL_INTERVAL_MS = 2000;
+const POLL_INTERVAL_MS = 250;
 
 export function readGamepads() {
   try {

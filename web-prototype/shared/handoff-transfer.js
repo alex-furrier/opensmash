@@ -129,15 +129,15 @@ async function incomingDisc(setCleanup){
 
 /** Save a bounded HTTP stream using the same incoming-disc receipt as handoff. */
 export async function receiveDiscResponse(response,size,signal,onProgress,setCleanup){
- if(!response.ok||Number(response.headers.get('content-length'))!==size)throw Error('The temporary dev disc could not be loaded completely.');
+ if(!response.ok||Number(response.headers.get('content-length'))!==size)throw Error('The game file could not be loaded completely.');
  signal.throwIfAborted();const stage=await incomingDisc(setCleanup),reader=response.body.getReader();let received=0;
  const abort=()=>{void reader.cancel(signal.reason).catch(()=>{});};signal.addEventListener('abort',abort,{once:true});
  try{
   for(;;){signal.throwIfAborted();const{done,value}=await reader.read();signal.throwIfAborted();if(done)break;
-   if(received+value.byteLength>size)throw Error('Invalid dev disc byte count.');
+   if(received+value.byteLength>size)throw Error('Invalid game file byte count.');
    await stage.writer.write(value);received+=value.byteLength;onProgress(received);
   }
-  if(received!==size)throw Error('The dev disc load ended before the whole file arrived.');
+  if(received!==size)throw Error('The game download ended before the whole file arrived.');
   signal.throwIfAborted();await stage.writer.close();
   const file=new File([await stage.handle.getFile()],'melee-usa-1.02.iso',{type:'application/octet-stream'});
   Object.defineProperty(file,Symbol.for('opensmash.received-disc'),{value:stage.receipt});return file;

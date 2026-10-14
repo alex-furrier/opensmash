@@ -1410,7 +1410,7 @@ function select(name) {
 function markPick(name, tag) {
   const cell = name == null ? null : getCell(name);
   if (!cell) return null;
-  if (tag) cell.dataset.pick = tag;
+  if (tag) cell.dataset.pick = [cell.dataset.pick,tag].filter(Boolean).join(' · ');
   else delete cell.dataset.pick;
   return cell;
 }

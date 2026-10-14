@@ -1,3 +1,4 @@
+import HostDiscButton from '../web/lib/HostDiscButton';
 import {movesetPreferenceVersion} from '../web/lib/moveset-preference.mjs';
 import {useEffect,useState} from 'react';
 import LaunchSettings from '../web/app/LaunchSettings';
@@ -27,7 +28,7 @@ export function MeleeDiscSettings(){
    }else await clearLocalDisc();
   }catch(e){setError((e as Error).message);}
  }
- return <section className="melee-disc-settings"><h3>Melee disc</h3><p role="status">{status}</p>{error&&<p role="alert">{error}</p>}
+ return <section className="melee-disc-settings"><h3>Melee disc</h3>{!ready&&!desktop()&&<HostDiscButton/>}<p role="status">{status}</p>{error&&<p role="alert">{error}</p>}
   {ready?<button onClick={()=>void clear()}>Clear disc</button>:desktop()?<button disabled={busy} onClick={()=>void choose()}>Upload disc</button>:<label>{busy?"Checking disc…":"Upload disc"}<input disabled={busy} type="file" accept=".iso,.gcm" onChange={e=>void choose(e.target.files?.[0])}/></label>}
  </section>;
 }

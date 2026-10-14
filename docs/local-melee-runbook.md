@@ -72,13 +72,30 @@ Production builds and source/runtime patches must match; do not change a live
 engine root merely to make a document's example run.
 
 Use Settings for disc management, controls and gameplay rules. Zero minutes means
-unlimited time. Local launch supports P1–P4 port assignments; an online room has
-two humans, each acquiring one local input device. Keep the global moveset at
+unlimited time. The local menu supports two controller-owned human selections.
+Each cursor selects with A and unlocks with B; P1 owns shared settings and start.
+The mouse selects P1 when no controller is connected. Extra controllers block
+local start. With multiple controllers, other modes are disabled and restore
+automatically when one controller remains. The engine retains four ports; an
+online room has two humans, each acquiring one local input device. Keep the global moveset at
 `auto` to use character defaults; explicit overrides can mask those defaults.
 The private base selector exposes accepted pairs only. Physical multi-controller
 support still needs testing. At this checkpoint imports/caches use existing
 ignored checkout paths; PR #2's custom storage-root flags are a separate candidate,
 not options to pass to the current gameplay branch without checking support.
+
+## Optional host download
+
+Set `VITE_MELEE_DISC_SOURCE` to an authorized HTTPS game-file URL (or an HTTP
+loopback URL) when building the frontend to show **Load from host**. It is unset
+by default. The source must allow browser access and send the exact full disc
+`Content-Length`. No serving route is added by this option.
+
+The download stages in browser storage, then uses the same pinned disc verifier
+and cache as the file picker. Cancel, retry and local-file fallback are available;
+failed downloads leave the previous saved copy intact. A cached launch restores
+and verifies the existing copy before requesting host bytes. This option does
+not grant permission to distribute a disc or change network access.
 
 ## Existing private HTTPS topology
 
