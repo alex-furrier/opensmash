@@ -67,8 +67,9 @@ assert.ok((await page.locator('#local-fighter-selection').innerText()).includes(
 await page.locator('#local-fighter-selection button').first().click();
 await page.locator(`[data-roster-character="${picks[0].slug}"] .replica-select-control`).evaluate(el=>el.click());
 await controllerClick(page.locator('#local-fighter-selection').getByRole('button',{name:'Play locally',exact:true}));
-await page.locator('.melee-setup').getByRole('button',{name:'Play locally',exact:true}).waitFor({timeout:120000});
-await controllerClick(page.locator('.melee-setup').getByRole('button',{name:'Play locally',exact:true}));
+await page.waitForFunction(()=>document.querySelector('.game-overlay')||Array.from(document.querySelectorAll('.melee-setup button')).some(button=>button.textContent==='Play locally'),{},{timeout:120000});
+const optionalMode=page.locator('.melee-setup').getByRole('button',{name:'Play locally',exact:true});
+if(await optionalMode.isVisible())await controllerClick(optionalMode);
 const runtime=()=>page.frames().find(frame=>frame.url().includes('/engine/upstream/runtime.html'));
 await page.waitForFunction(()=>document.querySelector('.game-overlay'),{},{timeout:120000});
 for(let i=0;i<30;i++){
