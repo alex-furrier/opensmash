@@ -24,7 +24,7 @@ test('private origin configuration rejects broad, insecure and non-origin values
 import {privateMeleeRequestAllowed,allowedPrivateMeleeRoute} from '../server/handler.mjs';
 test('tailnet cannot access operator disc setup, raw game, native process or system files',()=>{
  for(const path of ['/api/game','/api/game/PlMr.dat','/api/setup','/api/setup/disc','/api/setup/clear','/api/native/status','/api/native/disc','/engine/sys/main.dol','/engine/sys-bundle.bin','/engine/sys-manifest.json','/engine/v/0123456789abcdef/sys/main.dol'])for(const method of ['GET','POST'])assert.equal(allowedPrivateMeleeRoute(method,path),false,path);
- for(const path of ['/api/netplay/config','/api/netplay/manifest','/api/imports','/api/imports/portraits/import-'+ 'a'.repeat(24)+'-tile.webp','/engine/upstream/runtime.mjs'])assert.equal(allowedPrivateMeleeRoute('GET',path),true,path);
+ for(const path of ['/api/netplay/config','/api/netplay/manifest','/api/source-portraits/regular.webp','/api/imports','/api/imports/portraits/import-'+ 'a'.repeat(24)+'-tile.webp','/engine/upstream/runtime.mjs'])assert.equal(allowedPrivateMeleeRoute('GET',path),true,path);
  assert.equal(allowedPrivateMeleeRoute('POST','/api/character-select'),true);
 });
 test('private gateway route limits also hold with spoofed loopback Host and no Origin',()=>{

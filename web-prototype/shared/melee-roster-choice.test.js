@@ -43,3 +43,8 @@ test('Family isolates accepted private entries while High School keeps legacy ro
  assert.deepEqual(meleeGridRoster(catalog,[],active,'family'),[],'catalog membership cannot populate a named private roster');
  assert.deepEqual(meleeGridRoster(catalog,active,[],'family').map(row=>row.meleeAvailable),[false]);
 });
+
+test('ordinary installed sources receive the private helper portrait route without replacing imported derivatives',()=>{
+ const rows=meleeGridRoster([{slug:'regular'}],[{slug:'custom',imported:true,portraitTile:'/melee/private-tile'}],[{slug:'regular'},{slug:'custom'}],'all');
+ assert.equal(rows.find(r=>r.slug==='regular').portraitTile,'/melee/api/source-portraits/regular.webp');assert.equal(rows.find(r=>r.slug==='custom').portraitTile,'/melee/private-tile');
+});

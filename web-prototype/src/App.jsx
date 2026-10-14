@@ -1649,6 +1649,8 @@ export default function App() {
   if (!isCreatePage) {
     Object.assign(visualBridgeRef.current, {
       characters:gridCharacters,
+      explicitLocalSelection:isMelee&&!demoMode&&!roomDraft,
+      menuControllerIndex:controllerPlan(advancedOptions,gamepads).find(slot=>slot?.kind==='gamepad')?.index,
       selectionContext(){return isMelee?JSON.stringify([controllerPlan(advancedOptions,gamepads),advancedOptions.selectionMode,loadMeleeSettings().mode,rosterUi.roster,roomDraft]):null;},
       baseFor(slug,slot){const row=gridCharacters.find(row=>row.slug===slug);return isMelee&&row?chosenBase(row,rosterUi.choices,slot,loadMeleeSettings().ports[selectionPort(slot)]?.target):undefined;},
       chooseBase(slug){const character=gridCharacters.find(row=>row.slug===slug);if(!isMelee||!character?.meleeAvailable)return;setBasePick({character,slot:window.gameLauncher?.selectionSlot(slug)||'1P'});},

@@ -82,7 +82,7 @@ export function allowedHostedRoute(method,path){
 export function allowedPrivateMeleeRoute(method,path){
  const unversioned=path.replace(/^\/engine\/v\/[a-f0-9]{16}\//,'/engine/');
  if(/^\/engine\/sys(?:\/|[-.])/.test(unversioned))return false;
- if((method==='GET'||method==='HEAD')&&(path==='/api/netplay/config'||path==='/api/netplay/manifest'||/^\/api\/imports\/portraits\/import-[a-f0-9]{24}-(?:tile|medium)\.webp$/.test(path)))return true;
+ if((method==='GET'||method==='HEAD')&&(path==='/api/netplay/config'||path==='/api/netplay/manifest'||/^\/api\/source-portraits\/[a-zA-Z0-9_-]+\.webp$/.test(path)||/^\/api\/imports\/portraits\/import-[a-f0-9]{24}-(?:tile|medium)\.webp$/.test(path)))return true;
  return allowedHostedRoute(method,path);
 }
 export function privateMeleeRequestAllowed(req,privateOrigin){

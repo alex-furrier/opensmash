@@ -107,9 +107,9 @@ function liveRosterCharacter(character) {
     // The server points `portrait` at the 90x86 tile derivative; a job that
     // predates the derivatives still resolves to a usable portrait.
     portraitUrl: character.portraitTile || character.portrait,
-    label: expandShortLabel(character.short, character.name) || character.name,
-    name: character.name,
-    nameFull: character.nameFull || '',
+    label: character.displayName && character.displayName !== character.name ? character.displayName : expandShortLabel(character.short, character.name) || character.name,
+    name: character.displayName || character.name,
+    nameFull: character.displayName ? '' : character.nameFull || '',
     source: character.generated ? 'generated' : 'live',
     fkind: character.fkind,
     bundle: character.bundle,
