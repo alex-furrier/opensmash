@@ -6,6 +6,8 @@ older runs retain their own revisions below. It is a coverage index, not a claim
 that every feature, device or current deployment passed one complete suite.
 Smash 64 and desktop have separate [build paths](multiplayer/README.md#ancestry-and-game-selection)
 and [desktop validation](../engines/melee/docs/DESKTOP_RELEASE.md).
+The [local runbook](local-melee-runbook.md) documents the committed entry points,
+private asset wiring, startup/stop and existing proxy topology.
 
 **A** = automated regression with fixtures/mocks unless stated otherwise.
 **B** = actual browser/game observation in the stated environment.
@@ -16,8 +18,8 @@ The 2026-10-14 read-only readiness audit reports 1,067 upstream catalog entries
 and 1,108 All tiles including the installed custom roster. Only 43 source packages
 are installed in that private environment; 1,065 catalog entries show **Source
 unavailable**. Those counts are an environment snapshot, not a global catalog
-promise. Historical public-character Chrome matches exist; catalog recovery is
-a separate investigation. Local play supports P1–P4 human ports; online rooms
+promise. The later restoration checkpoint below supersedes source availability
+for that local environment. Local play supports P1–P4 human ports; online rooms
 support exactly two humans with one local input source per peer.
 
 | Feature | User-facing behavior | How tested | What the evidence establishes / limits |
@@ -86,6 +88,23 @@ is the consolidation date unless the original record supplies a run date.
   or NumPy failed dependency loading; no dependency installation was needed.
   These focused passes do not supersede historical full-suite failures/skips in
   [multiplayer validation](multiplayer/README.md#current-validation-and-historical-evidence).
+- **E8 — upstream source restoration:** 2026-10-14, local website at `98ec5d1`
+  with local availability patch `d87c9ec` (source publication pending review).
+  The [upstream release](https://github.com/turtlesoupy/opensmash-melee/releases/tag/desktop-characters-v1)
+  archive matched SHA-256 `ef0b0191a6d81b704cccc0d78a0cb459874a6e0064de4893a23e2d6542edc878`.
+  Path/link checks and the existing GLB mesh reader, PNG verification and WAV
+  headers validated 1,063 packages. Installed 1,061 new source folders, preserving
+  two existing sources, all current catalog assignments and active private metadata.
+  Live availability is 1,104 sources: 1,063 regular plus 41 active private; All
+  remains 1,108 tiles. Historical private imports stay addressable but are excluded
+  from active availability. Three focused route tests passed. Adam West, Ryan
+  Reynolds, Scrapper and Tooth Fairy remain unavailable; no assets were fabricated.
+  Chrome 155.0.8059.79 solo samples for Luigi, Kirby and Link passed owned keyboard
+  acquisition, actual progress and return. A Kirby-versus-Link local companion
+  sample passed gameplay and Stop/return. Solo selection used the existing React
+  bridge; companion used the actual DOM Select handler and tutorial Skip. These
+  are not physical-pointer/controller certification. This is a sample, not gameplay acceptance of all
+  1,063 sources. Detailed asset/rollback and browser receipts remain private.
 
 ## Repeatable targeted checks
 
