@@ -1,8 +1,9 @@
 # Feature verification map
 
-This map describes the fork's Melee browser experience at source checkpoint
-`98ec5d1618568f400ab58aa888838d2d0c2e3a05`. Consolidated on 2026-10-14;
-older runs retain their own revisions below. It is a coverage index, not a claim
+This map tracks the fork's Melee browser experience through merged source
+`483793bfabaae80ce86228c0194742569554d38a`, consolidated on 2026-10-14 UTC.
+The original baseline was `98ec5d1618568f400ab58aa888838d2d0c2e3a05`;
+individual evidence records retain their own source and runtime revisions. It is a coverage index, not a claim
 that every feature, device or current deployment passed one complete suite.
 Smash 64 and desktop have separate [build paths](multiplayer/README.md#ancestry-and-game-selection)
 and [desktop validation](../engines/melee/docs/DESKTOP_RELEASE.md).
@@ -196,4 +197,26 @@ of this documentation change.
 - **E10 — controller preparation menus:** implementation `7dde67eb62f0ef406e86a6c791e42223700f7a5c`, 2026-10-14 UTC, macOS Chrome with two isolated browser peers and synthetic standard pads. Website cursor ownership remains available while preparing or waiting for Ready, transfers to the engine at selection/start, and returns after launch failure. Two peers supplied their own legal local disc, selected two fighters, created/joined the observed room link, clicked Ready using their own polling-driven cursor, reached gameplay with both website cursors hidden, advanced 90 ticks, then stopped and returned. Seven focused selection/lifecycle checks passed; independent source review reported no findings. Repeat with two fresh Chrome contexts on an isolated configured host; use the existing P1 cursor for Create room, Join room and Ready, then verify `data-melee-input-owned` changes from false to true before gameplay. Native boot/match blocking remains a DOM fixture; physical controller and WAN certification remain unrun. Private receipts remain private.
 
 - **E11 — two-controller menu and optional host loading:** merged source `7a6b522456890f122122f9ab444d27379ffaa67e`, 2026-10-14 UTC. Thirty-nine focused tests passed. The [controller browser proof](../engines/melee/tools/prove_controller_selection.mjs) exercised independent picks, reconnect, held-button edges, roster invalidation, distinct 90-tick input phases, replacement-device neutrality and return. The private HTTPS match advanced 210 ticks; physical controllers and Safari remain unverified. [Host loader regressions](../engines/melee/tests/host_disc_download.test.mjs) cover corrupt/interrupted downloads, cancel/retry and preservation of the previous cache. Follow-on per-port regression covers duplicate fighters and a P2-owned base dialog.
-- **E12 — app-relative configured host disc:** the opt-in [host-disc browser proof](../engines/melee/tools/prove_host_disc.mjs) downloads through `/melee/api/disc`, checks the pinned full size, cancels/retries, enters real gameplay and reuses browser storage after reload and server/browser restart. [Fixed-file server tests](../engines/melee/tests/host_disc_server.test.mjs) cover exact digest, route/method/range rejection and private-origin policy. This capability requires explicit private server configuration; no ISO or private proof profile is included in the repository.
+- **E12 — app-relative configured host disc:** observed 2026-10-14 UTC on macOS 26.6.1 (build 25G76), Chrome 155.0.8059.79 through the existing Playwright Chrome channel, and Node 26.7.0. The tested implementation was `e47e7c4ec282d67c25d3594f0bfc4276b05be194`; squash merge `483793bfabaae80ce86228c0194742569554d38a` has the identical source tree. The runtime content revision was `3b45217ed4e9277026720664581b0e0ed7597f5030798a36b9190a48e1bb260c`, reported as `identity.engine` by `/melee/api/netplay/manifest`. Runtime files remained unchanged: `runtime.mjs` SHA-256 `f1e92a121b7eec52c321adb6029eac845fe5a91e6c7a6bd478ab642cdb25d04c`, browser JS `5d69f2fd4a2ddcff50cc5d04084bcd14fb9b3eefef0cde96861855aec97ceda7`, and WASM `780c8e1ba76c3277cfa9baae4c52b3afa9934f1d8fbdc601985e831b11b05bf7`.
+
+  **Observed:** the complete HTTP stream matched 1,459,978,240 bytes and pinned disc SHA-256 `0de05981a34156b9cedcef73c73d4244ac05cf6149ab3c9cfed917698819e464`. The [pinned browser proof](https://github.com/alex-furrier/opensmash/blob/e47e7c4ec282d67c25d3594f0bfc4276b05be194/engines/melee/tools/prove_host_disc.mjs) exercised app-relative download, progress, cancel/retry, existing import/cache, 60 game ticks and reload without another ISO request. After server and browser restart, the persistent profile launched from cache with zero disc GETs and at least 60 further ticks. The postmerge check repeated cached gameplay with unchanged runtime and private-asset hashes. [Pinned fixed-file tests](https://github.com/alex-furrier/opensmash/blob/e47e7c4ec282d67c25d3594f0bfc4276b05be194/engines/melee/tests/host_disc_server.test.mjs) cover size/digest, route/method/range rejection and existing private-origin policy.
+
+  **Repeat:** use that source tree, the content-identified runtime and existing dependencies. Configure the owned ISO privately with `MELEE_HOST_DISC_FILE`, retain the approved private origin and loopback binding from the [runbook](local-melee-runbook.md), and confirm the runtime identity above. Set `MELEE_PLAYWRIGHT_MODULE` to the existing Playwright module. Choose a fresh private evidence directory outside Git and the approved app origin, then run:
+
+  ```sh
+  node engines/melee/tools/prove_host_disc.mjs --origin "$APP_ORIGIN" --output "$PRIVATE_PROOF" --phase download
+  ```
+
+  Stop and restart only the test-owned website using the same private environment; keep the asset helper and network mapping unchanged. Reopen the same proof profile:
+
+  ```sh
+  node engines/melee/tools/prove_host_disc.mjs --origin "$APP_ORIGIN" --output "$PRIVATE_PROOF" --phase restore
+  ```
+
+  Inspect both JSON receipts: exact size/digest, successful cancel/retry, gameplay progress and zero ISO GETs on restoration. The separate shutdown repair is recorded at source `06b345494c392ad3d113a69824c241e8afef43a5`. Check out that repair revision, rather than the historical E12 implementation, to repeat its configured and unconfigured regression with existing private inputs:
+
+  ```sh
+  MELEE_TEST_ENGINE_ROOT="$MELEE_ENGINE" MELEE_TEST_HOST_DISC_FILE="$MELEE_DISC" node --test engines/melee/tests/friend_site.test.mjs engines/melee/tests/host_disc_server.test.mjs engines/melee/tests/host_disc_download.test.mjs
+  ```
+
+  **Limits:** this establishes Chrome behavior on the stated Mac with the existing private app and disc. It does not certify Safari, physical controllers, fresh-machine setup, alternative discs, WAN performance or broader access. The explicit server configuration serves ISO bytes only to the app's existing authorized audience. ISO bytes, browser profiles, private paths and screenshots are excluded from the repository; private receipts remain private.
