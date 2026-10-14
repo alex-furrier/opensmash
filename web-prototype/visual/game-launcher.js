@@ -1,4 +1,4 @@
-import {reconcileControllers,lockControllerChoice,unlockControllerChoice,controllerLaunchChoices,isPrimaryController} from '../shared/controller-selection.js';
+import {reconcileControllers,lockControllerChoice,unlockControllerChoice,controllerLaunchChoices,isPrimaryController,invalidateControllerChoices} from '../shared/controller-selection.js';
 import {reconcileSelection,selectFighter,readyFighters} from '../shared/local-fighter-selection.js';
 import {startMenuPointer} from './menu-pointer.js';
 import { n64Keyboard } from '../shared/n64-keyboard.js';
@@ -444,6 +444,7 @@ let pendingPicks = [];
 let pendingPickSlots = "";
 
 let hostLoadButton;
+let hostLoadOperation;
 let localSelection;
 let controllerSelection;
 let clickingOwner;
@@ -509,7 +510,8 @@ function showPickPrompt(text) {
   pickPrompt.hidden = !text;
 }
 
-function clearPicks() {
+function clearPicks({invalidateControllers=false}={}) {
+  if(invalidateControllers){controllerSelection=invalidateControllerChoices(ownedState());localSelection=undefined;}
   pendingPicks = [];
   pendingPickSlots = "";
   window.characterGrid?.clearPicks?.();
@@ -2691,6 +2693,7 @@ function finishClosingFlow(sequence, restoreFocus) {
 }
 
 function closeLaunchFlow(immediate = false) {
+  hostLoadOperation?.abort();
   setSceneLift(0);
   if (!overlay || overlay.hidden) return;
   flowSequence += 1;
@@ -3099,16 +3102,14 @@ syncRomResetButton();
 // Optional host source shares the local disc validator and cache.
 if(APP_BRIDGE?.hostDiscConfigured?.()&&uploadButton){
  const button=document.createElement('button');button.type='button';button.className=uploadButton.className;button.textContent='Load from host';button.hidden=APP_BRIDGE?.experience!=='melee';hostLoadButton=button;uploadButton.after(button);
- let operation;
  button.onclick=async()=>{
-  if(operation){operation.abort();return;}
-  const controller=new AbortController();operation=controller;
-  const fighter=pendingFighter;
+  if(hostLoadOperation){hostLoadOperation.abort();return;}
+  const controller=new AbortController();hostLoadOperation=controller;
+  const fighter=pendingFighter,sequence=flowSequence;
   button.textContent='Cancel download';uploadButton.disabled=true;
-  try{await APP_BRIDGE.loadHostDisc(controller.signal,message=>{flowCopy.textContent=message;});if(!controller.signal.aborted&&fighter&&!overlay.hidden){closeLaunchFlow(true);requestLaunch(fighter);}}
-  catch(error){showRomError(controller.signal.aborted?'Download cancelled. Try again or choose a local disc.':error.message);}
-  finally{if(operation===controller){operation=null;button.textContent='Load from host';uploadButton.disabled=false;}}
+  try{await APP_BRIDGE.loadHostDisc(controller.signal,message=>{if(sequence===flowSequence&&!controller.signal.aborted)flowCopy.textContent=message;});if(!controller.signal.aborted&&sequence===flowSequence&&APP_BRIDGE?.experience==='melee'&&fighter===pendingFighter&&!overlay.hidden){closeLaunchFlow(true);requestLaunch(fighter);}}
+  catch(error){if(sequence===flowSequence&&!overlay.hidden)showRomError(controller.signal.aborted?'Download cancelled. Try again or choose a local disc.':error.message);}
+  finally{if(hostLoadOperation===controller){hostLoadOperation=null;button.textContent='Load from host';if(sequence===flowSequence)uploadButton.disabled=false;}}
  };
- cancelButton?.addEventListener('click',()=>operation?.abort());
- window.addEventListener('pagehide',()=>operation?.abort());
+ window.addEventListener('pagehide',()=>hostLoadOperation?.abort());
 }

@@ -715,7 +715,7 @@ export default function App() {
   const [rosterUi,setRosterUi]=useState(()=>{try{const saved=JSON.parse(meleePreferences.getItem(rosterChoiceKey)||'{}');return {roster:rosterScopes.includes(saved.roster)?saved.roster:'high-school',choices:saved.choices||{}};}catch{return {roster:'high-school',choices:{}};}});
   const [basePick,setBasePick]=useState(null);
   function saveRosterUi(next){setRosterUi(next);try{meleePreferences.setItem(rosterChoiceKey,JSON.stringify(next));}catch{}}
-  function selectRoster(roster){window.gameLauncher?.clearPicks();setBasePick(null);saveRosterUi({...rosterUi,roster});}
+  function selectRoster(roster){window.gameLauncher?.clearPicks({invalidateControllers:true});setBasePick(null);saveRosterUi({...rosterUi,roster});}
   function chooseRosterBase(target){
     const choices=rememberBase(rosterUi.choices,basePick.character,basePick.slot,target);
     saveRosterUi({...rosterUi,choices});window.gameLauncher?.updatePickTarget(basePick.character.slug,target,basePick.slot);setBasePick(null);
@@ -741,7 +741,7 @@ export default function App() {
     ? (isMelee ? meleeDemoGridOrder : demoGridOrder)(characters.filter((character) => character.visibility !== "private" && !character.mine))
     : (isMelee?meleeGridRoster(mergeCharactersBySlug(meleeCatalog,characters),localMeleeRoster,availableMeleeRoster,rosterUi.roster,checkingMeleeSources):characters)), [characters, demoMode, isMelee,localMeleeRoster,availableMeleeRoster,rosterUi.roster,checkingMeleeSources]);
   const gridJobs = demoMode ? [] : fighterJobs;
-  useEffect(()=>{window.gameLauncher?.clearPicks();setBasePick(null);},[gridCharacters]);
+  useEffect(()=>{window.gameLauncher?.clearPicks({invalidateControllers:true});setBasePick(null);},[gridCharacters]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1146,7 +1146,7 @@ export default function App() {
     try { n64Keyboard?.save(n64Keyboard.defaults()); } catch { /* storage blocked */ }
     window.openSmashControllerRemap?.clearAllProfiles?.();
     resetMeleePreferences();
-    window.gameLauncher?.clearPicks();setBasePick(null);setRosterUi({roster:'high-school',choices:{}});
+    window.gameLauncher?.clearPicks({invalidateControllers:true});setBasePick(null);setRosterUi({roster:'high-school',choices:{}});
   }
 
   async function requestLaunch(action) {

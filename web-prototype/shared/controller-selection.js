@@ -24,3 +24,8 @@ export function controllerLaunchChoices(state) {
  return state.devices.length>0&&state.connectedCount<=CONTROLLER_SELECTION_LIMIT&&state.devices.every(d=>d.locked&&d.choice)?state.devices.map(d=>({...d.choice,port:d.port,index:d.index,id:d.id})):null;
 }
 export function isPrimaryController(state,owner){return !!state.devices[0]&&owns(state.devices[0],owner);}
+
+export function invalidateControllerChoices(state){
+ let nextGeneration=state.nextGeneration;
+ return {...state,devices:state.devices.map(d=>({...d,generation:nextGeneration++,choice:null,locked:false})),nextGeneration};
+}

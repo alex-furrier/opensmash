@@ -53,6 +53,11 @@ assert.equal(await page.getByRole('button',{name:'Create room',exact:true}).isDi
 await page.evaluate(()=>{window.proofPads[1]=window.proofRemoved;window.proofPads[1].buttons[0]={pressed:true,value:1};window.dispatchEvent(Object.assign(new Event('gamepadconnected'),{gamepad:window.proofPads[1]}));});await page.waitForTimeout(300);
 assert.equal(await play.isDisabled(),true,'reconnected held A does not lock a ghost fighter');
 await page.evaluate(()=>window.proofPads[1].buttons[0]={pressed:false,value:0});await controllerClick(tile(picks[1]),1);
+await page.getByRole('button',{name:'Family',exact:true}).click();await page.waitForTimeout(400);
+assert.equal(await play.isDisabled(),true,'roster change invalidates hidden controller choices');
+await page.getByRole('button',{name:'High School',exact:true}).click();await page.waitForTimeout(400);
+assert.equal(await play.isDisabled(),true,'returning to roster requires fresh choices');
+await controllerClick(tile(picks[0]),0);await controllerClick(tile(picks[1]),1);
 await page.locator('#local-fighter-selection').scrollIntoViewIfNeeded();await page.screenshot({path:output+'/selection.png'});
 assert.deepEqual(errors,[]);
 await controllerClick(play,0);
@@ -99,5 +104,5 @@ await page.getByRole('button',{name:'Return to roster',exact:true}).click();awai
 const returned=await page.locator('#local-fighter-selection').innerText();
 assert.equal(await page.locator(`[data-roster-character="${picks[0].slug}"]`).getAttribute('data-pick'),'1P');
 assert.equal(await page.locator(`[data-roster-character="${picks[1].slug}"]`).getAttribute('data-pick'),'2P');
-await writeFile(output+'/game.json',JSON.stringify({select,before,after,ownedPhases,returned,independentOwnedPads:true,modesRestoredOnDisconnect:true,reconnectHeldButtonNeutral:true,assignmentMenuRemoved:true,replacementDeviceAndKeyboardStayNeutral:true,errors},null,2));
+await writeFile(output+'/game.json',JSON.stringify({select,before,after,ownedPhases,returned,independentOwnedPads:true,modesRestoredOnDisconnect:true,reconnectHeldButtonNeutral:true,assignmentMenuRemoved:true,rosterInvalidation:true,replacementDeviceAndKeyboardStayNeutral:true,errors},null,2));
 }finally{await browser.close();}

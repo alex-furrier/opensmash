@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {reconcileControllers,lockControllerChoice,unlockControllerChoice,controllerLaunchChoices,isPrimaryController} from './controller-selection.js';
+import {reconcileControllers,lockControllerChoice,unlockControllerChoice,controllerLaunchChoices,isPrimaryController,invalidateControllerChoices} from './controller-selection.js';
 const pad=(index,id='Pad '+index)=>({index,id,connected:true});
 test('each controller locks only its own fighter; locked choice needs its own unlock',()=>{
  let s=reconcileControllers(undefined,[pad(0),pad(1)]);const [p1,p2]=s.devices;
@@ -36,4 +36,12 @@ test('polling order changes retain ownership, choices and primary controller',()
  assert.deepEqual(s.devices.map(d=>d.generation),[one.generation,two.generation]);
  assert.deepEqual(controllerLaunchChoices(s).map(d=>[d.slug,d.port,d.index]),[['one',0,7],['two',1,2]]);
  assert.equal(isPrimaryController(s,two),false);
+});
+
+test('roster invalidation clears every lock and rejects callbacks from the previous roster',()=>{
+ let s=reconcileControllers(undefined,[pad(0),pad(1)]);const old=s.devices[0];
+ s=lockControllerChoice(s,old,{slug:'old-roster'});s=invalidateControllerChoices(s);
+ assert.equal(controllerLaunchChoices(s),null);assert.equal(s.devices[0].choice,null);
+ assert.deepEqual(s.devices.map(d=>d.index),[0,1]);
+ s=lockControllerChoice(s,old,{slug:'stale'});assert.equal(s.devices[0].choice,null);
 });
