@@ -52,7 +52,8 @@ export async function cacheDisc(file,signal,progress){
    committed=true;
    if(receipt)receipt.adopted=true;
    for await(const entry of dir.keys())if(entry!==name&&(entry===current||/^disc-[a-z0-9-]+\.iso$/.test(entry)))await dir.removeEntry(entry).catch(()=>{});
-   const persistent=await navigator.storage.persist?.().catch(()=>false);
+   // Read existing permission only: an optional native prompt must not block play.
+   const persistent=await navigator.storage.persisted?.().catch(()=>false);
    return persistent?'Disc saved on this device.':'Disc cached on this device. Clearing site data or browser storage cleanup can remove it.';
   }finally{if(!committed)await dir.removeEntry(name).catch(()=>{});}
  });

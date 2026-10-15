@@ -2659,8 +2659,15 @@ function showLaunchFlow(fighter, { create = false } = {}) {
   overlay.classList.remove('is-leaving', 'is-model-settled', 'is-upload-revealed');
   overlay.hidden = false;
   document.body.classList.add('is-launch-flow-open');
-  ensureFlowRenderer();
-  showFlowModel('cartridge');
+  if (usesDisc()) {
+    // The Melee setup card has no model to animate while it downloads or verifies.
+    stopFlowAnimation();
+    if (activeModel) activeModel.visible = false;
+    overlay.classList.add('is-model-settled', 'is-upload-revealed');
+  } else {
+    ensureFlowRenderer();
+    showFlowModel('cartridge');
+  }
   requestAnimationFrame(() => {
     overlay.classList.add('is-visible');
     flowTimer = window.setTimeout(() => {

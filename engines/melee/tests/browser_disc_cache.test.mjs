@@ -15,6 +15,18 @@ class Directory {
  async removeEntry(n){if(!this.entries.delete(n))throw missing();}
  async *keys(){yield* this.entries.keys();}
 }
+test('saving a verified disc checks existing persistence without requesting a blocking permission',async()=>{
+ const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator'),root=new Directory();let requests=0,checks=0;
+ try{
+  for(const persistent of [false,true]){
+   Object.defineProperty(globalThis,'navigator',{configurable:true,value:{storage:{getDirectory:async()=>root,persisted:async()=>{checks++;return persistent;},persist:async()=>{requests++;return true;}}}});
+   const message=await cacheDisc(new File(['verified copy'],'disc.iso'),new AbortController().signal,()=>{});
+   assert.equal(requests,0);assert.equal(await(await restoreCachedDisc()).text(),'verified copy');
+   assert.match(message,persistent?/Disc saved/:/Disc cached/);
+  }
+  assert.equal(checks,2);
+ }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
+});
 test('disc cache commits complete files, preserves old copy on abort/quota, and clears only its directory',async()=>{
  const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator'),root=new Directory();
  Object.defineProperty(globalThis,'navigator',{configurable:true,value:{storage:{getDirectory:async()=>root,persist:async()=>false}}});
