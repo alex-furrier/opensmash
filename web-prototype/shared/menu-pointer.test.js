@@ -60,5 +60,10 @@ test('two menu controllers arbitrate scrolling, preserve cursor edges, and stop 
  pads[0].buttons[0].pressed=true;frame();frame();assert.equal(clicks,1,'held A still clicks only once');
  active=false;const stopped=scroll;frame();assert.equal(scroll,stopped);assert.ok(cursors.every(c=>c.removed));
  active=true;frame();assert.equal(clicks,1,'held A cannot leak on return');
+ const hiddenDialog={visibility:'hidden',dataset:{},getClientRects:()=>[{}],append:cursor=>{cursor.parentNode=hiddenDialog;},getBoundingClientRect:()=>({x:0,y:0,width:1000,height:800})};
+ const visibleDialog={...hiddenDialog,visibility:'visible',append:cursor=>{cursor.parentNode=visibleDialog;}};
+ globalThis.document.querySelectorAll=()=>[hiddenDialog,visibleDialog];
+ pads.forEach(p=>p.axes=[0,0,0,0]);frame();
+ assert.equal(cursors.at(-2).parentNode,visibleDialog,'hidden tutorial upload section cannot own the cursor');
  globalThis.document.hidden=true;const hidden=scroll;frame();assert.equal(scroll,hidden);
 });

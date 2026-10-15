@@ -27,7 +27,7 @@ export function startMenuPointer({enabled,controllers,controllerIndex,click,back
   const keys=new Set(owners.map(o=>`${o.key}:${o.generation}`));
   for(const [key,value] of states)if(!keys.has(key)){value.cursor.remove();states.delete(key);}
   const pads=active?Array.from(navigator.getGamepads?.()||[]):[];
-  const dialog=Array.from(document.querySelectorAll('dialog[open],[role="dialog"][aria-modal="true"]')).find(node=>node.getClientRects().length),surface=dialog||document.body;
+  const dialog=Array.from(document.querySelectorAll('dialog[open],[role="dialog"][aria-modal="true"]')).find(node=>node.getClientRects().length&&getComputedStyle(node).visibility!=='hidden'),surface=dialog||document.body;
   let scrolling;
   for(const owner of owners){
    const key=`${owner.key}:${owner.generation}`,pad=pads.find(p=>p?.connected&&p.index===owner.index&&(!owner.id||p.id===owner.id));

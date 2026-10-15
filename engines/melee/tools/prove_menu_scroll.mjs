@@ -27,7 +27,7 @@ async function open(viewport,pads=2){
 async function hold(page,port,value,ms=400){await page.evaluate(({port,value})=>window.proofPads[port].axes[3]=value,{port,value});await page.waitForTimeout(ms);await page.evaluate(port=>window.proofPads[port].axes[3]=0,port);await page.waitForTimeout(100);}
 async function scrollTop(page){await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));await page.waitForTimeout(100);}
 try{
- if(!args.includes('--settings-only')){
+ if(!args.includes('--settings-only')&&!args.includes('--tutorial-only')){
  const {context,page}=await open({width:1440,height:1000});
  console.log('Menu loaded');await scrollTop(page);await hold(page,0,.21);assert.equal(await page.evaluate(()=>scrollY),0,'deadzone must not scroll');
  await hold(page,1,1);const p2=await page.evaluate(()=>scrollY);console.log('P2 scroll',p2);assert.ok(p2>200,'P2 right stick must scroll the shared menu');
@@ -68,7 +68,7 @@ try{
   await page.screenshot({path:output+'/selected-'+width+'.png'});results.push({label:'layout',width,...geometry});await context.close();
  }
  }
- for(const viewport of [{width:390,height:320},{width:844,height:390}]){
+ if(!args.includes('--tutorial-only'))for(const viewport of [{width:390,height:320},{width:844,height:390}]){
   const {context,page}=await open(viewport);
   try{
    const settings=page.getByRole('button',{name:'Settings',exact:true});
@@ -98,5 +98,19 @@ try{
    results.push({label:'settings',viewport,before,after,lower,lowerControlClickedByP1:true,p2Blocked:true,backgroundStill:true});
   }finally{await context.close();}
  }
- assert.deepEqual(errors,[]);await writeFile(output+'/result.json',JSON.stringify({date:new Date().toISOString(),chrome:browser.version(),results,engineBlocked:true,syntheticControllers:true,errors},null,2));console.log('Chrome menu scrolling, ownership, transfer gating and seven responsive layouts passed.');
+ {
+  const {context,page}=await open({width:844,height:390});
+  try{
+   await page.evaluate(()=>window.gameLauncher.showControls());
+   await page.waitForFunction(()=>document.querySelector('.launch-flow-overlay')?.dataset.step==='controller');await page.waitForTimeout(150);
+   const state=await page.evaluate(()=>{const upload=document.querySelector('.launch-flow-upload'),cursor=document.querySelector('.menu-controller-cursor[data-player="1"]');return {uploadLaidOut:upload.getClientRects().length>0,uploadVisibility:getComputedStyle(upload).visibility,cursorDialog:cursor.parentElement.id,cursorVisibility:getComputedStyle(cursor).visibility};});
+   await writeFile(output+'/tutorial.json',JSON.stringify(state,null,2));
+   assert.equal(state.uploadLaidOut,true);assert.equal(state.uploadVisibility,'hidden');
+   assert.equal(state.cursorDialog,'launch-flow-controller-step','visible controller tutorial must own the cursor');assert.equal(state.cursorVisibility,'visible');
+   await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:true,value:1});await page.waitForTimeout(80);await page.evaluate(()=>window.proofPads[0].buttons[1]={pressed:false,value:0});
+   await page.locator('.launch-flow-overlay').waitFor({state:'hidden'});
+   results.push({label:'tutorial',...state,p1BackCloses:true,engineBlocked:true});
+  }finally{await context.close();}
+ }
+ assert.deepEqual(errors,[]);await writeFile(output+'/result.json',JSON.stringify({date:new Date().toISOString(),chrome:browser.version(),results,engineBlocked:true,syntheticControllers:true,errors},null,2));console.log('Chrome menu scrolling, Settings, tutorial cursor, ownership and responsive checks passed.');
 }finally{await browser.close();}
