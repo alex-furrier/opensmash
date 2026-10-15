@@ -19,6 +19,7 @@ import {keyLabel,loadBindings,rawGamepads,sampleMeleePad,type Action} from '@/li
 // GameCube button bits in the pad word, keyed by the control id from the bindings module.
 const bits:Record<string,number>={a:0x100,b:0x200,x:0x400,y:0x800,z:0x10,l:0x40,r:0x20,start:0x1000};
 export default function Game({fighter,settings,roster,onClose,soundOn=true,chrome=true,holdForTrailer=false,trailerReveal=false,onTrailerReady,onTrailerStatus,room,onRematch}:{room?:any;onRematch?:()=>void;fighter:Fighter;settings:Settings;roster:Fighter[];onClose:()=>void;soundOn?:boolean;chrome?:boolean;holdForTrailer?:boolean;trailerReveal?:boolean;onTrailerReady?:()=>void;onTrailerStatus?:(status:string)=>void}){
+ const closeCallback=useRef(onClose);closeCallback.current=onClose;
  const matchMode=room?.launch?.mode??settings.mode;
  const matchTarget=room?.launch?.ports[room.assignment.player]?.target||(settings.ports[0].target&&settings.ports[0].target!=='auto'?settings.ports[0].target:fighter.target);
  useEffect(()=>{setAudioEnabled(soundOn);},[soundOn]);
@@ -134,6 +135,13 @@ export default function Game({fighter,settings,roster,onClose,soundOn=true,chrom
     if(data.type==='trailer-ready')trailerReadyCallback.current?.();
     if(data.type==='intro'){if(holdForTrailer&&!trailerVisible.current){setError('The deployed Melee runtime does not support trailer preloading. Deploy the updated engine input release, then reload this page.');return;}stopAnnouncer();setStatus('');startAudio();}
     if(data.type==='playable'){playable=true;setStatus('');startAudio();if(!gameInputBlocked())canvas.current?.focus({preventScroll:true});}
+    // Native GS_RESULTS follows the finished VS match, including sudden death.
+    // Other launch modes intentionally retain their own native menu lifecycle.
+    if(data.type==='progress'&&matchMode===0&&playable&&data.sceneKind===5){
+     closed=true;running=false;blur();cancelAnimationFrame(raf);setOwnsInput(false);
+     if(document.fullscreenElement)void document.exitFullscreen().catch(()=>{});
+     closeCallback.current();return;
+    }
     if(data.type==='error')failLaunch(data.message||'Melee initialization failed without an error message.');
     if(data.type==='log'){console.log('[Melee]',data.text);if(playable&&data.text.includes('[opensmash] destination ready'))setStatus('');}
     if(data.type==='metrics'){
