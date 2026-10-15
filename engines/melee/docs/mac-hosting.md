@@ -120,11 +120,40 @@ endpoint before startup. This health check proves availability, not game accepta
 A successful process exit stays stopped. These jobs do not promise boot-before-login
 or availability while the Mac sleeps, is offline, or awaits FileVault unlock.
 
-The runner clears inherited environment settings. It does not enable host ISO
-delivery, scripted opponents or public listeners. It verifies toolchain versions,
+The runner clears inherited environment settings. Host ISO delivery stays disabled
+unless the private service JSON explicitly includes `hostDiscFile`; scripted
+opponents and public listeners remain disabled. It verifies toolchain versions,
 release bytes, helper code/input hashes and configured runtime hashes before exec.
 Keep the service runner itself at the reviewed immutable release path when rendering
 jobs; rendering from a development checkout would retain that checkout path.
+
+## Optional existing-disc delivery
+
+Omit `hostDiscFile` to keep delivery disabled. After approval for the exact existing
+file and everyone holding the shared password, add its absolute path to the private
+service JSON. The launcher accepts one owner-owned regular file outside the sealed
+release, rejects symlinks, and passes the path only to Node. It never inherits a
+disc path from the launch environment or copies the ISO into the release.
+
+Node verifies the complete file against the pinned Melee USA 1.02 size and SHA-256
+before listening. Invalid files stop startup. Only a verified configured disc enables
+the password gate's disc routes. Anonymous GET/HEAD requests remain denied; signed-in
+users can fetch metadata and the file through the existing app. Responses use
+`no-store`. Requests for other paths, query-selected files, unsupported methods or
+Range downloads return no disc bytes. Interrupted downloads restart from the
+beginning. Password rotation or session expiry cancels active protected transfers;
+it cannot erase files users have already saved.
+
+Password setup, connector activation and DNS publication do not themselves approve
+ISO delivery. Keep it disabled until the file/audience decision is explicit. Use
+synthetic fixtures to check authentication, HEAD, ranges, digest rejection and
+transfer revocation without serving the owner's real ISO:
+
+```sh
+node --test web-prototype/server/shared-password.test.js \
+  engines/melee/tests/host_disc_server.test.mjs \
+  engines/melee/tests/host_disc_download.test.mjs
+```
 
 ## Activate, validate and recover
 

@@ -34,6 +34,13 @@ def config(path):
     for key in ('helper', 'authFile', 'characterRoot', 'roster', 'logs', 'engineRoot'):
         if Path(value[key]).resolve().is_relative_to(release):
             raise ValueError('Private state/runtime must be outside source release: ' + key)
+    disc = value.get('hostDiscFile')
+    if disc is not None:
+        if not isinstance(disc, str) or not Path(disc).is_absolute():
+            raise ValueError('hostDiscFile requires one explicit absolute private file')
+        path = Path(disc)
+        if path.is_symlink() or not path.is_file() or path.stat().st_uid != os.getuid() or path.resolve().is_relative_to(release):
+            raise ValueError('hostDiscFile must be an owner-owned regular file outside the release')
     return value
 
 
@@ -82,6 +89,8 @@ def service_environment(value, role, helper_key):
                    FIGHTER_JOBS_ROOT=str(helper / 'build/fighter-jobs'), OBJECT_STORE_ROOT=str(helper / 'build/objects'))
         # Legacy app cookies have a separate purpose and expire on service restart.
         env['COOKIE_SECRET'] = secrets.token_hex(32)
+        if value.get('hostDiscFile') is not None:
+            env['MELEE_HOST_DISC_FILE'] = value['hostDiscFile']
     return env
 
 
@@ -123,7 +132,7 @@ def run(path, role):
         os.chdir(helper)
         args = [value['python'], str(helper / 'tools/serve_melee.py'), '--upstream', '--port', '8818', '--characters', value['characterRoot'], '--private-roster', value['roster']]
     else:
-        # Never forward an inherited ISO delivery or simulated-peer environment setting.
+        # Only explicit validated configuration can opt into disc delivery.
         for _ in range(30):
             try:
                 with urlopen(Request('http://127.0.0.1:8818/api/imports?roster=active', headers={'X-OpenSmash-Token': helper_key}), timeout=2) as response:

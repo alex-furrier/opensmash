@@ -68,7 +68,7 @@ function loginFailure(req, res, status, message = 'Unable to sign in. Check the 
   else loginPage(res, status, message);
 }
 
-export function createSharedPasswordGate({file, origin, now = Date.now, pollMs = 500} = {}) {
+export function createSharedPasswordGate({file, origin, allowHostDisc = false, now = Date.now, pollMs = 500} = {}) {
   const url = new URL(origin);
   if (url.protocol !== 'https:' || url.origin !== origin || url.hostname !== 'smash.alexfurrier.dev' || !file) throw Error('Shared hosting requires its exact HTTPS origin and auth file.');
   let current, fingerprint, loading, generation = 0;
@@ -156,8 +156,8 @@ export function createSharedPasswordGate({file, origin, now = Date.now, pollMs =
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !originAllowed(req)) { reply(res, 403, '{"error":"Forbidden"}'); return false; }
     if (pathname === '/logout' && req.method === 'POST') { res.setHeader('Set-Cookie', setCookie(SESSION, '', 0)); res.writeHead(303, {Location: '/login'}); res.end(); return false; }
     if (pathname.startsWith('/__/auth/') || (pathname.startsWith('/api/auth/') && pathname !== '/api/auth/config')) { reply(res, 404, '{"error":"Not found"}'); return false; }
-    // Disc delivery is deliberately unavailable to the new password audience.
-    if (/^\/melee\/api\/disc(?:-source)?$/.test(pathname)) { reply(res, 404, '{"available":false}'); return false; }
+    // Opt-in routes remain authenticated, uncached and tracked for revocation.
+    if (allowHostDisc !== true && /^\/melee\/api\/disc(?:-source)?$/.test(pathname)) { reply(res, 404, '{"available":false}'); return false; }
     const release = track(() => res.destroy(), auth);
     if (!release) return false;
     res.once('close', release); res.once('finish', release);

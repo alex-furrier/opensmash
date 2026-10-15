@@ -188,5 +188,22 @@ class MacReleaseTests(unittest.TestCase):
         file.chmod(0o600); config['authFile'] = str(self.root / 'release/auth.json'); file.write_text(json.dumps(config))
         with self.assertRaisesRegex(ValueError, 'outside source'): service.plists(file)
 
+    def test_host_disc_is_explicit_external_file_and_web_only(self):
+        value = {key: str(self.root / key) for key in ('release', 'helper', 'node', 'python', 'authFile', 'engineRoot', 'characterRoot', 'roster', 'logs')}
+        file = self.root / 'service.json'
+        file.write_text(json.dumps(value)); file.chmod(0o600)
+        disc = self.root / 'private.iso'; disc.write_bytes(b'synthetic fixture only')
+        value['hostDiscFile'] = str(disc); file.write_text(json.dumps(value))
+        accepted = service.config(file)
+        self.assertEqual(service.service_environment(accepted, 'web', '0' * 64)['MELEE_HOST_DISC_FILE'], str(disc))
+        self.assertNotIn('MELEE_HOST_DISC_FILE', service.service_environment(accepted, 'helper', '0' * 64))
+        self.assertNotIn(str(disc), json.dumps(service.plists(file)))
+        release_disc = self.root / 'release/private.iso'
+        release_disc.parent.mkdir(); release_disc.write_bytes(b'not packaged')
+        link = self.root / 'linked.iso'; link.symlink_to(disc)
+        for invalid in ('relative.iso', '', 1, str(self.root), str(link), str(release_disc), str(self.root / 'absent.iso')):
+            value['hostDiscFile'] = invalid; file.write_text(json.dumps(value))
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError): service.config(file)
+
 
 if __name__ == '__main__': unittest.main()

@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,writeFile,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';import {createHash} from 'node:crypto';import http from 'node:http';
+import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,writeFile,rm,symlink} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';import {createHash} from 'node:crypto';import http from 'node:http';
 import {createHostDisc,HOST_DISC_PATH} from '../server/host-disc.mjs';import {privateMeleeRequestAllowed,allowedHostedRoute} from '../server/handler.mjs';
 test('fixed file is size/digest verified and restart-stable; unrelated paths, methods and ranges never return bytes',async()=>{
  const dir=await mkdtemp(join(tmpdir(),'host-disc-')),file=join(dir,'private.iso'),bytes=Buffer.alloc(3*1024*1024,73),digest=createHash('sha256').update(bytes).digest('hex');await writeFile(file,bytes);
@@ -6,6 +6,7 @@ test('fixed file is size/digest verified and restart-stable; unrelated paths, me
  async function start(){disc=await createHostDisc({file,expectedSize:bytes.length,expectedHash:digest});server=http.createServer((req,res)=>{void disc.respond(req,res).catch(()=>res.destroy());});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));return 'http://127.0.0.1:'+server.address().port;}
  async function stop(){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await disc.close();}
  try{
+  const link=join(dir,'linked.iso');await symlink(file,link);await assert.rejects(createHostDisc({file:link,expectedSize:bytes.length,expectedHash:digest}),{code:'ELOOP'});
   await assert.rejects(createHostDisc({file,expectedSize:bytes.length-1,expectedHash:digest}),/size/);
   await assert.rejects(createHostDisc({file,expectedSize:bytes.length,expectedHash:'0'.repeat(64)}),/digest/);
   for(let restart=0;restart<2;restart++){

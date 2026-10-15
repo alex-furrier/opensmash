@@ -12,13 +12,14 @@ import {EventEmitter, once} from 'node:events';
 const origin = 'https://smash.alexfurrier.dev';
 const password = 'isolated-test-only-password';
 const config = async () => ({helperKey: randomBytes(32).toString('hex'), authVersion: randomBytes(32).toString('hex'), sealKey: randomBytes(32).toString('hex'), password: await passwordRecord(password)});
-async function fixture(t, {missing = false} = {}) {
+async function fixture(t, {missing = false, allowHostDisc = false, protectedHandler} = {}) {
   const directory = await mkdtemp(path.join(tmpdir(), 'opensmash-auth-'));
   const file = path.join(directory, 'auth.json'); let value = await config();
   if (!missing) await writeFile(file, JSON.stringify(value), {mode: 0o600});
-  const gate = createSharedPasswordGate({file, origin, pollMs: 10});
+  const gate = createSharedPasswordGate({file, origin, allowHostDisc, pollMs: 10});
   const server = http.createServer(async (req, res) => {
     if (!await gate.handle(req, res)) return;
+    if (protectedHandler) return protectedHandler(req, res);
     if (req.url === '/stream') { res.writeHead(200, {'Cache-Control': 'public,max-age=100', 'CDN-Cache-Control': 'public'}); res.write('data'); return; }
     res.writeHead(200, {'Cache-Control': 'public,max-age=100', 'CDN-Cache-Control': 'public'}); res.end('protected');
   });
@@ -30,7 +31,7 @@ async function fixture(t, {missing = false} = {}) {
     }); req.on('error', reject); req.end(body);
   });
   const session = async (overrides = {}) => '__Host-opensmash-session=' + await sealData({version: value.authVersion, expires: Date.now() + 3600000, ...overrides}, {password: value.sealKey, ttl: 43200});
-  const rotate = async () => {value = await config(); await writeFile(file + '.tmp', JSON.stringify(value), {mode: 0o600}); await rename(file + '.tmp', file);};
+  const rotate = async next => {value = next || await config(); await writeFile(file + '.tmp', JSON.stringify(value), {mode: 0o600}); await rename(file + '.tmp', file);};
   return {gate, request, session, rotate, file, server, get value() {return value;}};
 }
 
@@ -40,6 +41,44 @@ test('anonymous GET/HEAD assets, encoded paths, API and spoofed authority are de
   assert.equal((await f.request('/')).status, 303);
   assert.equal((await f.request('/login', {headers: {Host: 'localhost'}})).status, 403);
   assert.equal((await f.request('/login', {headers: {Origin: 'https://evil.example'}})).status, 403);
+});
+
+test('explicit hosted disc remains authenticated for GET/HEAD, rejects ranges and cancels on rotation', {timeout: 15000}, async t => {
+  const {createHostDisc, HOST_DISC_PATH, HOST_DISC_CONFIG_PATH} = await import('../../engines/melee/server/host-disc.mjs');
+  const {createHash} = await import('node:crypto');
+  const directory = await mkdtemp(path.join(tmpdir(), 'opensmash-auth-disc-'));
+  const file = path.join(directory, 'synthetic.iso'), bytes = Buffer.alloc(16 * 1024 * 1024, 71);
+  const digest = createHash('sha256').update(bytes).digest('hex');
+  await writeFile(file, bytes);
+  const disc = await createHostDisc({file, expectedSize: bytes.length, expectedHash: digest});
+  t.after(async () => {await disc.close();await rm(directory, {recursive: true, force: true});});
+  const f = await fixture(t, {allowHostDisc: true, protectedHandler: (req, res) => {
+    if (req.url === HOST_DISC_CONFIG_PATH) {res.writeHead(200, {'Content-Type':'application/json'});res.end(JSON.stringify(disc.metadata));return;}
+    void disc.respond(req, res).catch(() => res.destroy());
+  }});
+  for (const route of [HOST_DISC_PATH, HOST_DISC_CONFIG_PATH]) for (const method of ['GET','HEAD']) assert.equal((await f.request(route, {method})).status, 401);
+  const cookie = await f.session(), headers = {Cookie: cookie};
+  const metadata = await f.request(HOST_DISC_CONFIG_PATH, {headers});assert.equal(JSON.parse(metadata.text).sha256, digest);assert.equal(metadata.headers['cache-control'],'no-store');
+  const head = await f.request(HOST_DISC_PATH, {method:'HEAD',headers});assert.equal(head.status,200);assert.equal(head.headers['content-length'],String(bytes.length));assert.equal(head.text,'');
+  const get = await f.request(HOST_DISC_PATH, {headers});assert.equal(get.status,200);assert.equal(get.headers['cdn-cache-control'],'no-store');assert.equal(createHash('sha256').update(get.text).digest('hex'),digest);
+  for (const [route, options] of [[HOST_DISC_PATH+'?file=other',{}],[HOST_DISC_PATH,{headers:{...headers,Range:'bytes=0-99'}}],[HOST_DISC_PATH,{method:'POST',headers:{...headers,Origin:origin}}]]) {
+    const denied = await f.request(route,{headers,...options});assert.equal(denied.status,404);assert.equal(denied.text,'');
+  }
+  assert.equal((await f.request(HOST_DISC_PATH,{headers:{...headers,Origin:'https://other.example'}})).status,403);
+  const next = await config();
+  const stream = await new Promise(resolve => http.get({host:'127.0.0.1',port:f.server.address().port,path:HOST_DISC_PATH,headers:{Host:'smash.alexfurrier.dev',...headers}},resolve));
+  assert.equal(stream.statusCode,200);const aborted=once(stream,'aborted');await f.rotate(next);await f.request('/login');stream.resume();await aborted;
+  assert.equal((await f.request(HOST_DISC_PATH,{method:'HEAD',headers})).status,401);
+});
+
+test('production startup rejects an unverified configured disc before listening', async t => {
+  const {execFile} = await import('node:child_process');const {promisify} = await import('node:util');const {fileURLToPath} = await import('node:url');
+  const directory = await mkdtemp(path.join(tmpdir(),'opensmash-invalid-disc-')), file = path.join(directory,'synthetic.iso');
+  const bytes = 'synthetic-invalid-disc-content';await writeFile(file,bytes);t.after(()=>rm(directory,{recursive:true,force:true}));
+  const env={PATH:process.env.PATH,HOME:directory,NODE_ENV:'production',HOST:'127.0.0.1',PORT:'0',CREATION_ENABLED:'0',MELEE_SHARED_HOSTING:'1',MELEE_SHARED_AUTH_FILE:path.join(directory,'unused-auth.json'),MELEE_PRIVATE_ORIGIN:origin,MELEE_HOST_DISC_FILE:file};
+  await assert.rejects(promisify(execFile)(process.execPath,[fileURLToPath(new URL('./index.js',import.meta.url))],{env,timeout:10000}),error=>{
+    assert.match(error.stderr,/unexpected size/);assert.ok(!error.stdout.includes('OpenSmash web:'));assert.ok(!error.stderr.includes(bytes));return true;
+  });
 });
 
 test('login CSRF/origin, wrong password, valid cookie, logout and forced private caching', async t => {

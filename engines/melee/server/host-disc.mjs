@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import {open} from 'node:fs/promises';
+import {constants} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {ISO_SIZE,ISO_SHA256} from '../runtime/web/disc.mjs';
@@ -7,7 +8,7 @@ export const HOST_DISC_PATH='/melee/api/disc';
 export const HOST_DISC_CONFIG_PATH='/melee/api/disc-source';
 /** One explicitly configured, verified file; no caller-supplied filesystem path. */
 export async function createHostDisc({file,expectedSize=ISO_SIZE,expectedHash=ISO_SHA256}){
- const handle=await open(file,'r');let info;
+ const handle=await open(file,constants.O_RDONLY|constants.O_NOFOLLOW);let info;
  try{
   info=await handle.stat();if(!info.isFile()||info.size!==expectedSize)throw Error('Configured host disc has an unexpected size.');
   const hash=createHash('sha256');

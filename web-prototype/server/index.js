@@ -43,7 +43,6 @@ const sharedHosting = process.env.MELEE_SHARED_HOSTING === '1';
 if (process.env.MELEE_SHARED_AUTH_FILE && !sharedHosting) throw Error('Auth file requires MELEE_SHARED_HOSTING=1.');
 if (sharedHosting && (!process.env.MELEE_SHARED_AUTH_FILE || process.env.MELEE_PRIVATE_ORIGIN !== 'https://smash.alexfurrier.dev' || !['127.0.0.1','localhost','::1'].includes(HOST))) throw Error('Shared hosting requires auth file, exact origin and loopback HOST.');
 if (sharedHosting && process.env.CREATION_ENABLED !== '0') throw Error('Shared hosting requires CREATION_ENABLED=0.');
-const sharedPassword = sharedHosting ? createSharedPasswordGate({file: process.env.MELEE_SHARED_AUTH_FILE, origin: process.env.MELEE_PRIVATE_ORIGIN}) : null;
 if(process.env.MELEE_PRIVATE_ORIGIN){const {privateFriendOrigin}=await import('../../engines/melee/server/friend-rooms.mjs');privateFriendOrigin(process.env.MELEE_PRIVATE_ORIGIN);}
 const {createHostDisc,HOST_DISC_PATH,HOST_DISC_CONFIG_PATH}=await import('../../engines/melee/server/host-disc.mjs');
 let hostDisc;
@@ -51,6 +50,7 @@ if(process.env.MELEE_HOST_DISC_FILE){
  if(!['127.0.0.1','localhost','::1'].includes(HOST)||!process.env.MELEE_PRIVATE_ORIGIN)throw Error('Host disc requires the existing private origin and a loopback HOST.');
  hostDisc=await createHostDisc({file:process.env.MELEE_HOST_DISC_FILE});
 }
+const sharedPassword = sharedHosting ? createSharedPasswordGate({file: process.env.MELEE_SHARED_AUTH_FILE, origin: process.env.MELEE_PRIVATE_ORIGIN, allowHostDisc: Boolean(hostDisc)}) : null;
 const handleMelee = createEmbeddedMeleeHandler();
 let friendRuntime=null,attachFriendRooms;
 if(process.env.MELEE_NETPLAY_ENGINE_ROOT){
