@@ -158,7 +158,7 @@ test('real friend upgrade owner rejects missing/tampered sessions and closes an 
   const connect = cookie => new WebSocket(`ws://127.0.0.1:${f.server.address().port}/melee/room`, {headers: {Host: 'smash.alexfurrier.dev', Origin: origin, Cookie: cookie || ''}});
   for (const cookie of ['', 'bad']) {
     const socket = connect(cookie);socket.on('error', () => {});
-    const [req, response] = await once(socket, 'unexpected-response');assert.equal(response.statusCode, 401);response.resume();socket.terminate();
+    const [req, response] = await once(socket, 'unexpected-response');assert.equal(response.statusCode, 401);assert.equal(response.headers['content-length'], '0');assert.equal(response.headers.connection, 'close');assert.equal(response.headers['cache-control'], 'no-store');response.resume();socket.terminate();
   }
   const socket = connect(await f.session());await once(socket, 'open');const closed = once(socket, 'close');
   await f.rotate();await closed;

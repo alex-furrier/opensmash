@@ -43,10 +43,10 @@ export function attachFriendRooms(server,{engine,host='127.0.0.1',simulatedPeer,
   let auth;
   if(sharedPassword){
    try{auth=await sharedPassword.authorizeUpgrade(req);}catch{}
-   if(!auth){socket.end('HTTP/1.1 401 Unauthorized\r\n\r\n');return;}
+   if(!auth){socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\nCache-Control: no-store\r\n\r\n');return;}
   }
   if(req.url!=='/melee/room')return;
-  if(!friendOriginAllowed(req,{host,privateOrigin})){socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');return;}
+  if(!friendOriginAllowed(req,{host,privateOrigin})){socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\nCache-Control: no-store\r\n\r\n');return;}
   wss.handleUpgrade(req,socket,head,ws=>{if(sharedPassword&&!sharedPassword.trackSocket(ws,auth))return;wss.emit('connection',ws);});
  };
  server.on('upgrade',upgrade);
