@@ -6,7 +6,9 @@ import type {Fighter} from '../web/lib/fighter';
 import {connectFriendRoom,localFriendDevice} from '../web/lib/friend-room.mjs';
 export default function FriendMatch({fighter,settings,localPortPlan,roster,onClose,soundOn,simulated=false,automatic=false}:{fighter:Fighter;settings:Settings;localPortPlan?:any;roster:Fighter[];onClose:()=>void;soundOn:boolean;simulated?:boolean;automatic?:boolean}){
  const [connection,setConnection]=useState<any>(),[assignment,setAssignment]=useState<any>(),[message,setMessage]=useState('Choose two fighters in Match settings, then create a room.'),[code,setCode]=useState(()=>location.hash.replace(/^#room=/,''));
- const restart=useRef<any>(undefined),initial=useRef(false);
+ const restart=useRef<any>(undefined),initial=useRef(false),matchAssigned=useRef(false),mounted=useRef(false);
+ const closeCallback=useRef(onClose);closeCallback.current=onClose;
+ useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
  useEffect(()=>{if(automatic&&!initial.current){initial.current=true;create();}},[automatic]);
  useEffect(()=>()=>connection?.client.stop(),[connection]);
  useEffect(()=>{if(!connection&&restart.current){const match=restart.current;restart.current=undefined;connect({type:'create',match,...(simulated?{testBot:true}:{})});}},[connection]);
@@ -15,10 +17,15 @@ export default function FriendMatch({fighter,settings,localPortPlan,roster,onClo
   const localDevice=localFriendDevice(applyLauncherSelection(settings,{portPlan:localPortPlan}).ports);
   if(!localDevice){setMessage('Choose a keyboard or gamepad in Players & Controllers first.');return;}
   const room=connectFriendRoom(request,(event:any)=>{
+   if(!mounted.current)return;
    if(event.type==='room')setMessage(event.players.map((p:any,i:number)=>`Player ${i+1}: ${p?(p.ready?'Ready':'Preparing'):'Waiting'}`).join(' · '));
-   if(event.type==='stopped'){setMessage(event.reason);setAssignment(undefined);setConnection(undefined);}
+   if(event.type==='stopped'){
+    const returnToRoster=matchAssigned.current&&!restart.current;matchAssigned.current=false;
+    setMessage(event.reason);setAssignment(undefined);setConnection(undefined);
+    if(returnToRoster)closeCallback.current();
+   }
   });
-  setConnection({client:room,settings,localDevice});void room.assignment.then((joined:any)=>{if(room.closed)return;setAssignment(joined);setCode(location.origin+'/melee#room='+joined.room);}).catch((error:Error)=>setMessage(error.message));
+  setConnection({client:room,settings,localDevice});void room.assignment.then((joined:any)=>{if(room.closed)return;matchAssigned.current=true;setAssignment(joined);setCode(location.origin+'/melee#room='+joined.room);}).catch((error:Error)=>setMessage(error.message));
  }
  function create(){try{
   const proposal=plan(friendMatchSettings(settings),fighter,roster);connect({type:'create',match:proposal,...(simulated?{testBot:true}:{})});

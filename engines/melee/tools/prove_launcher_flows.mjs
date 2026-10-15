@@ -53,8 +53,7 @@ async function playable(label){
  await page.screenshot({path:out+'/'+label+'-start.png'});results.push({label,display,frames:after.frame-before.frame,positionDelta:moved.state[3]-before.state[3],actualPlayable:true});
 }
 async function stop(mode){
- await page.getByRole('button',{name:mode==='computer'?'Stop friend match':'Return to roster',exact:true}).click();
- if(mode==='computer')await page.getByRole('button',{name:'Return to roster',exact:true}).click();
+ if(await page.locator('.game-overlay').isVisible())await page.getByRole('button',{name:mode==='computer'?'Stop friend match':'Return to roster',exact:true}).click();
  await page.getByRole('button',{name:'Create room',exact:true}).waitFor();
 }
 async function shortMatch(){
@@ -62,8 +61,10 @@ async function shortMatch(){
  await page.getByLabel('Stocks',{exact:true}).fill('1');await page.getByLabel('Minutes (0 = unlimited)',{exact:true}).fill('1');await page.getByRole('button',{name:'Back',exact:true}).click();await page.getByRole('button',{name:'Cancel',exact:true}).click();
 }
 async function resultsScreen(label){
- const frame=page.frames().find(frame=>frame.url().includes('/engine/upstream/runtime.html'));
- await frame.waitForFunction(()=>window.Module._direct_scene_kind()===5,{},{timeout:100000});await page.screenshot({path:out+'/'+label+'-results.png'});results.at(-1).actualResults=true;
+ await page.waitForFunction(()=>window.launcherProof.some(event=>event.type==='progress'&&event.sceneKind===5),{},{timeout:100000});
+ await page.waitForFunction(()=>!document.querySelector('.game-overlay'));
+ await page.getByRole('group',{name:'Choose roster',exact:true}).waitFor();
+ await page.screenshot({path:out+'/'+label+'-returned.png'});results.at(-1).actualResults=true;results.at(-1).returnedAutomatically=true;
 }
 let display;
 try{
