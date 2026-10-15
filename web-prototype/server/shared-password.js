@@ -1,4 +1,5 @@
 import {open} from 'node:fs/promises';
+import {sharedLoginPage} from './shared-login-page.js';
 import {constants} from 'node:fs';
 import {randomBytes, scrypt, timingSafeEqual} from 'node:crypto';
 import {promisify} from 'node:util';
@@ -60,7 +61,7 @@ function loginPage(res, status = 200, message = "A private lobby for friends.") 
   const token = randomBytes(32).toString('hex');
   res.setHeader('Set-Cookie', setCookie(CSRF, token, 600));
   res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
-  reply(res, status, `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OpenSmash · Private lobby</title><style>body{margin:0;min-height:100dvh;display:grid;place-items:center;background:#10141a;color:#f5f2e9;font:18px system-ui}main{width:min(360px,85vw)}h1{font-size:36px}label,input,button{display:block;box-sizing:border-box;width:100%}input,button{margin-top:12px;padding:14px;border-radius:8px;font:inherit}button{background:#ffc853;color:#171717;border:0;font-weight:700}p{color:#b9c0cc}</style><main><h1>OpenSmash</h1><p${status === 200 ? '' : ' role="alert"'}>${message}</p><form action="/login" method="post"><input type="hidden" name="csrf" value="${token}"><label>Shared password<input name="password" type="password" required autocomplete="current-password" maxlength="1024" autofocus></label><button>Enter lobby</button></form></main></html>`, 'text/html; charset=utf-8');
+  reply(res, status, sharedLoginPage({token, message, failed: status !== 200}), 'text/html; charset=utf-8');
 }
 
 function loginFailure(req, res, status, message = 'Unable to sign in. Check the shared password and try again.') {
