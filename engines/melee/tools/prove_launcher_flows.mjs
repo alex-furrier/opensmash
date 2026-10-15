@@ -34,8 +34,8 @@ async function setupDisc(){
 if(debugScenario)await context.addInitScript(scenario=>{window.addEventListener('message',({data})=>{if(data?.type==='select'&&data.netplay)data.netplay.debug={scripted:false,scenario,seed:17};});},debugScenario);
 async function begin(mode,skip=false){
  await page.evaluate(()=>{window.launcherProof=[];});await pick().click();
- if(skip){const tutorial=page.getByRole('button',{name:'Skip',exact:true}),choice=page.locator('#local-fighter-selection button:last-of-type:not(:disabled),.melee-setup button').filter({hasText:mode==='solo'?'Play locally':'Play against computer'});await Promise.race([tutorial.waitFor(),choice.waitFor()]);if(await tutorial.isVisible())await tutorial.click();}
- const localStart=page.locator('#local-fighter-selection').getByRole('button',{name:'Play locally',exact:true});
+ if(skip){const tutorial=page.getByRole('button',{name:'Skip',exact:true}),choice=page.locator('#local-fighter-selection button:last-of-type:not(:disabled),.melee-setup button').filter({hasText:mode==='solo'?/^(Start match|Play locally)$/:/^(Start match|Play against computer)$/});await Promise.race([tutorial.waitFor(),choice.waitFor()]);if(await tutorial.isVisible())await tutorial.click();}
+ const localStart=page.locator('#local-fighter-selection').getByRole('button',{name:'Start match',exact:true});
  if(await localStart.isVisible())await localStart.click();
  await page.locator('.melee-setup').getByRole('button',{name:mode==='solo'?'Play locally':'Play against computer',exact:true}).click();
  if(mode==='computer'){await page.getByRole('button',{name:'Create room',exact:true}).click();await page.getByRole('button',{name:'Ready',exact:true}).click();}

@@ -22,9 +22,9 @@ try{
  const saved=await page.evaluate(async()=>{const root=await navigator.storage.getDirectory(),dir=await root.getDirectoryHandle('opensmash-melee-disc-v1');const name=await(await(await dir.getFileHandle('current')).getFile()).text();const file=await(await dir.getFileHandle(name)).getFile();return {size:file.size,name,staging:[]};});assert.equal(saved.size,ISO_SIZE);
  await page.getByRole('button',{name:'Back',exact:true}).click();await page.getByRole('button',{name:'Cancel',exact:true}).click();await page.waitForFunction(()=>document.body.style.position!=='fixed');
  const slug=await page.evaluate(()=>window.openSmashReactBridge.characters.find(c=>c.meleeAvailable).slug);
- await page.locator(`[data-roster-character="${slug}"] .replica-select-control`).evaluate(el=>el.click());await page.locator('#local-fighter-selection').getByRole('button',{name:'Play locally',exact:true}).click();
+ await page.locator(`[data-roster-character="${slug}"] .replica-select-control`).evaluate(el=>el.click());await page.locator('#local-fighter-selection').getByRole('button',{name:'Start match',exact:true}).click();
  const mode=page.locator('.melee-setup').getByRole('button',{name:'Play locally',exact:true});await page.waitForFunction(()=>document.querySelector('.game-overlay')||Array.from(document.querySelectorAll('.melee-setup button')).some(b=>b.textContent==='Play locally'));if(await mode.isVisible())await mode.click();
- for(let i=0;i<30;i++){if(await page.evaluate(()=>window.proofEvents.some(e=>e.type==='playable')))break;const confirm=page.getByRole('button',{name:'Confirm · A',exact:true});if(await confirm.isVisible())await confirm.click();await page.waitForTimeout(1000);}
+// Keep initialization neutral: upstream A-held startup swaps Zelda and Sheik.
  await page.waitForFunction(()=>window.proofEvents.some(e=>e.type==='playable'));const runtime=page.frames().find(f=>f.url().includes('/engine/upstream/runtime.html'));assert.ok(runtime);
  const start=await runtime.evaluate(()=>window.Module._direct_frame_count());await runtime.waitForFunction(n=>window.Module._direct_frame_count()>=n,start+60);const end=await runtime.evaluate(()=>window.Module._direct_frame_count());
  await page.getByRole('button',{name:'Return to roster',exact:true}).click();const completedDownloads=downloads.length;

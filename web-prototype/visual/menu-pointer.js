@@ -7,14 +7,28 @@ export function pointerStep(previous, pad, dt, width, height, enabled=true) {
   down,back,click:connected&&down&&!previous.down,goBack:connected&&back&&!previous.back,
   scroll:connected?axis(3)*900*dt:0,used:connected&&(!!axis(0)||!!axis(1)||down||back||!!axis(3))};
 }
+// Match the element under the cursor, but never scroll the page behind a modal.
+export function menuScrollTarget(hit, dialog) {
+ // ModalPage owns overflow for Settings; its role=dialog section grows inside it.
+ // Native dialogs still contain their own scrolling, including when nested.
+ const boundary=dialog?.tagName==='DIALOG'?dialog:dialog?.closest?.('.modal-page')||dialog;
+ for(let node=hit;node;node=node.parentElement){
+  if(boundary&&!boundary.contains(node))break;
+  if(node.scrollHeight>node.clientHeight&&/(auto|scroll)/.test(getComputedStyle(node).overflowY))return node;
+  if(node===boundary)break;
+ }
+ if(boundary)return boundary;
+ return document.scrollingElement;
+}
 export function startMenuPointer({enabled,controllers,controllerIndex,click,back}) {
  const states=new Map();let last=performance.now();
  function frame(now){
-  const active=enabled(),owners=active?(controllers?.()||[{key:'primary',generation:0,index:controllerIndex(),port:0}]):[];
+  const active=!document.hidden&&enabled(),owners=active?(controllers?.()||[{key:'primary',generation:0,index:controllerIndex(),port:0}]):[];
   const keys=new Set(owners.map(o=>`${o.key}:${o.generation}`));
   for(const [key,value] of states)if(!keys.has(key)){value.cursor.remove();states.delete(key);}
   const pads=active?Array.from(navigator.getGamepads?.()||[]):[];
-  const dialog=document.querySelector('dialog[open]'),surface=dialog||document.body;
+  const dialog=Array.from(document.querySelectorAll('dialog[open],[role="dialog"][aria-modal="true"]')).find(node=>node.getClientRects().length&&getComputedStyle(node).visibility!=='hidden'),surface=dialog||document.body;
+  let scrolling;
   for(const owner of owners){
    const key=`${owner.key}:${owner.generation}`,pad=pads.find(p=>p?.connected&&p.index===owner.index&&(!owner.id||p.id===owner.id));
    if(!pad)continue;
@@ -26,10 +40,14 @@ export function startMenuPointer({enabled,controllers,controllerIndex,click,back
    const state=entry.state=pointerStep(entry.state,pad,Math.min((now-last)/1000,.05),innerWidth,innerHeight,true);
    cursor.hidden=!!dialog&&(dialog.dataset.controllerOwner?dialog.dataset.controllerOwner!==key:owner.port!==0);cursor.style.transform=`translate(${state.x}px,${state.y}px)`;
    const hit=document.elementFromPoint(state.x,state.y);
-   if(state.scroll&&(owner.port===0||(dialog&&dialog.dataset.controllerOwner===key))){let scroll=hit;while(scroll&&!(scroll.scrollHeight>scroll.clientHeight&&/(auto|scroll)/.test(getComputedStyle(scroll).overflowY)))scroll=scroll.parentElement;if(scroll)scroll.scrollBy(0,state.scroll);else window.scrollBy(0,state.scroll);}
+   if(state.scroll&&!cursor.hidden&&(!scrolling||owner.port<scrolling.port))scrolling={hit,delta:state.scroll,port:owner.port};
    if(state.click&&!cursor.hidden){const target=hit?.closest('button,a,input,select,textarea,[role="button"]');if(target&&!target.disabled)click(target,owner);}
    if(state.goBack)back(owner);
   }
+  // The rAF deltas already make a continuous glide. CSS smooth scrolling would
+  // restart an animation every frame and swallow most of the stick movement.
+  // One active owner per frame also prevents two pads from doubling the speed.
+  if(scrolling)menuScrollTarget(scrolling.hit,dialog)?.scrollBy({top:scrolling.delta,left:0,behavior:'instant'});
   last=now;requestAnimationFrame(frame);
  }
  requestAnimationFrame(frame);
