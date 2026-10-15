@@ -40,7 +40,7 @@ support exactly two humans with one local input source per peer.
 | Confirmed input | Each peer acquires only its owned pad; both accept input and applied result at logical ticks; disagreement fails closed | A: [protocol](../engines/melee/tests/confirmed_input.test.mjs), [bridge](../engines/melee/tests/browser_bridge.test.mjs), [identity](../engines/melee/tests/netplay_identity.test.mjs). B: E1 | Distinct input traces, progress, mutation/disconnect/fresh-session controls and selected-state parity. No rollback/full snapshot. Ordered message faults over WebSocket/TCP are not transport packet loss. |
 | Disc storage and handoff | Player supplies verified disc locally; saved browser copy restores; paired transfer has validation and cleanup | A: [disc cache](../engines/melee/tests/browser_disc_cache.test.mjs), [handoff](../engines/melee/tests/private_handoff.test.mjs). B: [historical transfer proof](multiplayer/disc-transfer-proof.json), E2 | Real Mac browser transfer and current refresh restore. Historical standalone transfer does not establish current phone or WAN handoff. |
 | Donor fitting and attachments | Source package fits requested accepted donor/slot; required companion costumes remain available | A: [target choices](../engines/melee/tests/test_roster_choices.py), [native target options](../engines/melee/tests/test_native_target_options.py), [source-pivot rejection](../engines/melee/tests/source_pivot_contract.test.mjs). B: E5; [native fitting benchmark](../engines/melee/validation/native-fit/README.md) | Geometry/slot contracts and bounded target samples. Acceptance is per source/base, not all catalog combinations. Source-pivot is opt-in, reviewed 39-joint/four-donor browser/WebGPU only; standard DAT/desktop unsupported. Donor collision, attack and jump behavior is retained. |
-| Private deployment boundary | Existing tailnet release remains separate; shared-password hosting protects app/API/assets/upgrades, requires HTTPS through its exact-host connector and tokenizes the loopback helper; disc delivery requires explicit private configuration | A: [shared auth](../web-prototype/server/shared-password.test.js), [helper](../engines/melee/tests/test_shared_host_helper.py), [secure TTY](../engines/melee/tests/test_shared_password_cli.py), [release](../engines/melee/tests/test_mac_release.py), [origin policy](../engines/melee/tests/friend_origin.test.mjs), [disc server](../engines/melee/tests/host_disc_server.test.mjs). B: E2/E4/E5; E20/E21/E22/E23/E24 | E24 covers the styled public login and isolated authenticated real-file transfer. Authenticated custom-host transfer/gameplay and external-device acceptance remain unverified. |
+| Private deployment boundary | Existing tailnet release remains separate; shared-password hosting protects app/API/assets/upgrades, requires HTTPS through its exact-host connector and tokenizes the loopback helper; disc delivery requires explicit private configuration | A: [shared auth](../web-prototype/server/shared-password.test.js), [helper](../engines/melee/tests/test_shared_host_helper.py), [secure TTY](../engines/melee/tests/test_shared_password_cli.py), [release](../engines/melee/tests/test_mac_release.py), [origin policy](../engines/melee/tests/friend_origin.test.mjs), [disc server](../engines/melee/tests/host_disc_server.test.mjs). B: E2/E4/E5; E20/E21/E22/E23/E24/E25 | E24 covers the styled public login and isolated authenticated real-file transfer. E25 adds explicit upgrade-rejection framing. Authenticated custom-host transfer/gameplay and external-device acceptance remain unverified. |
 | Relocated private roots (separate candidate) | Retain imports and derived files outside checkout | A: [PR #2](https://github.com/alex-furrier/opensmash/pull/2), head `3d5907e`, contract and route/retry tests | 31 Python passes, four fixture skips, five JS passes. Candidate is separate from this map's source checkpoint. Gap: actual gameplay after root relocation; no private migration performed. |
 
 ## Evidence checkpoints
@@ -392,3 +392,21 @@ tailnet origin. This historical checkpoint did not perform deployment work.
   belong to the private deployment receipt. This source checkpoint does not claim
   an authenticated public-host transfer or two-device game acceptance. Password
   reset remains an owner-entered hidden-TTY operation documented in the Mac guide.
+
+- **E25 — explicit upgrade-rejection framing:** implementation `855790b`, checked
+  2026-10-15 UTC with Node 26.7.0. After the E24 activation, anonymous public
+  WebSocket probes intermittently received gateway 502 instead of the origin's
+  401. Local rejection remained 401 and no anonymous socket opened. Inspection
+  found that denied upgrades omitted an explicit body length and connection-close
+  header. The isolated real-upgrade regression failed on the missing length before
+  repair. Rejections now include `Content-Length: 0`, `Connection: close` and
+  `Cache-Control: no-store`; authentication and accepted upgrades are unchanged.
+  All 26 targeted authentication, disc and origin regressions passed:
+
+  ```sh
+  node --test --test-timeout=30000 web-prototype/server/shared-password.test.js engines/melee/tests/host_disc_server.test.mjs engines/melee/tests/host_disc_download.test.mjs engines/melee/tests/friend_origin.test.mjs
+  ```
+
+  A fixture pass does not prove the gateway cause or public recovery. Repeat public
+  upgrade probes after activation and retain their actual statuses in the private
+  deployment receipt; do not relabel an unexplained 502 as successful acceptance.
