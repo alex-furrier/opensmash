@@ -29,3 +29,9 @@ test("project paths support the split deployment workspace", async (t) => {
     pipelineUiRoot: path.join(pipelineProjectRoot, "play", "ui"),
   });
 });
+
+
+test("private character root is external and must be absolute", () => {
+  assert.equal(resolveProjectPaths("/release/web-prototype", {characterRoot: "/private/characters"}).pipelineUiRoot, "/private/characters");
+  assert.throws(() => resolveProjectPaths("/release/web-prototype", {characterRoot: "../private"}), /absolute/);
+});

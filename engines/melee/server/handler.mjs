@@ -13,7 +13,7 @@ export function createMeleeHandler({origin=process.env.MELEE_LOCAL_ORIGIN,produc
   }
   if(origin){
     upstream=new URL(origin);
-    if(production || upstream.protocol!=='http:' || !['127.0.0.1','localhost','[::1]'].includes(upstream.hostname)
+    if((production && !(process.env.MELEE_SHARED_HOSTING==='1'&&process.env.MELEE_SHARED_AUTH_FILE&&process.env.MELEE_PRIVATE_ORIGIN==='https://smash.alexfurrier.dev')) || upstream.protocol!=='http:' || !['127.0.0.1','localhost','[::1]'].includes(upstream.hostname)
       || upstream.username || upstream.password || upstream.pathname!=='/' || upstream.search || upstream.hash)
       throw Error('MELEE_LOCAL_ORIGIN must be a loopback HTTP origin in development.');
   }

@@ -1,3 +1,4 @@
+import {createSharedPasswordGate} from './shared-password.js';
 import {privateMeleeRequestAllowed} from '../../engines/melee/server/handler.mjs';
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
@@ -38,6 +39,11 @@ import { ACTIVE_JOB_STATUSES } from "./job-protocol.js";
 const PORT = Number(process.env.PORT || 4174);
 const HOST = process.env.HOST || (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
 if((process.env.MELEE_NETPLAY_ENGINE_ROOT||process.env.MELEE_SIMULATED_PEER_ISO||process.env.MELEE_PRIVATE_ORIGIN)&&!['127.0.0.1','localhost','::1'].includes(HOST))throw Error('Friend runtime requires a loopback HOST.');
+const sharedHosting = process.env.MELEE_SHARED_HOSTING === '1';
+if (process.env.MELEE_SHARED_AUTH_FILE && !sharedHosting) throw Error('Auth file requires MELEE_SHARED_HOSTING=1.');
+if (sharedHosting && (!process.env.MELEE_SHARED_AUTH_FILE || process.env.MELEE_PRIVATE_ORIGIN !== 'https://smash.alexfurrier.dev' || !['127.0.0.1','localhost','::1'].includes(HOST))) throw Error('Shared hosting requires auth file, exact origin and loopback HOST.');
+if (sharedHosting && process.env.CREATION_ENABLED !== '0') throw Error('Shared hosting requires CREATION_ENABLED=0.');
+const sharedPassword = sharedHosting ? createSharedPasswordGate({file: process.env.MELEE_SHARED_AUTH_FILE, origin: process.env.MELEE_PRIVATE_ORIGIN}) : null;
 if(process.env.MELEE_PRIVATE_ORIGIN){const {privateFriendOrigin}=await import('../../engines/melee/server/friend-rooms.mjs');privateFriendOrigin(process.env.MELEE_PRIVATE_ORIGIN);}
 const {createHostDisc,HOST_DISC_PATH,HOST_DISC_CONFIG_PATH}=await import('../../engines/melee/server/host-disc.mjs');
 let hostDisc;
@@ -150,7 +156,7 @@ const dispatcher = createJobDispatcher();
 const jobDatabase = createJobDatabase({
   jobsRoot: path.resolve(process.env.FIGHTER_JOBS_ROOT || path.join(APP_ROOT, "data", "fighter-jobs")),
 });
-const turnstile = createTurnstileVerifier();
+const turnstile = createTurnstileVerifier({isProduction: process.env.NODE_ENV === 'production' && !sharedHosting});
 const fighterJobs = createFighterJobs({
   appRoot: APP_ROOT,
   repoRoot: PIPELINE_PROJECT_ROOT,
@@ -164,7 +170,7 @@ const fighterJobs = createFighterJobs({
 });
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const authService = createAuthService({ isProduction: IS_PRODUCTION });
+const authService = createAuthService({ isProduction: IS_PRODUCTION, disabled: sharedHosting });
 // Bump the cookie name whenever the validation contract changes. This also
 // invalidates cookies created while the prototype was being exercised.
 const COOKIE_NAME = "opensmash_rom_v4";
@@ -422,6 +428,7 @@ function validSession(req) {
 }
 
 function mutationOriginAllowed(req) {
+  if (sharedHosting) return req.headers.origin === process.env.MELEE_PRIVATE_ORIGIN;
   const origin = req.headers.origin;
   if (!origin) return !IS_PRODUCTION;
   const requestHost = String(req.headers["x-forwarded-host"] || req.headers.host || "")
@@ -1425,7 +1432,10 @@ process.on("unhandledRejection", (reason) => {
 });
 
 const server = http.createServer((req, res) => {
-  handleRequest(req, res, vite).catch((error) => {
+  Promise.resolve().then(async () => {
+    if (sharedPassword && !await sharedPassword.handle(req, res)) return;
+    await handleRequest(req, res, vite);
+  }).catch((error) => {
     console.error(error);
     if (!res.headersSent) json(res, 500, { error: "Internal server error" });
     else res.destroy();
@@ -1439,7 +1449,8 @@ if(process.env.MELEE_SIMULATED_PEER_ISO){
  const {createSimulatedPeer}=await import('../../engines/melee/server/simulated-peer.mjs');
  simulatedPeer=createSimulatedPeer({chromium:createRequire(import.meta.url)(process.env.MELEE_PLAYWRIGHT_MODULE).chromium,origin:`http://${HOST.includes(':')?'['+HOST+']':HOST}:${PORT}`,iso:process.env.MELEE_SIMULATED_PEER_ISO,observeTicks:false,onObservation:event=>{if(event.type==='phase')console.info('[local opponent]',event.phase);else if(['combat-performance','startup-performance','browser-error','browser-console','error'].includes(event.type)||event.type==='frame-stall'&&event.durationMs>100)console.info('[local opponent diagnostic]',JSON.stringify(event));}});
 }
-const friendRooms=friendRuntime&&attachFriendRooms(server,{engine:friendRuntime.engine,host:HOST,simulatedPeer,privateOrigin:process.env.MELEE_PRIVATE_ORIGIN});
+const friendRooms=friendRuntime&&attachFriendRooms(server,{engine:friendRuntime.engine,host:HOST,simulatedPeer,privateOrigin:process.env.MELEE_PRIVATE_ORIGIN,sharedPassword});
+if(sharedPassword) server.on('upgrade',(req,socket)=>{if(!friendRuntime||req.url!=='/melee/room')socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');});
 if(friendRuntime||hostDisc)process.once('SIGINT',()=>{friendRooms?.close();void Promise.all([simulatedPeer?.close(),hostDisc?.close()]).then(()=>process.exit());});
 server.keepAliveTimeout = 65_000;
 server.headersTimeout = 66_000;

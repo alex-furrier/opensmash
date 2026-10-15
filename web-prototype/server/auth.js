@@ -102,8 +102,8 @@ function cookie(value, { isProduction, maxAge = AUTH_COOKIE_MAX_AGE_SECONDS } = 
     .join("; ");
 }
 
-export function createAuthService({ isProduction = process.env.NODE_ENV === "production" } = {}) {
-  const enabled = process.env.FIREBASE_AUTH_ENABLED === "1";
+export function createAuthService({ isProduction = process.env.NODE_ENV === "production", disabled = false } = {}) {
+  const enabled = !disabled && process.env.FIREBASE_AUTH_ENABLED === "1";
   const providers = (process.env.FIREBASE_AUTH_PROVIDERS || "google,apple,email")
     .split(/[,|]/)
     .map((provider) => provider.trim())
@@ -111,6 +111,7 @@ export function createAuthService({ isProduction = process.env.NODE_ENV === "pro
   let adminAuth = null;
 
   async function init() {
+    if (disabled) return;
     if (!enabled) {
       if (isProduction) {
         throw new Error("FIREBASE_AUTH_ENABLED=1 is required in production.");

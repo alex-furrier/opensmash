@@ -23,7 +23,7 @@ export function validateFriendProposal(value){
 export function privateFriendOrigin(value){
  if(!value)return undefined;
  const url=new URL(value);
- if(url.protocol!=='https:'||!url.hostname.endsWith('.ts.net')||url.username||url.password||url.pathname!=='/'||url.search||url.hash||url.origin!==value)throw Error('MELEE_PRIVATE_ORIGIN must be one exact HTTPS tailnet origin.');
+ if(url.protocol!=='https:'||(!url.hostname.endsWith('.ts.net')&&!(value==='https://smash.alexfurrier.dev'&&process.env.MELEE_SHARED_HOSTING==='1'&&process.env.MELEE_SHARED_AUTH_FILE))||url.username||url.password||url.pathname!=='/'||url.search||url.hash||url.origin!==value)throw Error('MELEE_PRIVATE_ORIGIN must be one exact approved HTTPS private origin.');
  return url.origin;
 }
 export function friendOriginAllowed(req,{host='127.0.0.1',privateOrigin}={}){
@@ -32,16 +32,22 @@ export function friendOriginAllowed(req,{host='127.0.0.1',privateOrigin}={}){
  if(privateOrigin&&origin===privateOrigin&&authority===new URL(privateOrigin).host)return true;
  try{const url=new URL(`http://${authority}`);return ['127.0.0.1','localhost','[::1]'].includes(url.hostname)&&origin===url.origin;}catch{return false;}
 }
-export function attachFriendRooms(server,{engine,host='127.0.0.1',simulatedPeer,privateOrigin}){
+export function attachFriendRooms(server,{engine,host='127.0.0.1',simulatedPeer,privateOrigin,sharedPassword}){
  privateOrigin=privateFriendOrigin(privateOrigin);
+ if(privateOrigin==='https://smash.alexfurrier.dev'&&!sharedPassword)throw Error('Custom origin requires shared-password upgrade authorization.');
  const rooms=createRooms({identity:{},launch:{},maxRooms:8,ttlMs:60*60*1000,permitTestBot:()=>!!simulatedPeer,startTestBot:request=>simulatedPeer.start(request),stopTestBot:session=>simulatedPeer?.stop(session),permitTestBotJoin:()=>!!simulatedPeer,resolveMatch:value=>{const proposal=validateFriendProposal(value);return {identity:null,launch:resolvedRules(proposal),proposal};},validateReady:(identity,room)=>{
   if(identity?.engine!==engine||identity.disc!==disc||identity.seed!==seed||identity.rules!==digest(resolvedRules(room.launch))||!/^[a-f0-9]{64}$/.test(identity.costumes))throw Error('Installed friend match identity mismatch.');
  }});
  const wss=new WebSocketServer({noServer:true,maxPayload:16384,perMessageDeflate:false});
- const upgrade=(req,socket,head)=>{
+ const upgrade=async(req,socket,head)=>{
+  let auth;
+  if(sharedPassword){
+   try{auth=await sharedPassword.authorizeUpgrade(req);}catch{}
+   if(!auth){socket.end('HTTP/1.1 401 Unauthorized\r\n\r\n');return;}
+  }
   if(req.url!=='/melee/room')return;
   if(!friendOriginAllowed(req,{host,privateOrigin})){socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');return;}
-  wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws));
+  wss.handleUpgrade(req,socket,head,ws=>{if(sharedPassword&&!sharedPassword.trackSocket(ws,auth))return;wss.emit('connection',ws);});
  };
  server.on('upgrade',upgrade);
  wss.on('connection',socket=>{socket.on('message',raw=>{try{rooms.receive(socket,JSON.parse(raw.toString()));}catch{rooms.disconnected(socket);socket.close(1008);}});socket.on('close',()=>rooms.disconnected(socket));socket.on('error',()=>rooms.disconnected(socket));});
