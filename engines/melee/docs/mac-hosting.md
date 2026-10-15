@@ -116,7 +116,9 @@ python3 engines/melee/tools/mac_hosting_service.py render \
 
 Review both plists before separately approved installation. They use user-login
 LaunchAgents, fixed loopback ports `4198` and `8818`, a 30-second restart throttle,
-and stable log paths. Launchd retries failed processes; it does not enforce a retry
+the Standard resource class and stable log paths. Background resource limits can
+delay the complete release integrity scan enough to exceed helper readiness waits.
+Launchd retries failed processes; it does not enforce a retry
 count or provide log rotation. The web runner waits for the helper's active-roster
 endpoint before startup. This health check proves availability, not game acceptance.
 A successful process exit stays stopped. These jobs do not promise boot-before-login
@@ -158,6 +160,15 @@ node --test web-prototype/server/shared-password.test.js \
 ```
 
 ## Activate, validate and recover
+
+Production shared hosting requires Cloudflare's exact `X-Forwarded-Proto: https`
+header through the exact-host loopback connector. HTTP GET/HEAD redirects to the
+fixed HTTPS origin before serving a login form or issuing cookies; insecure
+mutations and upgrades are denied. Missing or invalid scheme headers fail closed.
+HTTPS responses include HSTS for this hostname only. Do not enable a zone-wide
+redirect merely to repair one app. Local protection checks must simulate the
+connector's HTTPS scheme header; public checks must also verify real HTTP-to-HTTPS
+redirection and anonymous WSS denial through Cloudflare.
 
 Activation, launchctl installation/loading, credential provisioning and Tunnel/DNS
 apply remain separate owner actions with required action-time confirmation. Notify

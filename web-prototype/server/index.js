@@ -50,7 +50,7 @@ if(process.env.MELEE_HOST_DISC_FILE){
  if(!['127.0.0.1','localhost','::1'].includes(HOST)||!process.env.MELEE_PRIVATE_ORIGIN)throw Error('Host disc requires the existing private origin and a loopback HOST.');
  hostDisc=await createHostDisc({file:process.env.MELEE_HOST_DISC_FILE});
 }
-const sharedPassword = sharedHosting ? createSharedPasswordGate({file: process.env.MELEE_SHARED_AUTH_FILE, origin: process.env.MELEE_PRIVATE_ORIGIN, allowHostDisc: Boolean(hostDisc)}) : null;
+const sharedPassword = sharedHosting ? createSharedPasswordGate({file: process.env.MELEE_SHARED_AUTH_FILE, origin: process.env.MELEE_PRIVATE_ORIGIN, allowHostDisc: Boolean(hostDisc), requireProxyHttps: true}) : null;
 const handleMelee = createEmbeddedMeleeHandler();
 let friendRuntime=null,attachFriendRooms;
 if(process.env.MELEE_NETPLAY_ENGINE_ROOT){

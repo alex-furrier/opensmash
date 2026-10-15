@@ -58,7 +58,7 @@ def plists(path):
             'KeepAlive': {'SuccessfulExit': False},
             'ThrottleInterval': 30,
             'ExitTimeOut': 20,
-            'ProcessType': 'Background',
+            'ProcessType': 'Standard',
             'StandardOutPath': str(Path(value['logs']) / (role + '.log')),
             'StandardErrorPath': str(Path(value['logs']) / (role + '.error.log')),
             'EnvironmentVariables': {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'PYTHONUNBUFFERED': '1', 'PYTHONDONTWRITEBYTECODE': '1'},

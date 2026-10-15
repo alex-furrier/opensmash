@@ -16,11 +16,11 @@ test('password policy accepts eight alphabetic characters without composition ru
   await assert.rejects(passwordRecord('abcdefg'),/at least 8 characters/);
 });
 const config = async () => ({helperKey: randomBytes(32).toString('hex'), authVersion: randomBytes(32).toString('hex'), sealKey: randomBytes(32).toString('hex'), password: await passwordRecord(password)});
-async function fixture(t, {missing = false, allowHostDisc = false, protectedHandler} = {}) {
+async function fixture(t, {missing = false, allowHostDisc = false, requireProxyHttps = false, protectedHandler} = {}) {
   const directory = await mkdtemp(path.join(tmpdir(), 'opensmash-auth-'));
   const file = path.join(directory, 'auth.json'); let value = await config();
   if (!missing) await writeFile(file, JSON.stringify(value), {mode: 0o600});
-  const gate = createSharedPasswordGate({file, origin, allowHostDisc, pollMs: 10});
+  const gate = createSharedPasswordGate({file, origin, allowHostDisc, requireProxyHttps, pollMs: 10});
   const server = http.createServer(async (req, res) => {
     if (!await gate.handle(req, res)) return;
     if (protectedHandler) return protectedHandler(req, res);
@@ -45,6 +45,21 @@ test('anonymous GET/HEAD assets, encoded paths, API and spoofed authority are de
   assert.equal((await f.request('/')).status, 303);
   assert.equal((await f.request('/login', {headers: {Host: 'localhost'}})).status, 403);
   assert.equal((await f.request('/login', {headers: {Origin: 'https://evil.example'}})).status, 403);
+});
+
+test('production proxy policy redirects HTTP without a form and requires HTTPS for login and upgrades', async t => {
+  const f = await fixture(t,{requireProxyHttps:true});
+  for (const method of ['GET','HEAD']) {
+    const response=await f.request('/login?next=roster',{method,headers:{'X-Forwarded-Proto':'http'}});
+    assert.equal(response.status,308);assert.equal(response.headers.location,origin+'/login?next=roster');assert.equal(response.text,'');assert.equal(response.headers['set-cookie'],undefined);
+  }
+  const fixed=await f.request('http://other.example/path?x=1',{headers:{'X-Forwarded-Proto':'http'}});assert.equal(fixed.headers.location,origin+'/path?x=1');
+  for (const value of ['', 'http,https','invalid']) assert.equal((await f.request('/login',{headers:{'X-Forwarded-Proto':value}})).status,403);
+  assert.equal((await f.request('/login',{method:'POST',headers:{Origin:origin,'X-Forwarded-Proto':'http'},body:'synthetic-only'})).status,403);
+  const secure=await f.request('/login',{headers:{'X-Forwarded-Proto':'https'}});assert.equal(secure.status,200);assert.match(secure.headers['strict-transport-security'],/max-age=31536000/);
+  const cookie=await f.session();
+  const request=proto=>({headers:{host:'smash.alexfurrier.dev',origin,cookie,'x-forwarded-proto':proto},socket:{remoteAddress:'127.0.0.1'}});
+  assert.equal(await f.gate.authorizeUpgrade(request('http')),null);assert.equal(await f.gate.authorizeUpgrade(request(undefined)),null);assert.ok(await f.gate.authorizeUpgrade(request('https')));
 });
 
 test('explicit hosted disc remains authenticated for GET/HEAD, rejects ranges and cancels on rotation', {timeout: 15000}, async t => {
@@ -162,7 +177,10 @@ test('actual production Node router gates all early/static/helper routes and dis
     child.once('exit', () => {clearTimeout(timer);reject(Error('Server exited: '+errors));});
     child.stdout.on('data', chunk => {output += chunk;const match = /OpenSmash web: http:\/\/127.0.0.1:(\d+)/.exec(output);if(match){clearTimeout(timer);resolve(Number(match[1]));}});
   });
-  const request = (route, headers = {}, method = 'GET') => new Promise((resolve,reject) => {const req = http.request({host:'127.0.0.1',port,path:route,method,headers:{Host:'smash.alexfurrier.dev',...headers}}, res => {let text='';res.on('data',part=>text+=part);res.on('end',()=>resolve({status:res.statusCode,headers:res.headers,text}));});req.on('error',reject);req.end();});
+  const request = (route, headers = {}, method = 'GET') => new Promise((resolve,reject) => {const req = http.request({host:'127.0.0.1',port,path:route,method,headers:{Host:'smash.alexfurrier.dev','X-Forwarded-Proto':'https',...headers}}, res => {let text='';res.on('data',part=>text+=part);res.on('end',()=>resolve({status:res.statusCode,headers:res.headers,text}));});req.on('error',reject);req.end();});
+  const insecure=await request('/login',{'X-Forwarded-Proto':'http'});assert.equal(insecure.status,308);assert.equal(insecure.headers.location,origin+'/login');assert.equal(insecure.text,'');
+  assert.equal((await request('/login',{'X-Forwarded-Proto':''})).status,403);
+  const secureLogin=await request('/login');assert.equal(secureLogin.status,200);assert.match(secureLogin.headers['strict-transport-security'],/max-age=31536000/);
   for(const route of ['/assets/app.js','/melee/api/netplay/config','/melee/api/disc','/melee/engine/a.wasm','/api/session','/livez','/__/auth/handler']) for(const method of ['GET','HEAD']) assert.equal((await request(route,{},method)).status,401);
   const cookie='__Host-opensmash-session='+await sealData({version:value.authVersion,expires:Date.now()+3600000},{password:value.sealKey,ttl:43200});
   const authConfig=await request('/api/auth/config',{Cookie:cookie});assert.equal(authConfig.status,200);assert.equal(JSON.parse(authConfig.text).enabled,false);

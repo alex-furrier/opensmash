@@ -180,6 +180,7 @@ class MacReleaseTests(unittest.TestCase):
         for job in jobs.values():
             self.assertEqual(job['ThrottleInterval'], 30)
             self.assertEqual(job['KeepAlive'], {'SuccessfulExit': False})
+            self.assertEqual(job['ProcessType'], 'Standard')
             self.assertNotIn('secret', json.dumps(job).lower())
             self.assertNotIn('launchctl', job['ProgramArguments'])
             self.assertEqual(job['ProgramArguments'][-2], '--role')

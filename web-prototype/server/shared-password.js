@@ -68,7 +68,7 @@ function loginFailure(req, res, status, message = 'Unable to sign in. Check the 
   else loginPage(res, status, message);
 }
 
-export function createSharedPasswordGate({file, origin, allowHostDisc = false, now = Date.now, pollMs = 500} = {}) {
+export function createSharedPasswordGate({file, origin, allowHostDisc = false, requireProxyHttps = false, now = Date.now, pollMs = 500} = {}) {
   const url = new URL(origin);
   if (url.protocol !== 'https:' || url.origin !== origin || url.hostname !== 'smash.alexfurrier.dev' || !file) throw Error('Shared hosting requires its exact HTTPS origin and auth file.');
   let current, fingerprint, loading, generation = 0;
@@ -116,6 +116,17 @@ export function createSharedPasswordGate({file, origin, allowHostDisc = false, n
     res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
     res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
     if (!hostAllowed(req) || (req.headers.origin && !originAllowed(req))) { reply(res, 403, '{"error":"Forbidden"}'); return false; }
+    if (requireProxyHttps) {
+      // Only the exact-host loopback connector supplies Cloudflare's overwritten scheme header.
+      if (req.headers['x-forwarded-proto'] !== 'https') {
+        if (req.headers['x-forwarded-proto'] === 'http' && ['GET','HEAD'].includes(req.method)) {
+          const target = new URL(req.url, origin);
+          res.writeHead(308, {Location: origin + target.pathname + target.search});res.end();
+        } else reply(res, 403, '{"error":"HTTPS required"}');
+        return false;
+      }
+      res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+    }
     const config = await refresh();
     if (!config) { reply(res, 503, '{"error":"Private hosting unavailable"}'); return false; }
     const pathname = new URL(req.url, origin).pathname;
@@ -163,6 +174,6 @@ export function createSharedPasswordGate({file, origin, allowHostDisc = false, n
     res.once('close', release); res.once('finish', release);
     return true;
   }
-  async function authorizeUpgrade(req) { return originAllowed(req) ? session(req) : null; }
+  async function authorizeUpgrade(req) { return originAllowed(req) && (!requireProxyHttps || req.headers['x-forwarded-proto'] === 'https') ? session(req) : null; }
   return {handle, authorizeUpgrade, trackSocket(socket, auth) { const release = track(() => socket.terminate(), auth); if (release) socket.once('close', release); return !!release; }, close() { clearInterval(timer); invalidate(); }};
 }
