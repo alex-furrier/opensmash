@@ -8,3 +8,8 @@
 .melee-trailer-reset:hover,.melee-trailer-reset:focus-visible{opacity:1}
 
 .melee-trailer-capture.is-concealed{opacity:0}
+
+/* Capture surfaces have explicit preview/viewport bounds and no match chrome. */
+.melee-trailer-capture.melee-surface .game-overlay,
+.melee-trailer-capture.melee-surface .game-panel {height:100%;min-height:0;}
+.melee-trailer-capture.melee-surface .game-panel .game-screen {height:100%;aspect-ratio:auto;}
