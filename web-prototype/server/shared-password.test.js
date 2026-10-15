@@ -44,7 +44,7 @@ test('anonymous GET/HEAD assets, encoded paths, API and spoofed authority are de
 
 test('login CSRF/origin, wrong password, valid cookie, logout and forced private caching', async t => {
   const f = await fixture(t);
-  const form = await f.request('/login');const csrf = /name="csrf" value="([a-f0-9]+)"/.exec(form.text)[1];const csrfCookie = form.headers['set-cookie'][0].split(';')[0];
+  const form = await f.request('/login');assert.equal(form.headers['referrer-policy'], 'same-origin');const csrf = /name="csrf" value="([a-f0-9]+)"/.exec(form.text)[1];const csrfCookie = form.headers['set-cookie'][0].split(';')[0];
   const login = (pw, headers = {}) => f.request('/login', {method: 'POST', headers: {Origin: origin, Cookie: csrfCookie, ...headers}, body: new URLSearchParams({csrf, password: pw}).toString()});
   assert.equal((await login(password, {Origin: ''})).status, 403);
   assert.equal((await login(password, {Cookie: ''})).status, 403);

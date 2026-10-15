@@ -52,7 +52,7 @@ function noStore(res) {
 }
 
 function reply(res, status, body, type = 'application/json') {
-  res.writeHead(status, {'Content-Type': type, 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer'});
+  res.writeHead(status, {'Content-Type': type, 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin'});
   res.end(body);
 }
 
