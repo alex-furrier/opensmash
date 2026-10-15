@@ -1474,7 +1474,7 @@
     outline: 2px solid #ff9a68; outline-offset: -4px;
   }
   .launch-flow-overlay[data-game="melee"] .launch-flow-upload button { min-height: 44px; }
-  .launch-flow-overlay[data-game="melee"] .launch-flow-cancel { width: 100%; min-height: 44px; }
+  .launch-flow-overlay[data-game="melee"] .launch-flow-upload .launch-flow-cancel { width: 100%; min-height: 44px; }
   .launch-flow-copy-toast {
     position: fixed;
     top: 16px;
