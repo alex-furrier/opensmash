@@ -8,8 +8,9 @@ own listener and owns room sockets and the optional scripted companion.
 Tailscale Serve is an external HTTPS proxy, not code in this repository.
 
 The current local demo uses these committed entry points with local process
-commands and private paths. This fork does not install an OpenSmash launch agent
-or provide a persistent service supervisor. A running URL is not a reboot/restart
+commands and private paths. This fork does not install an OpenSmash launch agent automatically. Separate
+[Mac hosting tools](../engines/melee/docs/mac-hosting.md) can stage verified releases
+and render login-only service jobs for an approved installation. A running URL is not a reboot/restart
 guarantee. See the [feature map](feature-verification.md) for verified scope.
 
 ## Prerequisites and wiring
