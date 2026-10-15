@@ -27,6 +27,7 @@ support exactly two humans with one local input source per peer.
 | --- | --- | --- | --- |
 | Gameplay and return | Select, play, reach results, Stop or return; retry owns a fresh attempt | A: [launch options](../engines/melee/tests/launch_options.test.mjs), [lifecycle](../engines/melee/tests/netplay_lifecycle.test.mjs). B: launcher proof, E2/E3 | Real local combat/results and return were observed. Selected native snapshots prove progress, not complete state equivalence. |
 | Match controls and picture | Toolbar reserves space above the picture; touch controls fit portrait and landscape; narrow headers wrap actions | B: [UI proof](../engines/melee/tools/prove_ui_polish.mjs), E14 | Actual Chrome game rendering, fullscreen, emulated touch acquisition and resize release. Safari and physical-device certification remain open. |
+| Trailer capture layout | Revealed capture fills its viewport; concealed preview retains its fixed bounds | A: [capture layout fixture](../engines/melee/tools/prove_trailer_layout.mjs), E15 | Five browser geometry fixtures; no real trailer preload, recording or private assets exercised. |
 | Local fighter selection | Two connected controllers own independent cursors, locks and per-port bases; P1 owns shared settings and start | A: [owned selection regressions](../web-prototype/shared/controller-selection.test.js). B: E11/E14 | Real Chrome gameplay with synthetic pads, reconnect/held-button, roster invalidation and neutral replacement-device input. Physical-controller certification remains open. |
 | Keyboard and controllers | Unified physical-port assignment; per-device buttons, axes and trigger deadzone; guest uses its own human device | A: [controller ports](../web-prototype/shared/controller-ports.test.js), [profiles](../engines/melee/tests/controller_profiles.test.mjs), [friend selection](../engines/melee/tests/friend_match.test.mjs). B: E2/E3 | Keyboard acquisition/movement and synthetic standard gamepad routing. Gap: physical multi-controller, hotplug and nonstandard adapters. |
 | Touch controls | Independent pointers and analog sticks reset on cancel/focus loss and layout changes | A: [mobile input](../web-prototype/shared/mobile-input.test.js), [touch controls](../web-prototype/shared/mobile-controls.test.js). B: [touch-emulation evidence](../engines/melee/validation/launch-prep/README.md), E14. U: E6 | Emulated browser touch plus a narrow subjective phone report; no current phone/controller certification. |
@@ -254,3 +255,15 @@ of this documentation change.
   ```
 
   Inspect `geometry.json` and the seven layout screenshots. `--iso` is optional when the profile already holds a verified local disc. The proof keeps initialization input neutral because upstream A-held startup intentionally swaps Zelda and Sheik. The idle start row is hidden; selecting a fighter reveals **Start match** beside the roster tabs. Two-controller selection still exposes its readiness hint. Character defaults and accepted alternate choices retain their existing storage and validation rules. Private roster assignments, per-person game receipts and screenshots remain outside this fork. No live deployment, public asset update or Safari certification was performed.
+
+- **E15 — bounded trailer capture repair:** source `b28370a58bd3fc644343c60c6f7ab412068091ea`, observed 2026-10-15 UTC in GPU-disabled Chrome 155.0.8059.79. Independent review of E14 found that the fixed trailer surface inherited the new in-page picture sizing. The [capture layout fixture](../engines/melee/tools/prove_trailer_layout.mjs) reproduced a 1920×1440 screen inside a 1920×1080 capture surface at reviewed source `5b4e4785222d20d8a7de0f6fe7722945d5237a30`; the bounds assertion failed and retained its screenshot and geometry.
+
+  The repair scopes full-height overlay, panel and screen sizing to `.melee-trailer-capture`. The same fixture passed revealed surfaces at 1920×1080, 1280×720, 960×720 and 720×1280, plus the 320×240 preparing preview. The frontend build passed. This is a CSS geometry regression with a generated canvas pattern, not an engine recording or trailer-preload certification. The normal match layout remains covered by E14.
+
+  Repeat with existing dependencies and an output directory outside Git:
+
+  ```sh
+  MELEE_PLAYWRIGHT_MODULE="$EXISTING_PLAYWRIGHT_MODULE" node engines/melee/tools/prove_trailer_layout.mjs --output "$PRIVATE_PROOF"
+  ```
+
+  To reproduce the failing control, add `--style-ref 5b4e4785222d20d8a7de0f6fe7722945d5237a30`. That run must fail on the wide surface; preserve `failure.json` and `wide.png` separately from the repaired result.
