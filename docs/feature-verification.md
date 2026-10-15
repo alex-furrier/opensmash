@@ -38,7 +38,7 @@ support exactly two humans with one local input source per peer.
 | Local companion | Explicit scripted second browser verifies/prepares/readies; Stop closes its owned session | A: [startup progress](../engines/melee/tests/local_opponent_progress.test.mjs), [simulated peer](../engines/melee/tests/test_simulated_peer.test.mjs). B: E2/E3/E14 | Two engines on the same Mac and fresh-session recovery. This helper is scripted, not native CPU AI or WAN evidence. |
 | Online room lifecycle | Create/share/join; both verified identities must Ready; Stop ends both; rematch is fresh | A: [friend match](../engines/melee/tests/friend_match.test.mjs), [rooms](../engines/melee/tools/netplay/rooms.test.mjs), [relay](../engines/melee/tools/netplay/server.test.mjs). B: E1/E2/E19 | Real local sockets and browser room transitions; actual private HTTPS on one Mac. Gap: two physical devices across WAN. |
 | Confirmed input | Each peer acquires only its owned pad; both accept input and applied result at logical ticks; disagreement fails closed | A: [protocol](../engines/melee/tests/confirmed_input.test.mjs), [bridge](../engines/melee/tests/browser_bridge.test.mjs), [identity](../engines/melee/tests/netplay_identity.test.mjs). B: E1 | Distinct input traces, progress, mutation/disconnect/fresh-session controls and selected-state parity. No rollback/full snapshot. Ordered message faults over WebSocket/TCP are not transport packet loss. |
-| Disc storage and handoff | Player supplies verified disc locally; saved browser copy restores; paired transfer has validation and cleanup | A: [disc cache](../engines/melee/tests/browser_disc_cache.test.mjs), [handoff](../engines/melee/tests/private_handoff.test.mjs). B: [historical transfer proof](multiplayer/disc-transfer-proof.json), E2 | Real Mac browser transfer and current refresh restore. Historical standalone transfer does not establish current phone or WAN handoff. |
+| Disc storage and handoff | Verified local or configured hosted disc; separate setup controls, visible download/check/save phases, saved-copy restore and paired transfer cleanup | A: [disc cache](../engines/melee/tests/browser_disc_cache.test.mjs), [hosted download](../engines/melee/tests/host_disc_download.test.mjs), [handoff](../engines/melee/tests/private_handoff.test.mjs). B: [historical transfer proof](multiplayer/disc-transfer-proof.json), E2/E26 | E26 covers controlled download presentation and bounded transfer/storage measurements. Historical standalone transfer does not establish current phone or WAN handoff. |
 | Donor fitting and attachments | Source package fits requested accepted donor/slot; required companion costumes remain available | A: [target choices](../engines/melee/tests/test_roster_choices.py), [native target options](../engines/melee/tests/test_native_target_options.py), [source-pivot rejection](../engines/melee/tests/source_pivot_contract.test.mjs). B: E5; [native fitting benchmark](../engines/melee/validation/native-fit/README.md) | Geometry/slot contracts and bounded target samples. Acceptance is per source/base, not all catalog combinations. Source-pivot is opt-in, reviewed 39-joint/four-donor browser/WebGPU only; standard DAT/desktop unsupported. Donor collision, attack and jump behavior is retained. |
 | Private deployment boundary | Existing tailnet release remains separate; shared-password hosting protects app/API/assets/upgrades, requires HTTPS through its exact-host connector and tokenizes the loopback helper; disc delivery requires explicit private configuration | A: [shared auth](../web-prototype/server/shared-password.test.js), [helper](../engines/melee/tests/test_shared_host_helper.py), [secure TTY](../engines/melee/tests/test_shared_password_cli.py), [release](../engines/melee/tests/test_mac_release.py), [origin policy](../engines/melee/tests/friend_origin.test.mjs), [disc server](../engines/melee/tests/host_disc_server.test.mjs). B: E2/E4/E5; E20/E21/E22/E23/E24/E25 | E24 covers the styled public login and isolated authenticated real-file transfer. E25 adds explicit upgrade-rejection framing. Authenticated custom-host transfer/gameplay and external-device acceptance remain unverified. |
 | Relocated private roots (separate candidate) | Retain imports and derived files outside checkout | A: [PR #2](https://github.com/alex-furrier/opensmash/pull/2), head `3d5907e`, contract and route/retry tests | 31 Python passes, four fixture skips, five JS passes. Candidate is separate from this map's source checkpoint. Gap: actual gameplay after root relocation; no private migration performed. |
@@ -410,3 +410,45 @@ tailnet origin. This historical checkpoint did not perform deployment work.
   A fixture pass does not prove the gateway cause or public recovery. Repeat public
   upgrade probes after activation and retain their actual statuses in the private
   deployment receipt; do not relabel an unexplained 502 as successful acceptance.
+
+- **E26 — disc setup layout and bounded HTTP writes:** implementation
+  `768dde62319f1876691409b24d8dea8c656ea55f`, checked 2026-10-15 UTC on macOS,
+  Node 26.7.0 and Chrome 155.0.8059.79. Independent browser reproduction found
+  that the dynamically inserted hosted-download button shared the file-picker's
+  decorative wrapper, clipping and overlapping both controls. React now owns a
+  separate download control and wrapper. The Melee upload step uses a compact,
+  scrollable card; Smash 64 and the controller step keep their existing layouts.
+  Download, local-file and cancel actions remain separate. Retry clears the old
+  error, and cancellation restores the alternatives.
+
+  Candidate static assets were supplied only inside a fresh authorized tailnet
+  test browser. Idle and held synthetic-download states passed at 1728×1258,
+  1440×900, 768×1024, 390×844, 320×640 and 844×390, including non-overlapping
+  controls, 44px action targets, cancellation, retry and Escape-to-close. No real
+  download was started by that layout proof. The supplied Library screenshot was
+  resolved but its pixels could not be materialized in this environment; this
+  checkpoint describes the independently reproduced screen, not visual inspection
+  of the supplied image. Screenshots and proof scripts remain operator-private.
+
+  HTTP reception batches small fragments into at most 1 MiB of additional storage
+  buffer while retaining direct writes for larger reads. Progress acknowledges
+  written bytes. The UI reports early fractional progress, transferred MB and
+  observed average MB/s, then relays verification/save phases. Authentication,
+  pinned integrity checks, cache adoption, Range rejection and no-store policy are
+  unchanged. Twenty-four targeted regressions passed, including a multi-batch
+  patterned file, a final partial batch and cancellation preserving the saved copy:
+
+  ```sh
+  node --test --test-timeout=30000 engines/melee/tests/host_disc_download.test.mjs web-prototype/shared/handoff-transfer.test.js engines/melee/tests/host_disc_server.test.mjs web-prototype/server/shared-password.test.js
+  ```
+
+  A bounded authenticated loopback sample from the approved disc reached about
+  718 MiB/s for 64 MiB before client cancellation. OS page cache may contribute.
+  Synthetic Chrome OPFS tests with 8 KiB fragments measured about 26–28 MiB/s
+  with the prior receiver versus 318–409 MiB/s with batching; writes fell from
+  2,048 to 16 for 16 MiB. Normal 32 MiB loopback HTTP remained fast with both
+  receivers. These small local samples isolate client write overhead; they do not
+  establish public authenticated throughput, a Mac uplink limit or a WAN speedup.
+  Public measurement requires an authorized browser session; no password or
+  production cookie was extracted. Independent review and deployment acceptance
+  remain separate prerequisites recorded in the private handoff.
