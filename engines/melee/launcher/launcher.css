@@ -2,7 +2,7 @@
 .melee-setup input { display:block; margin:12px auto; max-width:100%; }
 .melee-surface .game-overlay { position:relative; padding:0; background:#111; }
 .melee-surface .game-panel { width:100%; max-width:none; }
-.melee-surface .game-panel header { display:flex; justify-content:space-between; align-items:center; padding:8px; }
+.melee-surface .game-panel header:not(.game-toolbar) { display:flex; justify-content:space-between; align-items:center; padding:8px; }
 .melee-surface .game-screen { position:relative; }
 .melee-surface canvas { display:block; max-width:100%; width:100%; height:auto; }
 .melee-surface .game-message { padding:16px; }
@@ -15,37 +15,57 @@
 .experience-selector { position:fixed; top:12px; left:12px; z-index:50; background:#151515; color:#fff; padding:8px 12px; border:1px solid #777; border-radius:8px; }
 .experience-selector select { color:inherit; background:inherit; margin-left:8px; }
 
-/* The live upstream surface needs a bounded viewport in the shared launcher. */
-.melee-surface:has(.game-panel) {overflow:hidden;}
-.melee-surface .game-overlay,.melee-surface .game-panel {position:absolute;inset:0;height:100%;}
-.melee-surface .game-panel .game-screen {position:absolute;inset:0;}
-.melee-surface .game-panel header {position:absolute;top:0;left:0;right:0;z-index:6;background:#1119;}
-.melee-surface .game-panel header h2,.melee-surface .game-panel header p {margin:0;font-size:12px;}
+/* Match chrome is a flow row above the picture, never a renderer overlay.
+   In-page play keeps its full 4:3 picture; fullscreen shares the remaining space. */
+.intro-video-frame:has(.melee-surface .game-panel) {aspect-ratio:auto;height:auto;min-height:0;max-height:none;}
+.intro-video-frame:has(.melee-surface .game-panel)>.intro-video {display:none;}
+.melee-surface:has(.game-panel) {position:relative;inset:auto;overflow:hidden;}
+.melee-surface .game-overlay,.melee-surface .game-panel {position:relative;inset:auto;height:auto;}
+.melee-surface .game-panel {display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;min-height:0;}
+.melee-surface .game-panel .game-screen {position:relative;inset:auto;grid-row:2;align-self:stretch;min-width:0;min-height:0;width:100%;aspect-ratio:4/3;}
 .melee-surface .game-panel canvas {height:100%;object-fit:contain;}
+.melee-surface .game-toolbar {min-width:0;position:relative;inset:auto;z-index:6;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px max(8px,env(safe-area-inset-right)) 6px max(8px,env(safe-area-inset-left));background:#080504;border-bottom:1px solid #5d3a2b;color:#fff2d6;font-family:"Kanit",sans-serif;}
+.melee-surface .game-title {flex:1 1 10rem;min-width:0;}
+.melee-surface .game-toolbar-actions {display:flex;align-items:center;gap:6px;margin-left:auto;}
+.melee-surface .game-toolbar h2,.melee-surface .game-toolbar p {margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.melee-surface .game-toolbar h2 {font-size:.9375rem;line-height:1.25;}
+.melee-surface .game-toolbar p {font-size:.6875rem;line-height:1.4;color:#c7a985;}
+.melee-surface .game-toolbar .fps {flex:none;font-size:.6875rem;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.melee-surface .game-toolbar button {flex:none;display:grid;place-items:center;width:44px;min-width:44px;min-height:44px;margin:0;padding:4px;border:1px solid #5d3a2b;border-radius:0;background:#080504;color:#fff2d6;font:600 .875rem/1 "Kanit",sans-serif;cursor:pointer;}
+.melee-surface .game-toolbar .sound-game {width:auto;font-size:.6875rem;}
+.melee-surface .game-peer-label {display:block;font-size:.625rem;line-height:1.2;color:#c7a985;}
 .melee-surface .game-help {display:none;}
-.melee-surface .game-message {position:absolute;inset:0;display:grid;place-content:center;margin:0;background:#000b;z-index:3;}
-.melee-surface .game-message[role=alert] {justify-items:center;gap:12px;text-align:center;}
-.melee-surface .game-message[role=alert]>p {max-width:min(560px,90%);margin:0;font-size:15px;}
-.melee-surface .game-error-details {max-width:min(720px,92vw);text-align:left;font-size:11px;opacity:.75;}
+.melee-surface .game-message {position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:12px;margin:0;background:#080504ed;z-index:3;text-align:center;}
+.melee-surface .game-message>p {max-width:min(560px,90%);margin:0;font:500 15px/1.5 "Kanit",sans-serif;}
+.melee-surface .game-error-details {max-width:min(720px,92vw);text-align:left;font-size:11px;color:#c7a985;}
 .melee-surface .game-error-details pre {max-height:30vh;overflow:auto;white-space:pre-wrap;word-break:break-word;margin:6px 0 0;padding:8px;background:#0008;}
-.melee-surface .game-message[role=alert] button {padding:8px 20px;font-weight:600;color:#111;background:#f2f2f2;border:0;border-radius:6px;cursor:pointer;}
-.melee-surface .sound-game,.melee-surface .confirm-game {position:absolute;bottom:8px;z-index:4;}
-.melee-surface .sound-game {left:8px;}.melee-surface .confirm-game {right:8px;}
-@media (pointer:coarse) and (orientation:portrait) {
- .melee-surface .game-panel .game-screen {bottom:calc(284px + env(safe-area-inset-bottom));}
-}
-@media (pointer:coarse) and (orientation:landscape) {
- .melee-surface .game-panel .game-screen {left:160px;right:170px;}
- .melee-surface .game-panel header {left:160px;right:170px;}
+.melee-setup {color:#fff2d6;font-family:"Kanit",sans-serif;background:#080504;}
+.melee-setup button,.melee-surface .game-message button {min-height:44px;color:#fff2d6;background:#080504;border:1px solid #5d3a2b;border-radius:0;padding:10px 18px;font:600 16px/1.2 "Kanit",sans-serif;cursor:pointer;}
+.melee-setup button:hover:not(:disabled),.melee-surface .game-toolbar button:hover,.melee-surface .game-message button:hover {background:rgba(255,128,44,.12);border-color:#9b5d42;}
+.melee-setup button:disabled {opacity:.45;cursor:default;}
+.melee-setup button:focus-visible,.melee-surface button:focus-visible {outline:2px solid #fff0b5;outline-offset:2px;}
+.melee-setup input {color:#fff2d6;background:#080504;border:1px solid #5d3a2b;padding:10px;min-width:0;}
+.melee-setup p {max-width:520px;line-height:1.5;}
+.melee-setup>div:has(button) {display:flex;flex-wrap:wrap;justify-content:center;gap:10px;}
+.melee-setup [role=status] {display:block;flex-basis:100%;line-height:1.5;}
+/* The outer shell owns browser fullscreen and immersive fallback dimensions. */
+.game-surface-shell:is(:fullscreen,:-webkit-full-screen,.is-immersive) .intro-video-frame:has(.melee-surface .game-panel) {height:100%;min-height:0;aspect-ratio:auto;}
+.game-surface-shell:is(:fullscreen,:-webkit-full-screen,.is-immersive) .melee-surface:has(.game-panel),
+.game-surface-shell:is(:fullscreen,:-webkit-full-screen,.is-immersive) .game-overlay,
+.game-surface-shell:is(:fullscreen,:-webkit-full-screen,.is-immersive) .game-panel {height:100%;max-height:none;}
+.game-surface-shell:is(:fullscreen,:-webkit-full-screen,.is-immersive) .game-screen {aspect-ratio:auto;}
+.game-surface-shell:is(:fullscreen,:-webkit-full-screen,.is-immersive) .game-toolbar {padding-top:max(6px,env(safe-area-inset-top));}
+@media(pointer:coarse) and (orientation:landscape) {
+ .arena-shell:has(.melee-touch-deck)>.retro-site-header {display:none;}
+ .intro-video-stage:has(.melee-touch-deck) {padding-top:0;}
+ .melee-surface .game-panel {height:min(360px,100dvh);grid-template-columns:calc(136px + env(safe-area-inset-left)) minmax(0,1fr) calc(154px + env(safe-area-inset-right));grid-template-rows:auto minmax(0,1fr);}
+ .melee-surface .game-toolbar {grid-column:2;padding-inline:4px;}
+ .melee-surface .game-panel .game-screen {grid-column:2;aspect-ratio:auto;}
+ .melee-surface .game-toolbar,.melee-surface .game-toolbar-actions {gap:3px;}
 }
 
-/* Share the launcher's dark, high-contrast controls in setup and play. */
-.melee-setup button,.melee-surface .game-panel header button,.melee-surface .game-message button {
- color:#fff2d5;background:#211e18;border:1px solid #87754f;padding:8px 14px;font:inherit;cursor:pointer;
+@media(pointer:coarse) and (orientation:portrait) {
+ /* The shared shell places a 52px nav and 8px gap above in-page play.
+    Short phones shrink the picture before pushing controls below the viewport. */
+ :where(.arena-shell) .melee-surface .game-panel {max-height:calc(100dvh - 60px);}
 }
-.melee-setup button:hover,.melee-surface .game-panel header button:hover,.melee-surface .game-message button:hover {background:#453824;}
-.melee-setup button:focus-visible,.melee-surface button:focus-visible {outline:2px solid #ffd366;outline-offset:3px;}
-.melee-setup input {color:#fff;background:#161616;border:1px solid #87754f;padding:10px;}
-.melee-setup p {max-width:520px;line-height:1.5;}
-.melee-surface .game-panel header {gap:8px;flex-wrap:wrap;}
-.melee-surface .game-panel header>div {margin-right:auto;}

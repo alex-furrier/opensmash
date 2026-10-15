@@ -31,7 +31,7 @@ async function controllerClick(locator,port=0){
 }
 
 const tile=(row)=>page.locator(`[data-roster-character="${row.slug}"] .replica-select-control`);
-const play=page.locator('#local-fighter-selection').getByRole('button',{name:'Play locally',exact:true});
+const play=page.locator('#local-fighter-selection').getByRole('button',{name:'Start match',exact:true});
 assert.equal(await page.locator('[data-selection-slot]').count(),0,'assignment menu removed');
 assert.equal(await page.getByRole('button',{name:'Create room',exact:true}).isDisabled(),true);
 await controllerClick(tile(picks[0]),0);
@@ -85,11 +85,7 @@ const optionalMode=page.locator('.melee-setup').getByRole('button',{name:'Play l
 if(await optionalMode.isVisible())await controllerClick(optionalMode);
 const runtime=()=>page.frames().find(frame=>frame.url().includes('/engine/upstream/runtime.html'));
 await page.waitForFunction(()=>document.querySelector('.game-overlay'),{},{timeout:120000});
-for(let i=0;i<30;i++){
- if(await page.evaluate(()=>window.proofEvents.some(e=>e.type==='playable')))break;
- const confirm=page.getByRole('button',{name:'Confirm · A',exact:true});if(await confirm.isVisible())await confirm.click();
- await page.waitForTimeout(1000);
-}
+// Keep initialization neutral: upstream A-held startup swaps Zelda and Sheik.
 await page.waitForFunction(()=>window.proofEvents.some(e=>e.type==='playable'),{},{timeout:120000});
 assert.ok(runtime(),'real engine frame');
 const select=await runtime().evaluate(()=>window.proofEvents.find(e=>e.type==='select'));
