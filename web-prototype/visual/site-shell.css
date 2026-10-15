@@ -1434,6 +1434,47 @@
     color: inherit;
     outline: 0;
   }
+  /* Melee setup is a readable card; the cartridge composition belongs to Smash 64. */
+  .launch-flow-overlay[data-game="melee"][data-step="upload"] .launch-flow-canvas { visibility: hidden; }
+  .launch-flow-overlay[data-game="melee"][data-step="upload"] .launch-flow-upload {
+    inset: 50% auto auto 50%;
+    width: min(480px, calc(100% - 32px));
+    max-height: calc(100svh - 32px);
+    padding: clamp(20px, 4vw, 32px);
+    transform: translate(-50%, -50%);
+    justify-content: flex-start;
+    border: 1px solid #765443;
+    border-top: 3px solid #f2d9a6;
+    background: linear-gradient(155deg, #241911, #100c09 75%);
+    box-shadow: 0 24px 64px #0008;
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+  }
+  .launch-flow-overlay[data-game="melee"] .launch-flow-upload #launch-flow-title {
+    position: static; width: auto; height: auto; margin: 0;
+    clip: auto; clip-path: none; overflow: visible; white-space: normal;
+    font-size: clamp(25px, 5vw, 34px); line-height: 1.2;
+  }
+  .launch-flow-overlay[data-game="melee"] .launch-flow-upload .launch-flow-copy {
+    width: 100%; min-height: 3em; margin: 16px 0 0; font-size: 17px; line-height: 1.5;
+  }
+  .launch-flow-overlay[data-game="melee"] .launch-flow-upload .launch-flow-rom-hint {
+    width: 100%; margin: 14px 0 0; font-size: 13px; line-height: 1.6;
+  }
+  .launch-flow-overlay[data-game="melee"] .launch-flow-rom-copy { width: 100%; overflow-wrap: anywhere; }
+  .launch-flow-overlay[data-game="melee"] .launch-flow-rom-copy code { white-space: normal; }
+  .launch-flow-overlay[data-game="melee"] #rom-host-load-cell,
+  .launch-flow-overlay[data-game="melee"] .launch-flow-upload > .launch-flow-fire-cell { width: 100%; }
+  .launch-flow-overlay[data-game="melee"] #rom-host-load-cell .launch-flow-fire-cell { width: 100%; }
+  .launch-flow-overlay[data-game="melee"] #rom-host-load-button {
+    background: #f2d9a6; color: #21150d; text-shadow: none;
+  }
+  .launch-flow-overlay[data-game="melee"] #rom-host-load-button:hover { background: #ffe9c1; }
+  .launch-flow-overlay[data-game="melee"] .launch-flow-upload button:focus-visible {
+    outline: 2px solid #ff9a68; outline-offset: -4px;
+  }
+  .launch-flow-overlay[data-game="melee"] .launch-flow-upload button { min-height: 44px; }
+  .launch-flow-overlay[data-game="melee"] .launch-flow-cancel { width: 100%; min-height: 44px; }
   .launch-flow-copy-toast {
     position: fixed;
     top: 16px;

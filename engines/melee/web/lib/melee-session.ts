@@ -1,4 +1,4 @@
-import {downloadHostDisc,hostDiscSource} from './host-disc-download.mjs';
+import {downloadHostDisc,hostDiscSource,hostDiscProgress} from './host-disc-download.mjs';
 import {ISO_SIZE,ISO_SHA256} from '../../runtime/web/disc.mjs';
 import {cacheDisc,restoreCachedDisc,removeCachedDisc} from './disc-cache.ts';
 import {unlockAudio} from './audio.ts';
@@ -199,6 +199,13 @@ export async function selectHostDisc(signal:AbortSignal,onProgress:(message:stri
   await restoreLocalDisc();controller.signal.throwIfAborted();if(localDiscReady())return;
   await discoverHostDisc();controller.signal.throwIfAborted();
   const url=hostDiscSource(configuredHostDisc,location.href);
-  await downloadHostDisc({url,size:ISO_SIZE,signal:controller.signal,onProgress:(bytes:number)=>onProgress(`Downloading your game… ${Math.floor(bytes/ISO_SIZE*100)}%`),acceptFile:(file:File,signal:AbortSignal)=>selectLocalDisc(file,false,signal)});
+  const started=performance.now();let reported=0;
+  await downloadHostDisc({url,size:ISO_SIZE,signal:controller.signal,onProgress:(bytes:number)=>{
+   const now=performance.now();
+   if(!reported||now-reported>=250||bytes===ISO_SIZE){reported=now;onProgress(hostDiscProgress(bytes,ISO_SIZE,now-started));}
+  },acceptFile:async(file:File,signal:AbortSignal)=>{
+   const unsubscribe=subscribeLocalDisc(({state,message})=>{if(state==='checking'||state==='ready')onProgress(message);});
+   try{await selectLocalDisc(file,false,signal);}finally{unsubscribe();}
+  }});
  }finally{clearTimeout(timeout);signal.removeEventListener('abort',cancel);if(hostDownload===controller)hostDownload=undefined;}
 }

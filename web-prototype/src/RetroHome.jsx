@@ -112,6 +112,9 @@ export function LaunchFlow() {
           </button>
         </div>
         <input id="rom-file-input" className="launch-flow-file-input" type="file" hidden accept=".z64,.n64,.v64,.rom,.zip,application/octet-stream,application/zip" />
+        <div id="rom-host-load-cell" hidden>
+          <FlameAction id="rom-host-load-button" type="button">Download game</FlameAction>
+        </div>
         <FlameAction id="rom-upload-button" type="button">Choose ROM</FlameAction>
         <button id="launch-cancel-button" className="launch-flow-action launch-flow-cancel" type="button">Cancel</button>
         <button

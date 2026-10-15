@@ -443,7 +443,8 @@ const pickPrompt = document.getElementById('fighter-pick-prompt');
 let pendingPicks = [];
 let pendingPickSlots = "";
 
-let hostLoadButton;
+const hostLoadButton=document.getElementById('rom-host-load-button');
+const hostLoadCell=document.getElementById('rom-host-load-cell');
 let hostLoadOperation;
 let localSelection;
 let controllerSelection;
@@ -457,7 +458,7 @@ function localState() {
   return localSelection;
 }
 function renderLocalSelection() {
-  if(hostLoadButton)hostLoadButton.hidden=APP_BRIDGE?.experience!=='melee';
+  if(hostLoadCell)hostLoadCell.hidden=!APP_BRIDGE?.hostDiscConfigured?.()||APP_BRIDGE?.experience!=='melee';
   const panel=document.getElementById('local-fighter-selection');
   if(!panel)return;
   panel.hidden=!APP_BRIDGE?.explicitLocalSelection||document.body.classList.contains('is-game-running');
@@ -2643,15 +2644,16 @@ function showLaunchFlow(fighter, { create = false } = {}) {
   createUploadMode = create;
   resetRomPrompt();
   resetControlCheck();
-  if (flowTitle) flowTitle.textContent = create ? 'Create a fighter' : 'Play Smash.fun';
+  if (flowTitle) flowTitle.textContent = create ? 'Create a fighter' : usesDisc() ? 'Get ready to play' : 'Play Smash.fun';
   if (flowCopy) {
     flowCopy.textContent = usesDisc()
-      ? 'Insert your Melee USA 1.02 disc (.iso or .gcm). It stays on your device.'
+      ? APP_BRIDGE?.hostDiscConfigured?.() ? 'Download the hosted game (1.46 GB), or choose your local Melee USA 1.02 disc.' : 'Insert your Melee USA 1.02 disc (.iso or .gcm). It stays on your device.'
       : create
       ? 'To create a fighter, choose your legally obtained USA-release Super Smash Bros. 64 ROM. It never leaves your device.'
       : 'To play, choose your legally obtained USA-release Super Smash Bros. 64 ROM. It never leaves your device.';
   }
   overlay.dataset.mode = create ? 'create' : 'launch';
+  overlay.dataset.game = usesDisc() ? 'melee' : 'ssb64';
   overlay.dataset.step = 'upload';
   modelRestedAt = 0;
   overlay.classList.remove('is-leaving', 'is-model-settled', 'is-upload-revealed');
@@ -3112,16 +3114,19 @@ syncRomResetButton();
 // Optional host source shares the local disc validator and cache.
 async function mountHostDiscAction(){
  await APP_BRIDGE?.discoverHostDisc?.();
- if(!APP_BRIDGE?.hostDiscConfigured?.()||!uploadButton||hostLoadButton)return;
- const button=document.createElement('button');button.type='button';button.className=uploadButton.className;button.textContent='Load from host';button.hidden=APP_BRIDGE?.experience!=='melee';hostLoadButton=button;uploadButton.after(button);
+ if(!APP_BRIDGE?.hostDiscConfigured?.()||!uploadButton||!hostLoadButton||!hostLoadCell)return;
+ const button=hostLoadButton;hostLoadCell.hidden=APP_BRIDGE?.experience!=='melee';
  button.onclick=async()=>{
   if(hostLoadOperation){hostLoadOperation.abort();return;}
   const controller=new AbortController();hostLoadOperation=controller;
   const fighter=pendingFighter,sequence=flowSequence;
-  button.textContent='Cancel download';uploadButton.disabled=true;
+  const prompt=flowCopy.textContent,hint=document.getElementById('rom-filename-hint');
+  if(formError){formError.hidden=true;formError.textContent='';}
+  button.textContent='Cancel download';uploadButton.disabled=true;fileInput.disabled=true;
+  if(hint)hint.hidden=true;setAlternativesDisabled(true);flowCopy.textContent='Connecting to host…';
   try{await APP_BRIDGE.loadHostDisc(controller.signal,message=>{if(sequence===flowSequence&&!controller.signal.aborted)flowCopy.textContent=message;});if(!controller.signal.aborted&&sequence===flowSequence&&APP_BRIDGE?.experience==='melee'&&fighter===pendingFighter&&!overlay.hidden){closeLaunchFlow(true);requestLaunch(fighter);}}
-  catch(error){if(sequence===flowSequence&&!overlay.hidden)showRomError(controller.signal.aborted?'Download cancelled. Try again or choose a local disc.':error.message);}
-  finally{if(hostLoadOperation===controller){hostLoadOperation=null;button.textContent='Load from host';if(sequence===flowSequence)uploadButton.disabled=false;}}
+  catch(error){if(sequence===flowSequence&&!overlay.hidden){flowCopy.textContent=prompt;showRomError(controller.signal.aborted?'Download cancelled. Try again or choose a local disc.':error.message);}}
+  finally{if(hostLoadOperation===controller){hostLoadOperation=null;button.textContent='Download game';if(sequence===flowSequence){uploadButton.disabled=false;fileInput.disabled=false;if(hint)hint.hidden=false;setAlternativesDisabled(false);}}}
  };
  window.addEventListener('pagehide',()=>hostLoadOperation?.abort());
 }

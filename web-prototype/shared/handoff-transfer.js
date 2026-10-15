@@ -130,15 +130,25 @@ async function incomingDisc(setCleanup){
 /** Save a bounded HTTP stream using the same incoming-disc receipt as handoff. */
 export async function receiveDiscResponse(response,size,signal,onProgress,setCleanup){
  if(!response.ok||Number(response.headers.get('content-length'))!==size)throw Error('The game file could not be loaded completely.');
- signal.throwIfAborted();const stage=await incomingDisc(setCleanup),reader=response.body.getReader();let received=0;
+ signal.throwIfAborted();const stage=await incomingDisc(setCleanup),reader=response.body.getReader();let received=0,written=0;
+ // Coalesce small network fragments into bounded writes, without splitting large reads.
+ const pending=new Uint8Array(1024*1024);let queued=0;
+ const write=async bytes=>{signal.throwIfAborted();await stage.writer.write(bytes);written+=bytes.byteLength;onProgress(written);};
+ const flush=async()=>{if(queued){await write(pending.subarray(0,queued));queued=0;}};
  const abort=()=>{void reader.cancel(signal.reason).catch(()=>{});};signal.addEventListener('abort',abort,{once:true});
  try{
   for(;;){signal.throwIfAborted();const{done,value}=await reader.read();signal.throwIfAborted();if(done)break;
    if(received+value.byteLength>size)throw Error('Invalid game file byte count.');
-   await stage.writer.write(value);received+=value.byteLength;onProgress(received);
+   received+=value.byteLength;
+   if(!queued&&value.byteLength>=pending.byteLength){await write(value);continue;}
+   for(let offset=0;offset<value.byteLength;){
+    const length=Math.min(pending.byteLength-queued,value.byteLength-offset);
+    pending.set(value.subarray(offset,offset+length),queued);queued+=length;offset+=length;
+    if(queued===pending.byteLength)await flush();
+   }
   }
   if(received!==size)throw Error('The game download ended before the whole file arrived.');
-  signal.throwIfAborted();await stage.writer.close();
+  await flush();signal.throwIfAborted();await stage.writer.close();
   const file=new File([await stage.handle.getFile()],'melee-usa-1.02.iso',{type:'application/octet-stream'});
   Object.defineProperty(file,Symbol.for('opensmash.received-disc'),{value:stage.receipt});return file;
  }finally{signal.removeEventListener('abort',abort);await reader.cancel().catch(()=>{});reader.releaseLock();}
