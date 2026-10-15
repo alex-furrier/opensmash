@@ -19,7 +19,7 @@ const equal = (a, b) => {
 const setCookie = (name, value, age) => `${name}=${value}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${age}`;
 
 export async function passwordRecord(password) {
-  if (typeof password !== 'string' || password.length < 16 || Buffer.byteLength(password) > 1024) throw Error('Use a password between 16 and 1024 bytes.');
+  if (typeof password !== 'string' || password.length < 8 || Buffer.byteLength(password) > 1024) throw Error('Use at least 8 characters and at most 1024 bytes.');
   const salt = randomBytes(32).toString('hex');
   const hash = (await derive(password, salt, 32, {N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024})).toString('hex');
   return {salt, hash, N: 32768, r: 8, p: 3};

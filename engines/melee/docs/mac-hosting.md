@@ -95,7 +95,9 @@ runtime manifest, including optional worker scripts, rather than a sample. Keep
 that runtime root unchanged between deployments.
 
 The authentication file is separately created through the secure local password
-handoff. Never put its contents into this configuration, arguments, Git or logs.
+handoff. It accepts at least eight characters, with no required digits, symbols
+or mixed case, and at most 1024 bytes. Both password entries stay hidden. Never
+put its contents into this configuration, arguments, Git or logs.
 The runner checks ownership/permissions and reads only the validated `helperKey`
 for its private helper channel. Both roles require this stable key: Python receives
 `OPENSMASH_DESKTOP_TOKEN`; Node receives `MELEE_SERVICE_TOKEN` with the loopback

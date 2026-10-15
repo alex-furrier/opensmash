@@ -16,7 +16,7 @@ CLI = Path(__file__).resolve().parents[3] / 'web-prototype/server/shared-passwor
 
 @unittest.skipUnless(shutil.which('node'), 'Node is required for the owner CLI')
 class SharedPasswordCliTests(unittest.TestCase):
-    def run_cli(self, target, password):
+    def run_cli(self, target, password, accepted=True):
         previous = target.read_bytes() if target.exists() else None
         master, slave = pty.openpty()
         process = subprocess.Popen(['node', str(CLI), str(target)], stdin=slave, stdout=slave, stderr=slave, start_new_session=True)
@@ -41,9 +41,13 @@ class SharedPasswordCliTests(unittest.TestCase):
                     sent = 3
                 if process.poll() is not None:
                     break
-            self.assertEqual(process.wait(timeout=1), 0)
+            self.assertEqual(process.wait(timeout=1) == 0, accepted)
             self.assertNotIn(password, output)
             self.assertIn(b'private helper access credential', output)
+            self.assertIn(b'at least 8 characters; no digits or symbols required', output)
+            if not accepted:
+                self.assertEqual(target.read_bytes() if target.exists() else None, previous)
+                return None
             value = json.loads(target.read_text())
             self.assertNotIn(value['helperKey'].encode(), output)
             self.assertNotIn(value['sealKey'].encode(), output)
@@ -68,6 +72,15 @@ class SharedPasswordCliTests(unittest.TestCase):
             self.assertNotEqual(first['sealKey'], second['sealKey'])
             self.assertNotEqual(first['authVersion'], second['authVersion'])
             self.assertNotEqual(first['password']['hash'], second['password']['hash'])
+
+    def test_eight_alphabetic_characters_accepted_seven_rejected_without_mutation(self):
+        with tempfile.TemporaryDirectory(prefix='opensmash-cli-policy-') as root:
+            target = Path(root) / 'private/auth.json'
+            self.run_cli(target, b'abcdefg', accepted=False)
+            self.assertFalse(target.exists())
+            value = self.run_cli(target, b'abcdefgh')
+            self.run_cli(target, b'abcdefg', accepted=False)
+            self.assertEqual(json.loads(target.read_text()), value)
 
 
 if __name__ == '__main__':

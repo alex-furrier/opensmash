@@ -11,6 +11,10 @@ import {EventEmitter, once} from 'node:events';
 
 const origin = 'https://smash.alexfurrier.dev';
 const password = 'isolated-test-only-password';
+test('password policy accepts eight alphabetic characters without composition rules and rejects seven', async () => {
+  const record = await passwordRecord('abcdefgh');assert.match(record.hash,/^[a-f0-9]{64}$/);
+  await assert.rejects(passwordRecord('abcdefg'),/at least 8 characters/);
+});
 const config = async () => ({helperKey: randomBytes(32).toString('hex'), authVersion: randomBytes(32).toString('hex'), sealKey: randomBytes(32).toString('hex'), password: await passwordRecord(password)});
 async function fixture(t, {missing = false, allowHostDisc = false, protectedHandler} = {}) {
   const directory = await mkdtemp(path.join(tmpdir(), 'opensmash-auth-'));

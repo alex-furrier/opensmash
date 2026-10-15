@@ -20,7 +20,7 @@ let password, confirmation;
 try {
   process.stdout.write(`This will create or rotate the private password at ${file}.\nExisting sessions, WebSockets and active downloads will be invalidated.\nA separate private helper access credential will be created on first setup and preserved on password rotation. It is never shown or sent to browsers.\n`);
   if (await ask('Type CONFIRM to continue: ') !== 'CONFIRM') { input.close(); process.exit(1); }
-  password = await ask('Shared password (hidden, at least 16 characters): ');
+  password = await ask('Shared password (hidden, at least 8 characters; no digits or symbols required): ');
   confirmation = await ask('Confirm shared password (hidden): ');
 } finally { input.close(); }
 if (password !== confirmation) throw Error('Passwords did not match. No configuration was changed.');
