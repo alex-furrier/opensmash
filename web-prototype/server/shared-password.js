@@ -25,14 +25,14 @@ export async function passwordRecord(password) {
   return {salt, hash, N: 32768, r: 8, p: 3};
 }
 
-async function readConfiguration(file) {
+export async function readSharedPasswordConfiguration(file) {
   const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
     const stat = await handle.stat();
     if (!stat.isFile() || stat.size > 8192 || (stat.mode & 0o077) || stat.uid !== process.getuid()) throw Error('Invalid auth file permissions.');
     const value = JSON.parse(await handle.readFile('utf8'));
     const p = value.password;
-    if (!/^[a-f0-9]{64}$/.test(value.authVersion) || !/^[a-f0-9]{64}$/.test(value.sealKey) || !/^[a-f0-9]{64}$/.test(p?.salt) || !/^[a-f0-9]{64}$/.test(p?.hash) || p.N !== 32768 || p.r !== 8 || p.p !== 3) throw Error('Invalid auth file.');
+    if (!/^[a-f0-9]{64}$/.test(value.helperKey) || !/^[a-f0-9]{64}$/.test(value.authVersion) || !/^[a-f0-9]{64}$/.test(value.sealKey) || !/^[a-f0-9]{64}$/.test(p?.salt) || !/^[a-f0-9]{64}$/.test(p?.hash) || p.N !== 32768 || p.r !== 8 || p.p !== 3) throw Error('Invalid auth file.');
     return value;
   } finally { await handle.close(); }
 }
@@ -81,7 +81,7 @@ export function createSharedPasswordGate({file, origin, now = Date.now, pollMs =
     if (loading) return loading;
     loading = (async () => {
       try {
-        const next = await readConfiguration(file);
+        const next = await readSharedPasswordConfiguration(file);
         const bytes = JSON.stringify(next);
         if (fingerprint && bytes !== fingerprint) invalidate();
         current = next; fingerprint = bytes;

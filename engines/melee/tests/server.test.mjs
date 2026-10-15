@@ -83,3 +83,21 @@ test('production source bearer links cache publicly without cookies; errors and 
  assert.match(prepare.headers.get('set-cookie'),/opensmash-melee-client=/);
  assert.equal((await fetch(origin+path+'.wasm')).status,404);
 });
+
+test('shared-host token gateway preserves private portraits and strips all client authority before proxy', async t=>{
+ const received=[],secret='f'.repeat(64);
+ const upstream=http.createServer((req,res)=>{received.push({path:req.url,headers:req.headers});res.writeHead(200,{'Content-Type':'application/octet-stream','X-OpenSmash-Token':secret,'X-OpenSmash-Owner':'private-owner'});res.end('fixture');});
+ upstream.listen(0,'127.0.0.1');await once(upstream,'listening');t.after(()=>upstream.close());
+ const handler=createMeleeHandler({origin:undefined,serviceOrigin:`http://127.0.0.1:${upstream.address().port}`,serviceToken:secret,production:true,privateHosting:true});
+ const server=http.createServer((req,res)=>handler(req,res));server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>server.close());
+ const origin=`http://127.0.0.1:${server.address().port}`;
+ for(const route of ['/api/source-portraits/fighter.webp','/api/imports/portraits/import-'+'a'.repeat(24)+'-tile.webp','/api/imports/portraits/import-'+'a'.repeat(24)+'-medium.webp'])for(const method of ['GET','HEAD']){
+  const response=await fetch(origin+'/melee'+route,{method,headers:{Cookie:'private-session=secret',Authorization:'Bearer client','X-OpenSmash-Token':'forged','X-OpenSmash-Owner':'forged'}});await response.arrayBuffer();
+  assert.equal(response.status,200);assert.equal(response.headers.get('x-opensmash-token'),null);assert.equal(response.headers.get('x-opensmash-owner'),null);
+  const observed=received.at(-1);assert.equal(observed.headers['x-opensmash-token'],secret);assert.equal(observed.headers.cookie,undefined);assert.equal(observed.headers.authorization,undefined);assert.notEqual(observed.headers['x-opensmash-owner'],'forged');
+ }
+ const count=received.length;
+ for(const route of ['/api/game/PlMr.dat','/api/setup/disc','/api/native/launch','/engine/sys/main.dol'])for(const method of ['GET','HEAD','POST'])assert.equal((await fetch(origin+'/melee'+route,{method})).status,404);
+ assert.equal(received.length,count);
+ assert.throws(()=>createMeleeHandler({origin:'http://127.0.0.1:8818',production:true,privateHosting:true}));
+});

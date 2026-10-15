@@ -31,9 +31,22 @@ credential suffixes, environment files, dependency directories and source maps
 are rejected. Runtime WASM, templates and custom sources stay in private local
 storage. Preserve upstream license files and the release's source commit.
 
-Install the production Node dependencies into the staged release using its frozen
-lock and approved package manager. Do not point `node_modules` at another checkout.
-Then record hashes of the installed layer and verify the complete release:
+Install both dependency owners into the staged release. The website uses the
+pinned pnpm version with an explicit hoisted layout; normal pnpm directory links
+are intentionally rejected by sealing. The room server resolves `ws` relative to
+`engines/melee/tools/netplay/package.json`, so its separate npm lock and dependency
+layer are required. Record both lock hashes in the build receipt. Use the exact
+approved toolchain and retain these command outputs:
+
+```sh
+cd /absolute/releases/COMMIT/web-prototype
+pnpm install --prod --frozen-lockfile --config.node-linker=hoisted --ignore-scripts
+cd /absolute/releases/COMMIT/engines/melee/tools/netplay
+npm ci --omit=dev --ignore-scripts
+```
+
+Do not point either `node_modules` at another checkout. Then record hashes of both
+installed layers and verify the complete release:
 
 ```sh
 python3 engines/melee/tools/package_mac_release.py seal-dependencies /absolute/releases/COMMIT
@@ -83,7 +96,12 @@ that runtime root unchanged between deployments.
 
 The authentication file is separately created through the secure local password
 handoff. Never put its contents into this configuration, arguments, Git or logs.
-The runner checks ownership/permissions, passes its path to Node, and creates a
+The runner checks ownership/permissions and reads only the validated `helperKey`
+for its private helper channel. Both roles require this stable key: Python receives
+`OPENSMASH_DESKTOP_TOKEN`; Node receives `MELEE_SERVICE_TOKEN` with the loopback
+`MELEE_SERVICE_ORIGIN`. Readiness requests send `X-OpenSmash-Token`. No key is put
+in plist arguments or logs. Password rotation preserves this separate helper key.
+The runner passes the authentication-file path to Node and creates a
 separate process-only key for legacy app cookies. Those legacy cookies expire on
 restart; the shared-password session and rotation authority remain in the external
 authentication file. Code rollback must keep using the current authentication file.

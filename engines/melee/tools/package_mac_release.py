@@ -18,6 +18,8 @@ SOURCE_FILES = {'LICENSE', 'engines/melee/upstream.json', 'engines/melee/require
                 'web-prototype/config/demo.js', 'web-prototype/config/trailer.js',
                 'web-prototype/package-lock.json', 'web-prototype/pnpm-lock.yaml'}
 FORBIDDEN = {'.git', 'node_modules', '__pycache__', '.env', 'build', 'data', '.aws', '.codex'}
+DEPENDENCY_ROOTS = ('web-prototype/node_modules', 'engines/melee/tools/netplay/node_modules')
+REQUIRED_LOCKS = {'web-prototype/pnpm-lock.yaml', 'engines/melee/tools/netplay/package-lock.json'}
 FORBIDDEN_SUFFIXES = {'.iso', '.gcm', '.rvz', '.pem', '.key', '.p12', '.pyc'}
 
 
@@ -107,8 +109,8 @@ def package(repo, frontend, output, audio_wasm=None, build_receipt=None):
         for name, expected in receipt.get('lockFiles', {}).items():
             if name not in files or hashlib.sha256(files[name]).hexdigest() != expected:
                 raise ValueError('Build lock hash mismatch')
-        if not receipt.get('lockFiles'):
-            raise ValueError('Build receipt needs dependency lock hashes')
+        if not REQUIRED_LOCKS <= receipt.get('lockFiles', {}).keys():
+            raise ValueError('Build receipt needs website and netplay dependency lock hashes')
         files['build-receipt.json'] = (json.dumps(receipt, sort_keys=True) + '\n').encode()
     if audio_wasm is not None:
 
@@ -132,7 +134,8 @@ def verify(release):
     dependencies = manifest.get('dependencies', {})
     for name, expected in dependencies.items():
         path = release / name
-        if not name.startswith('web-prototype/node_modules/') or not path.resolve().is_relative_to((release / 'web-prototype/node_modules').resolve()):
+        dependency_root = next((release / root for root in DEPENDENCY_ROOTS if name.startswith(root + '/')), None)
+        if dependency_root is None or dependency_root.is_symlink() or not path.resolve().is_relative_to(dependency_root.resolve()):
             raise ValueError('Dependency escapes release')
         if digest(path) != expected:
             raise ValueError('Dependency hash mismatch: ' + name)
@@ -149,17 +152,20 @@ def seal_dependencies(release):
     """Freeze an already installed dependency layer; does not run an installer."""
     release = Path(release)
     manifest = json.loads(regular(release, 'release.json').read_text())
-    root = release / 'web-prototype/node_modules'
-    if root.is_symlink() or not root.is_dir():
-        raise ValueError('Install dependencies inside release, not an external symlink')
     dependencies = {}
-    for path in root.rglob('*'):
-        if path.is_symlink() and (not path.resolve().is_relative_to(root.resolve()) or not path.is_file()):
-            raise ValueError('Dependency symlink escape/directory link')
-        if path.is_file():
-            dependencies[path.relative_to(release).as_posix()] = digest(path)
-    if not dependencies:
-        raise ValueError('Empty dependency layer')
+    for relative in DEPENDENCY_ROOTS:
+        root = release / relative
+        if root.is_symlink() or not root.is_dir():
+            raise ValueError('Install both dependency layers inside release: ' + relative)
+        layer = {}
+        for path in root.rglob('*'):
+            if path.is_symlink() and (not path.resolve().is_relative_to(root.resolve()) or not path.is_file()):
+                raise ValueError('Dependency symlink escape/directory link')
+            if path.is_file():
+                layer[path.relative_to(release).as_posix()] = digest(path)
+        if not layer:
+            raise ValueError('Empty dependency layer: ' + relative)
+        dependencies.update(layer)
     manifest['dependencies'] = dict(sorted(dependencies.items()))
     (release / 'release.json').write_text(json.dumps(manifest, indent=2) + '\n')
     verify(release)

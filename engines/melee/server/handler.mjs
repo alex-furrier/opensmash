@@ -4,7 +4,7 @@ import {createHash,createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
 
 // The imported server owns local game data and converters. Only development may
 // proxy to it. A public deployment needs a separately authenticated asset service.
-export function createMeleeHandler({origin=process.env.MELEE_LOCAL_ORIGIN,production=process.env.NODE_ENV==='production',serviceOrigin=process.env.MELEE_SERVICE_ORIGIN,serviceToken=process.env.MELEE_SERVICE_TOKEN}={}) {
+export function createMeleeHandler({origin=process.env.MELEE_LOCAL_ORIGIN,production=process.env.NODE_ENV==='production',serviceOrigin=process.env.MELEE_SERVICE_ORIGIN,serviceToken=process.env.MELEE_SERVICE_TOKEN,privateHosting=process.env.MELEE_SHARED_HOSTING==='1'}={}) {
   let upstream,hosted=false;
   if(serviceOrigin){
     upstream=new URL(serviceOrigin);hosted=true;
@@ -13,7 +13,7 @@ export function createMeleeHandler({origin=process.env.MELEE_LOCAL_ORIGIN,produc
   }
   if(origin){
     upstream=new URL(origin);
-    if((production && !(process.env.MELEE_SHARED_HOSTING==='1'&&process.env.MELEE_SHARED_AUTH_FILE&&process.env.MELEE_PRIVATE_ORIGIN==='https://smash.alexfurrier.dev')) || upstream.protocol!=='http:' || !['127.0.0.1','localhost','[::1]'].includes(upstream.hostname)
+    if(production || privateHosting || upstream.protocol!=='http:' || !['127.0.0.1','localhost','[::1]'].includes(upstream.hostname)
       || upstream.username || upstream.password || upstream.pathname!=='/' || upstream.search || upstream.hash)
       throw Error('MELEE_LOCAL_ORIGIN must be a loopback HTTP origin in development.');
   }
@@ -24,11 +24,11 @@ export function createMeleeHandler({origin=process.env.MELEE_LOCAL_ORIGIN,produc
       const body=JSON.stringify({error:'Melee assets are not configured on this server.'});
       res.writeHead(503,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(body);return true;
     }
-    if(hosted&&!allowedHostedRoute(req.method,url.pathname.slice('/melee'.length))){res.writeHead(404);res.end();return true;}
+    if(hosted&&!(privateHosting?allowedPrivateMeleeRoute:allowedHostedRoute)(req.method,url.pathname.slice('/melee'.length))){res.writeHead(404);res.end();return true;}
     // Engine runtime files are public and content-addressed: let the origin's
     // cache policy through and never attach a per-visitor cookie to them, or
     // neither browsers nor the CDN could cache them.
-    const sourceAsset=hosted&&production&&['GET','HEAD'].includes(req.method)&&/^\/melee\/api\/native-fit\/assets\/[a-f0-9]{64}\/sources\/[a-z0-9_-]+\.(?:json|rgba8|identity\.dat)$/.test(url.pathname);
+    const sourceAsset=hosted&&production&&!privateHosting&&['GET','HEAD'].includes(req.method)&&/^\/melee\/api\/native-fit\/assets\/[a-f0-9]{64}\/sources\/[a-z0-9_-]+\.(?:json|rgba8|identity\.dat)$/.test(url.pathname);
     const cacheable=sourceAsset||(['GET','HEAD'].includes(req.method)&&url.pathname.startsWith('/melee/engine/'));
     const headers={...req.headers,host:upstream.host};
     // The browser is talking to this same-origin development server. Never
@@ -51,7 +51,7 @@ export function createMeleeHandler({origin=process.env.MELEE_LOCAL_ORIGIN,produc
       headers['x-opensmash-owner']=createHash('sha256').update(identity).digest('hex');
     }
     const proxy=(upstream.protocol==='https:'?https:http).request(new URL(url.pathname.slice('/melee'.length)+url.search,upstream),{method:req.method,headers}, response=>{
-      const output={...response.headers,'Cross-Origin-Resource-Policy':'same-origin','Cache-Control':cacheable&&response.statusCode===200?response.headers['cache-control']||'no-store':'no-store'};delete output['set-cookie'];
+      const output={...response.headers,'Cross-Origin-Resource-Policy':'same-origin','Cache-Control':cacheable&&response.statusCode===200?response.headers['cache-control']||'no-store':'no-store'};delete output['set-cookie'];delete output['x-opensmash-token'];delete output['x-opensmash-owner'];
       delete output['cache-control'];
       if(sourceAsset){
         // Exact source URLs are bearer links, independent of visitor identity.

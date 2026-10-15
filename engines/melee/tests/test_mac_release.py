@@ -26,6 +26,8 @@ class MacReleaseTests(unittest.TestCase):
         self.put('engines/melee/tools/serve_melee.py', 'helper')
         self.put('engines/melee/requirements.txt', 'numpy==2.0')
         self.put('web-prototype/package-lock.json', '{}')
+        self.put('web-prototype/pnpm-lock.yaml', 'lockfileVersion: 9')
+        self.put('engines/melee/tools/netplay/package-lock.json', '{}')
         self.put('private/password.json', 'never capture')
         self.put('secrets.iso', 'never capture')
         self.git('add', '.'); self.git('commit', '-qm', 'Fixture')
@@ -98,6 +100,8 @@ class MacReleaseTests(unittest.TestCase):
         deps = self.release / 'web-prototype/node_modules/pkg'; deps.mkdir(parents=True)
         (deps / 'index.js').write_text('dependency')
         with self.assertRaisesRegex(ValueError, 'Unexpected release file'): package.verify(self.release)
+        netplay = self.release / 'engines/melee/tools/netplay/node_modules/ws'; netplay.mkdir(parents=True)
+        (netplay / 'index.js').write_text('websocket dependency')
         package.seal_dependencies(self.release)
         package.verify(self.release)
         (deps / 'index.js').write_text('mutation')
@@ -114,6 +118,58 @@ class MacReleaseTests(unittest.TestCase):
         receipt.write_text(json.dumps({'sourceCommit': 'wrong'}))
         with self.assertRaisesRegex(ValueError, 'Build receipt'): package.package(self.repo, self.frontend, self.release, build_receipt=receipt)
         self.assertFalse(self.release.exists())
+
+    def test_receipt_requires_both_dependency_owner_locks(self):
+        receipt = {
+            'sourceCommit': self.git('rev-parse', 'HEAD').decode().strip(),
+            'toolchain': {'node': 'fixture'},
+            'frontendFiles': {p.relative_to(self.frontend).as_posix(): package.digest(p) for p in self.frontend.rglob('*') if p.is_file()},
+            'lockFiles': {'web-prototype/pnpm-lock.yaml': package.digest(self.repo / 'web-prototype/pnpm-lock.yaml')},
+        }
+        file = self.root / 'receipt.json'; file.write_text(json.dumps(receipt))
+        with self.assertRaisesRegex(ValueError, 'website and netplay'): package.package(self.repo, self.frontend, self.release, build_receipt=file)
+        name = 'engines/melee/tools/netplay/package-lock.json'
+        receipt['lockFiles'][name] = package.digest(self.repo / name)
+        file.write_text(json.dumps(receipt))
+        package.package(self.repo, self.frontend, self.release, build_receipt=file)
+        package.verify(self.release)
+
+    def test_both_dependency_layers_required_and_websocket_mutation(self):
+        self.stage()
+        web = self.release / 'web-prototype/node_modules/pkg'; web.mkdir(parents=True)
+        (web / 'index.js').write_text('web')
+        with self.assertRaisesRegex(ValueError, 'both dependency layers'): package.seal_dependencies(self.release)
+        ws = self.release / 'engines/melee/tools/netplay/node_modules/ws'; ws.mkdir(parents=True)
+        (ws / 'index.js').write_text('ws')
+        package.seal_dependencies(self.release)
+        self.assertIn('engines/melee/tools/netplay/node_modules/ws/index.js', package.verify(self.release)['dependencies'])
+        (ws / 'index.js').write_text('mutation')
+        with self.assertRaisesRegex(ValueError, 'Dependency hash mismatch'): package.verify(self.release)
+
+    def test_helper_token_is_private_validated_and_never_in_plists(self):
+        file = self.root / 'auth.json'
+        file.write_text(json.dumps({'helperKey': '0' * 64})); file.chmod(0o600)
+        self.assertEqual(service.helper_token(file), '0' * 64)
+        file.write_text(json.dumps({'helperKey': 'bad'}))
+        with self.assertRaisesRegex(ValueError, 'helperKey'): service.helper_token(file)
+        file.chmod(0o644)
+        with self.assertRaisesRegex(ValueError, '0600'): service.helper_token(file)
+
+    def test_service_environments_authenticate_helper_without_broad_inheritance(self):
+        value = {key: str(self.root / key) for key in ('helper', 'authFile', 'engineRoot', 'characterRoot')}
+        token = '0' * 64
+        helper = service.service_environment(value, 'helper', token)
+        web = service.service_environment(value, 'web', token)
+        self.assertEqual(helper['OPENSMASH_DESKTOP_TOKEN'], token)
+        self.assertEqual(web['MELEE_SERVICE_TOKEN'], token)
+        self.assertEqual(web['MELEE_SERVICE_ORIGIN'], 'http://127.0.0.1:8818')
+        self.assertEqual(web['CREATION_ENABLED'], '0')
+        self.assertEqual(web['HOST'], '127.0.0.1')
+        self.assertNotIn('MELEE_LOCAL_ORIGIN', web)
+        self.assertNotIn('MELEE_HOST_DISC_FILE', web)
+        self.assertNotIn('MELEE_SIMULATED_PEER_ISO', web)
+        self.assertNotIn('MELEE_SHARED_AUTH_FILE', helper)
+        self.assertNotEqual(web['COOKIE_SECRET'], token)
 
     def test_launchd_dryrun_has_no_secrets_install_or_public_bind(self):
         config = {key: str(self.root / key) for key in ('release', 'helper', 'node', 'python', 'authFile', 'engineRoot', 'characterRoot', 'roster', 'logs')}

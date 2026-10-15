@@ -5,7 +5,7 @@ import {Writable} from 'node:stream';
 import {randomBytes} from 'node:crypto';
 import {mkdir, open, rename, unlink, lstat} from 'node:fs/promises';
 import path from 'node:path';
-import {passwordRecord} from './shared-password.js';
+import {passwordRecord, readSharedPasswordConfiguration} from './shared-password.js';
 
 const file = process.argv[2];
 if (!file || process.argv.length !== 3 || !path.isAbsolute(file) || !process.stdin.isTTY || !process.stdout.isTTY) {
@@ -18,7 +18,7 @@ const input = createInterface({input: process.stdin, output: quiet, terminal: tr
 const ask = prompt => { process.stdout.write(prompt); return new Promise(resolve => input.question('', answer => {process.stdout.write('\n'); resolve(answer);})); };
 let password, confirmation;
 try {
-  process.stdout.write(`This will create or rotate the private password at ${file}.\nExisting sessions, WebSockets and active downloads will be invalidated.\n`);
+  process.stdout.write(`This will create or rotate the private password at ${file}.\nExisting sessions, WebSockets and active downloads will be invalidated.\nA separate private helper access credential will be created on first setup and preserved on password rotation. It is never shown or sent to browsers.\n`);
   if (await ask('Type CONFIRM to continue: ') !== 'CONFIRM') { input.close(); process.exit(1); }
   password = await ask('Shared password (hidden, at least 16 characters): ');
   confirmation = await ask('Confirm shared password (hidden): ');
@@ -27,11 +27,13 @@ if (password !== confirmation) throw Error('Passwords did not match. No configur
 await mkdir(directory, {recursive: true, mode: 0o700});
 const parent = await lstat(directory);
 if (!parent.isDirectory() || parent.isSymbolicLink() || parent.uid !== process.getuid() || parent.mode & 0o077) throw Error('Use an owner-only private directory (mode 0700).');
+let helperKey;
 try {
   const existing = await lstat(file);
   if (!existing.isFile() || existing.isSymbolicLink() || existing.uid !== process.getuid() || existing.mode & 0o077) throw Error('Existing configuration must be an owner-only regular file.');
+  helperKey = (await readSharedPasswordConfiguration(file)).helperKey;
 } catch (error) { if (error.code !== 'ENOENT') throw error; }
-const config = {authVersion: randomBytes(32).toString('hex'), sealKey: randomBytes(32).toString('hex'), password: await passwordRecord(password)};
+const config = {helperKey: helperKey || randomBytes(32).toString('hex'), authVersion: randomBytes(32).toString('hex'), sealKey: randomBytes(32).toString('hex'), password: await passwordRecord(password)};
 password = confirmation = undefined;
 const temporary = path.join(directory, `.auth-${randomBytes(16).toString('hex')}.tmp`);
 try {

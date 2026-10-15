@@ -11,7 +11,7 @@ import {EventEmitter, once} from 'node:events';
 
 const origin = 'https://smash.alexfurrier.dev';
 const password = 'isolated-test-only-password';
-const config = async () => ({authVersion: randomBytes(32).toString('hex'), sealKey: randomBytes(32).toString('hex'), password: await passwordRecord(password)});
+const config = async () => ({helperKey: randomBytes(32).toString('hex'), authVersion: randomBytes(32).toString('hex'), sealKey: randomBytes(32).toString('hex'), password: await passwordRecord(password)});
 async function fixture(t, {missing = false} = {}) {
   const directory = await mkdtemp(path.join(tmpdir(), 'opensmash-auth-'));
   const file = path.join(directory, 'auth.json'); let value = await config();
