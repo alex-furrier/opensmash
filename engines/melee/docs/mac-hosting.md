@@ -98,6 +98,22 @@ The authentication file is separately created through the secure local password
 handoff. It accepts at least eight characters, with no required digits, symbols
 or mixed case, and at most 1024 bytes. Both password entries stay hidden. Never
 put its contents into this configuration, arguments, Git or logs.
+
+To reset a forgotten password, run the existing CLI from the current sealed
+release in the owner's terminal. The old password is not required:
+
+```sh
+/absolute/node /absolute/releases/COMMIT/web-prototype/server/shared-password-cli.js \
+  /absolute/private/auth.json
+```
+
+Type `CONFIRM`, then enter the new password twice at the hidden prompts. Do not
+send the password through chat or place it in command arguments. Rotation replaces
+the password hash, authentication version and session sealing key atomically while
+preserving the separate helper key. The running service detects the change without
+a restart, invalidates old sessions, closes their WebSockets and cancels active
+protected downloads. Completed downloads remain on the recipient's device.
+
 The runner checks ownership/permissions and reads only the validated `helperKey`
 for its private helper channel. Both roles require this stable key: Python receives
 `OPENSMASH_DESKTOP_TOKEN`; Node receives `MELEE_SERVICE_TOKEN` with the loopback
@@ -169,6 +185,20 @@ HTTPS responses include HSTS for this hostname only. Do not enable a zone-wide
 redirect merely to repair one app. Local protection checks must simulate the
 connector's HTTPS scheme header; public checks must also verify real HTTP-to-HTTPS
 redirection and anonymous WSS denial through Cloudflare.
+
+The public login uses the game's dark, warm palette and condensed title treatment.
+Its single password field, error messages and keyboard focus remain usable without
+JavaScript, game assets or external font requests. Run the isolated Chrome layout
+and synthetic sign-in proof before deploying a visual change:
+
+```sh
+MELEE_PLAYWRIGHT_MODULE=/absolute/existing/playwright \
+  node engines/melee/tools/prove_shared_login.mjs --output /absolute/private/login-proof
+```
+
+The proof opens an ephemeral loopback fixture, checks desktop, tablet, phone and
+narrow layouts, and exercises failed and successful login with synthetic credentials.
+It never reads the installed authentication file or contacts the public service.
 
 Activation, launchctl installation/loading, credential provisioning and Tunnel/DNS
 apply remain separate owner actions with required action-time confirmation. Notify
