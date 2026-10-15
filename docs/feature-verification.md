@@ -38,7 +38,7 @@ support exactly two humans with one local input source per peer.
 | Local companion | Explicit scripted second browser verifies/prepares/readies; Stop closes its owned session | A: [startup progress](../engines/melee/tests/local_opponent_progress.test.mjs), [simulated peer](../engines/melee/tests/test_simulated_peer.test.mjs). B: E2/E3/E14 | Two engines on the same Mac and fresh-session recovery. This helper is scripted, not native CPU AI or WAN evidence. |
 | Online room lifecycle | Create/share/join; both verified identities must Ready; Stop ends both; rematch is fresh | A: [friend match](../engines/melee/tests/friend_match.test.mjs), [rooms](../engines/melee/tools/netplay/rooms.test.mjs), [relay](../engines/melee/tools/netplay/server.test.mjs). B: E1/E2/E19 | Real local sockets and browser room transitions; actual private HTTPS on one Mac. Gap: two physical devices across WAN. |
 | Confirmed input | Each peer acquires only its owned pad; both accept input and applied result at logical ticks; disagreement fails closed | A: [protocol](../engines/melee/tests/confirmed_input.test.mjs), [bridge](../engines/melee/tests/browser_bridge.test.mjs), [identity](../engines/melee/tests/netplay_identity.test.mjs). B: E1 | Distinct input traces, progress, mutation/disconnect/fresh-session controls and selected-state parity. No rollback/full snapshot. Ordered message faults over WebSocket/TCP are not transport packet loss. |
-| Disc storage and handoff | Verified local or configured hosted disc; separate setup controls, visible download/check/save phases, saved-copy restore and paired transfer cleanup | A: [disc cache](../engines/melee/tests/browser_disc_cache.test.mjs), [hosted download](../engines/melee/tests/host_disc_download.test.mjs), [handoff](../engines/melee/tests/private_handoff.test.mjs). B: [historical transfer proof](multiplayer/disc-transfer-proof.json), E2/E26 | E26 covers controlled download presentation and bounded transfer/storage measurements. Historical standalone transfer does not establish current phone or WAN handoff. |
+| Disc storage and handoff | Verified local or configured hosted disc; separate setup controls, visible download/check/save phases, saved-copy restore and paired transfer cleanup | A: [disc cache](../engines/melee/tests/browser_disc_cache.test.mjs), [hosted download](../engines/melee/tests/host_disc_download.test.mjs), [handoff](../engines/melee/tests/private_handoff.test.mjs). B: [historical transfer proof](multiplayer/disc-transfer-proof.json), E2/E26/E27 | E26 covers controlled download presentation and bounded transfer/storage measurements. E27 records the live post-transfer persistence blocker. Historical standalone transfer does not establish current phone or WAN handoff. |
 | Donor fitting and attachments | Source package fits requested accepted donor/slot; required companion costumes remain available | A: [target choices](../engines/melee/tests/test_roster_choices.py), [native target options](../engines/melee/tests/test_native_target_options.py), [source-pivot rejection](../engines/melee/tests/source_pivot_contract.test.mjs). B: E5; [native fitting benchmark](../engines/melee/validation/native-fit/README.md) | Geometry/slot contracts and bounded target samples. Acceptance is per source/base, not all catalog combinations. Source-pivot is opt-in, reviewed 39-joint/four-donor browser/WebGPU only; standard DAT/desktop unsupported. Donor collision, attack and jump behavior is retained. |
 | Private deployment boundary | Existing tailnet release remains separate; shared-password hosting protects app/API/assets/upgrades, requires HTTPS through its exact-host connector and tokenizes the loopback helper; disc delivery requires explicit private configuration | A: [shared auth](../web-prototype/server/shared-password.test.js), [helper](../engines/melee/tests/test_shared_host_helper.py), [secure TTY](../engines/melee/tests/test_shared_password_cli.py), [release](../engines/melee/tests/test_mac_release.py), [origin policy](../engines/melee/tests/friend_origin.test.mjs), [disc server](../engines/melee/tests/host_disc_server.test.mjs). B: E2/E4/E5; E20/E21/E22/E23/E24/E25 | E24 covers the styled public login and isolated authenticated real-file transfer. E25 adds explicit upgrade-rejection framing. Authenticated custom-host transfer/gameplay and external-device acceptance remain unverified. |
 | Relocated private roots (separate candidate) | Retain imports and derived files outside checkout | A: [PR #2](https://github.com/alex-furrier/opensmash/pull/2), head `3d5907e`, contract and route/retry tests | 31 Python passes, four fixture skips, five JS passes. Candidate is separate from this map's source checkpoint. Gap: actual gameplay after root relocation; no private migration performed. |
@@ -452,3 +452,34 @@ tailnet origin. This historical checkpoint did not perform deployment work.
   Public measurement requires an authorized browser session; no password or
   production cookie was extracted. Independent review and deployment acceptance
   remain separate prerequisites recorded in the private handoff.
+
+- **E27 — readiness independent of optional persistence permission:** implementation
+  `1212c4993fe1ae3d0e4ddf10d743388d14d11025`, checked 2026-10-15 UTC on macOS.
+  Read-only native inspection of the existing signed-in public Zen window showed
+  the overlapping controls, download at 100%, and an unanswered browser persistent
+  storage prompt. No password or cookie was extracted, no extra download was
+  started, and the prompt was not answered by the agent. The cache path requested
+  that permission after verification and committing the saved-file pointer, then
+  waited before returning readiness. This identifies a post-transfer blocker;
+  it does not measure the completed transfer's network rate.
+
+  Cache completion now reads existing persistence status with `persisted()` and
+  never automatically requests `persist()`. An ungranted or unavailable persistence
+  status retains the existing best-effort cache message. The regression fails on
+  the old permission request and passes for both already-granted and ungranted
+  storage, preserving restoration of the committed file. Existing permissions,
+  cache format, integrity checks and authentication remain unchanged.
+
+  The compact Melee upload card also skips its unused 3D model renderer through
+  the existing animation owner. Controller preview still uses its existing model
+  path. Twenty-nine cache, transfer and authentication regressions passed:
+
+  ```sh
+  node --test --test-timeout=30000 engines/melee/tests/browser_disc_cache.test.mjs engines/melee/tests/host_disc_download.test.mjs web-prototype/shared/handoff-transfer.test.js engines/melee/tests/host_disc_server.test.mjs web-prototype/server/shared-password.test.js
+  ```
+
+  A prompt opened by an older loaded page remains an owner browser decision.
+  A refreshed candidate can restore the existing verified browser copy without
+  changing its origin or downloading it again. Candidate browser results, review,
+  user interruption acknowledgment and deployment health belong to the private
+  handoff; this source checkpoint does not claim activation.
