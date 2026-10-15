@@ -1,3 +1,4 @@
+import schema from '../runtime/launch-options.json' with {type:'json'};
 import {assertOwnedPadPhase} from './proof/owned-pad-phase.mjs';
 // Opt-in private local acceptance; no disc, roster or evidence is stored in Git.
 import {createRequire} from 'node:module';import assert from 'node:assert/strict';import {writeFile} from 'node:fs/promises';
@@ -7,12 +8,13 @@ if(!origin||!iso||!output||!process.env.MELEE_PLAYWRIGHT_MODULE)throw Error('Sup
 const {mkdir}=await import('node:fs/promises');await mkdir(output,{recursive:true});
 const {chromium}=createRequire(import.meta.url)(process.env.MELEE_PLAYWRIGHT_MODULE);
 const browser=await chromium.launch({channel:'chrome',headless:!args.includes('--headed')});const context=await browser.newContext({viewport:{width:1440,height:1000}});const page=await context.newPage();page.setDefaultTimeout(120000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
-await context.addInitScript(()=>{
+await context.addInitScript(defaults=>{
  window.proofEvents=[];window.addEventListener('message',({data})=>{if(['select','session','playable','pad','input','error'].includes(data?.type))window.proofEvents.push(data);});
  window.proofPads=[0,1].map(index=>({index,id:'Synthetic standard pad '+index,mapping:'standard',connected:true,axes:[0,0,0,0],buttons:Array.from({length:16},()=>({pressed:false,value:0}))}));
  navigator.getGamepads=()=>window.proofPads;
  localStorage.setItem('opensmash.melee-controls-complete.v1','complete');
-});
+ localStorage.setItem('melee-launch-v1',JSON.stringify({...defaults,stage:31,renderWidth:640,movesetPreferenceVersion:1,ports:defaults.ports.map((p,i)=>({...p,target:'auto',...(i>1?{device:'off'}:{})}))}));
+},schema.defaults);
 try{
 await page.goto(origin+'/melee');await page.getByRole('button',{name:'High School',exact:true}).click();await page.waitForFunction(()=>window.openSmashReactBridge?.characters?.some(c=>c.meleeAvailable));
 const rows=await page.evaluate(()=>window.openSmashReactBridge.characters.filter(r=>r.meleeAvailable));
@@ -91,6 +93,7 @@ assert.ok(runtime(),'real engine frame');
 const select=await runtime().evaluate(()=>window.proofEvents.find(e=>e.type==='select'));
 assert.ok(select?.launch);assert.deepEqual(select.launch.ports.slice(0,2).map(p=>p.character),picks.map(p=>p.slug));
 const snapshot=()=>runtime().evaluate(()=>{const m=window.Module,p=m._direct_snapshot()>>>2;return {frame:m._direct_frame_count(),scene:m._direct_scene_kind(),state:Array.from(HEAPF32.subarray(p,p+48))};});
+await runtime().waitForFunction(()=>{const m=window.Module,p=m._direct_snapshot()>>>2;return HEAPF32[p+2]===14&&HEAPF32[p+14]===14;},{},{timeout:20000});
 // CKind -> Ft_Kind: pinned upstream src/melee/ft/forward.h enumerations.
 const before=await snapshot();await writeFile(output+'/runtime-start.json',JSON.stringify({select,before},null,2));for(let port=0;port<2;port++){assert.equal(before.state[port*12],1);assert.equal(before.state[port*12+1],[2,3,1,24,4,5,6,17,0,18,16,8,9,12,10,15,13,14,19,7,22,20,21,26,23,25][select.launch.ports[port].fighter]);}
 const ownedPhases=[];
@@ -104,6 +107,21 @@ for(const [port,direction] of [[0,1],[1,-1]]) {
  const samples=assertOwnedPadPhase(events,port,direction);
  assert.ok(direction*(end.state[port*12+3]-start.state[port*12+3])>5,`port ${port} moves in its owned direction`);
  ownedPhases.push({port,direction,start,end,samples});
+}
+const rightStickPhases=[];
+for(const port of [0,1]){
+ await page.evaluate(()=>window.proofPads.forEach(p=>p.axes=[0,0,0,0]));
+ const neutral=await snapshot();await runtime().waitForFunction(frame=>window.Module._direct_frame_count()>=frame,neutral.frame+15,{timeout:20000});
+ await runtime().evaluate(()=>{const held=new Map();for(const e of window.proofEvents)if(e.type==='pad')held.set(e.values[0],e);window.proofEvents=[...held.values()];});
+ const pageTop=await page.evaluate(()=>scrollY),start=await snapshot();
+ await page.evaluate(port=>window.proofPads[port].axes[3]=1,port);
+ await runtime().waitForFunction(frame=>window.Module._direct_frame_count()>=frame,start.frame+20,{timeout:20000});
+ const end=await snapshot(),events=await runtime().evaluate(()=>window.proofEvents.filter(e=>e.type==='pad'));
+ assert.ok(events.some(e=>e.values[0]===port&&(e.values[2]>>>16)!==0x8080),'owned right stick reaches engine C-stick');
+ assert.ok(events.filter(e=>e.values[0]!==port).every(e=>(e.values[2]>>>0)===0x80808080),'other controller remains neutral');
+ assert.equal(await page.evaluate(()=>scrollY),pageTop,'gameplay right stick cannot scroll website');
+ assert.equal(await page.locator('.menu-controller-cursor:visible').count(),0);
+ rightStickPhases.push({port,start:start.frame,end:end.frame,pageTop,engineCStick:true});
 }
 const after=await snapshot();await page.evaluate(()=>window.proofPads.forEach(p=>p.axes=[0,0,0,0]));
 // Reusing a navigator index does not inherit the frozen match's device ownership.
@@ -119,5 +137,5 @@ await page.getByRole('button',{name:'Return to roster',exact:true}).click();awai
 const returned=await page.locator('#local-fighter-selection').innerText();
 assert.equal(await page.locator(`[data-roster-character="${picks[0].slug}"]`).getAttribute('data-pick'),'1P');
 assert.equal(await page.locator(`[data-roster-character="${picks[1].slug}"]`).getAttribute('data-pick'),'2P');
-await writeFile(output+'/game.json',JSON.stringify({select,before,after,ownedPhases,returned,independentOwnedPads:true,modesRestoredOnDisconnect:true,reconnectHeldButtonNeutral:true,assignmentMenuRemoved:true,rosterInvalidation:true,duplicateFighterP2BasePicker:true,uniqueMouseP2BasePicker:true,replacementDeviceAndKeyboardStayNeutral:true,errors},null,2));
+await writeFile(output+'/game.json',JSON.stringify({select,before,after,ownedPhases,rightStickPhases,returned,independentOwnedPads:true,modesRestoredOnDisconnect:true,reconnectHeldButtonNeutral:true,assignmentMenuRemoved:true,rosterInvalidation:true,duplicateFighterP2BasePicker:true,uniqueMouseP2BasePicker:true,replacementDeviceAndKeyboardStayNeutral:true,errors},null,2));
 }finally{await browser.close();}
