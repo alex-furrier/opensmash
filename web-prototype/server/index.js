@@ -730,7 +730,11 @@ async function engineRoster() {
 }
 
 async function scanEngineRoster(entries) {
-  const files = new Set(await readdir(PIPELINE_PLAY_ROOT));
+  // A Melee-only release can omit the separate Smash 64 bundle library.
+  const files = new Set(await readdir(PIPELINE_PLAY_ROOT).catch(error => {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }));
   const characters = [];
 
   for (const entry of entries) {

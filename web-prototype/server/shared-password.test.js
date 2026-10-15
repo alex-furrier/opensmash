@@ -123,6 +123,7 @@ test('actual production Node router gates all early/static/helper routes and dis
   for(const route of ['/assets/app.js','/melee/api/netplay/config','/melee/api/disc','/melee/engine/a.wasm','/api/session','/livez','/__/auth/handler']) for(const method of ['GET','HEAD']) assert.equal((await request(route,{},method)).status,401);
   const cookie='__Host-opensmash-session='+await sealData({version:value.authVersion,expires:Date.now()+3600000},{password:value.sealKey,ttl:43200});
   const authConfig=await request('/api/auth/config',{Cookie:cookie});assert.equal(authConfig.status,200);assert.equal(JSON.parse(authConfig.text).enabled,false);
+  const characters=await request('/api/characters',{Cookie:cookie});assert.equal(characters.status,200);assert.ok(Array.isArray(JSON.parse(characters.text).characters));
   const netplay=await request('/melee/api/netplay/config',{Cookie:cookie});assert.equal(netplay.status,200);assert.equal(netplay.headers['cache-control'],'no-store');
   assert.equal((await request('/api/session',{Cookie:cookie})).status,200);
   assert.equal((await request('/melee/api/game/PlMr.dat',{Cookie:cookie})).status,404);
