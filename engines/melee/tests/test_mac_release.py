@@ -163,6 +163,7 @@ class MacReleaseTests(unittest.TestCase):
         self.assertEqual(helper['OPENSMASH_DESKTOP_TOKEN'], token)
         self.assertEqual(web['MELEE_SERVICE_TOKEN'], token)
         self.assertEqual(web['MELEE_SERVICE_ORIGIN'], 'http://127.0.0.1:8818')
+        self.assertEqual(web['OBJECT_STORE_ROOT'], str(Path(value['helper']) / 'build/objects'))
         self.assertEqual(web['CREATION_ENABLED'], '0')
         self.assertEqual(web['HOST'], '127.0.0.1')
         self.assertNotIn('MELEE_LOCAL_ORIGIN', web)

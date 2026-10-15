@@ -79,7 +79,7 @@ def service_environment(value, role, helper_key):
                    MELEE_SHARED_HOSTING='1', MELEE_SHARED_AUTH_FILE=value['authFile'], MELEE_PRIVATE_ORIGIN=ORIGIN,
                    MELEE_SERVICE_ORIGIN='http://127.0.0.1:8818', MELEE_SERVICE_TOKEN=helper_key, MELEE_NETPLAY_ENGINE_ROOT=value['engineRoot'],
                    OPENSMASH_CHARACTER_ROOT=value['characterRoot'],
-                   FIGHTER_JOBS_ROOT=str(helper / 'build/fighter-jobs'))
+                   FIGHTER_JOBS_ROOT=str(helper / 'build/fighter-jobs'), OBJECT_STORE_ROOT=str(helper / 'build/objects'))
         # Legacy app cookies have a separate purpose and expire on service restart.
         env['COOKIE_SECRET'] = secrets.token_hex(32)
     return env
