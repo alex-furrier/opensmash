@@ -9,12 +9,15 @@ export function pointerStep(previous, pad, dt, width, height, enabled=true) {
 }
 // Match the element under the cursor, but never scroll the page behind a modal.
 export function menuScrollTarget(hit, dialog) {
+ // ModalPage owns overflow for Settings; its role=dialog section grows inside it.
+ // Native dialogs still contain their own scrolling, including when nested.
+ const boundary=dialog?.tagName==='DIALOG'?dialog:dialog?.closest?.('.modal-page')||dialog;
  for(let node=hit;node;node=node.parentElement){
-  if(dialog&&!dialog.contains(node))break;
+  if(boundary&&!boundary.contains(node))break;
   if(node.scrollHeight>node.clientHeight&&/(auto|scroll)/.test(getComputedStyle(node).overflowY))return node;
-  if(node===dialog)break;
+  if(node===boundary)break;
  }
- if(dialog)return dialog;
+ if(boundary)return boundary;
  return document.scrollingElement;
 }
 export function startMenuPointer({enabled,controllers,controllerIndex,click,back}) {

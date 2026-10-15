@@ -25,6 +25,21 @@ test('scroll picks the nearest scrollable container and never escapes a dialog',
  assert.equal(menuScrollTarget(child,null),root);
 });
 
+test('Settings can scroll its enclosing modal page without reaching the document',t=>{
+ const root={},outside={},overlay={scrollHeight:1200,clientHeight:320,overflowY:'auto'},
+  dialog={parentElement:overlay,closest:selector=>selector==='.modal-page'?overlay:null},
+  hit={parentElement:dialog};
+ overlay.contains=node=>[overlay,dialog,hit].includes(node);
+ dialog.contains=node=>[dialog,hit].includes(node);
+ const oldStyle=globalThis.getComputedStyle,oldDocument=globalThis.document;
+ globalThis.getComputedStyle=node=>node;globalThis.document={scrollingElement:root};
+ t.after(()=>{if(oldStyle)globalThis.getComputedStyle=oldStyle;else delete globalThis.getComputedStyle;if(oldDocument)globalThis.document=oldDocument;else delete globalThis.document;});
+ assert.equal(menuScrollTarget(hit,dialog),overlay,'Settings overflow belongs to its enclosing ModalPage');
+ assert.equal(menuScrollTarget(outside,dialog),overlay,'backdrop cannot scroll the document');
+ overlay.overflowY='visible';assert.equal(menuScrollTarget(hit,dialog),overlay,'non-overflowing modal still contains scrolling');
+ dialog.tagName='DIALOG';assert.equal(menuScrollTarget(hit,dialog),dialog,'native dialog keeps its own boundary even inside a modal page');
+});
+
 test('two menu controllers arbitrate scrolling, preserve cursor edges, and stop when input transfers',t=>{
  const globals=['document','navigator','requestAnimationFrame','innerWidth','innerHeight','getComputedStyle'];
  const saved=globals.map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]);

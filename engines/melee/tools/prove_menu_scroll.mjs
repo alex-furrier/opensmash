@@ -27,6 +27,7 @@ async function open(viewport,pads=2){
 async function hold(page,port,value,ms=400){await page.evaluate(({port,value})=>window.proofPads[port].axes[3]=value,{port,value});await page.waitForTimeout(ms);await page.evaluate(port=>window.proofPads[port].axes[3]=0,port);await page.waitForTimeout(100);}
 async function scrollTop(page){await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));await page.waitForTimeout(100);}
 try{
+ if(!args.includes('--settings-only')){
  const {context,page}=await open({width:1440,height:1000});
  console.log('Menu loaded');await scrollTop(page);await hold(page,0,.21);assert.equal(await page.evaluate(()=>scrollY),0,'deadzone must not scroll');
  await hold(page,1,1);const p2=await page.evaluate(()=>scrollY);console.log('P2 scroll',p2);assert.ok(p2>200,'P2 right stick must scroll the shared menu');
@@ -65,6 +66,37 @@ try{
   if(width<=600){assert.equal(Math.round(geometry.panel.x),Math.round(geometry.tabs.x));assert.equal(Math.round(geometry.start.width),Math.round(geometry.panel.width));assert.ok(geometry.start.y>=geometry.tabs.bottom);}
   else assert.ok(geometry.start.x>=geometry.tabs.right,'wide toolbar retains shared-row alignment');
   await page.screenshot({path:output+'/selected-'+width+'.png'});results.push({label:'layout',width,...geometry});await context.close();
+ }
+ }
+ for(const viewport of [{width:390,height:320},{width:844,height:390}]){
+  const {context,page}=await open(viewport);
+  try{
+   const settings=page.getByRole('button',{name:'Settings',exact:true});
+   if(await settings.isVisible())await settings.click();
+   else {await page.locator('summary').filter({hasText:'More'}).click();await page.getByRole('menuitem',{name:'Settings',exact:true}).click();}
+   const overlay=page.locator('.advanced-overlay'),cancel=overlay.getByRole('button',{name:'Cancel',exact:true});
+   await overlay.waitFor();await page.waitForTimeout(700);
+   const before=await overlay.evaluate(el=>({top:el.scrollTop,height:el.clientHeight,total:el.scrollHeight,pageTop:window.scrollY}));
+   const initialCancel=await cancel.boundingBox();assert.ok(initialCancel.y>=viewport.height,'lower Settings control starts below the viewport');
+   await hold(page,1,1);assert.equal(await overlay.evaluate(el=>el.scrollTop),before.top,'P2 cannot scroll shared Settings');
+   await hold(page,0,1,2200);
+   const after=await overlay.evaluate(el=>({top:el.scrollTop,height:el.clientHeight,total:el.scrollHeight,pageTop:window.scrollY})),lower=await cancel.boundingBox();
+   await page.screenshot({path:output+'/settings-'+viewport.width+'.png'});
+   await writeFile(output+'/settings-'+viewport.width+'.json',JSON.stringify({before,after,initialCancel,lower},null,2));
+   assert.ok(after.top>before.top,'P1 right stick must scroll the actual outer Settings overlay');
+   assert.ok(lower.y>=0&&lower.y+lower.height<=viewport.height+1,'lower Settings control becomes fully reachable');
+   assert.equal(after.pageTop,before.pageTop,'Settings must not scroll the background');
+   for(let i=0;i<120;i++){
+    const box=await cancel.boundingBox(),cursor=await page.locator('.menu-controller-cursor[data-player="1"]').evaluate(el=>{const r=el.getBoundingClientRect();return {x:r.x+13,y:r.y+13};});
+    const dx=box.x+box.width/2-cursor.x,dy=box.y+box.height/2-cursor.y;
+    if(Math.abs(dx)<7&&Math.abs(dy)<7)break;
+    await page.evaluate(({dx,dy})=>{window.proofPads[0].axes[0]=Math.abs(dx)>7?Math.sign(dx)*Math.min(1,Math.max(.3,Math.abs(dx)/50)):0;window.proofPads[0].axes[1]=Math.abs(dy)>7?Math.sign(dy)*Math.min(1,Math.max(.3,Math.abs(dy)/50)):0;},{dx,dy});
+    await page.waitForTimeout(25);
+   }
+   await page.evaluate(()=>{window.proofPads[0].axes=[0,0,0,0];window.proofPads[0].buttons[0]={pressed:true,value:1};});await page.waitForTimeout(80);
+   await page.evaluate(()=>window.proofPads[0].buttons[0]={pressed:false,value:0});await overlay.waitFor({state:'hidden'});
+   results.push({label:'settings',viewport,before,after,lower,lowerControlClickedByP1:true,p2Blocked:true,backgroundStill:true});
+  }finally{await context.close();}
  }
  assert.deepEqual(errors,[]);await writeFile(output+'/result.json',JSON.stringify({date:new Date().toISOString(),chrome:browser.version(),results,engineBlocked:true,syntheticControllers:true,errors},null,2));console.log('Chrome menu scrolling, ownership, transfer gating and seven responsive layouts passed.');
 }finally{await browser.close();}
