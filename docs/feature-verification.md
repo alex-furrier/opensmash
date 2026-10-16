@@ -38,7 +38,7 @@ support exactly two humans with one local input source per peer.
 | Local companion | Explicit scripted second browser verifies/prepares/readies; Stop closes its owned session | A: [startup progress](../engines/melee/tests/local_opponent_progress.test.mjs), [simulated peer](../engines/melee/tests/test_simulated_peer.test.mjs). B: E2/E3/E14 | Two engines on the same Mac and fresh-session recovery. This helper is scripted, not native CPU AI or WAN evidence. |
 | Online room lifecycle | Create/share/join; both verified identities must Ready; Stop ends both; rematch is fresh | A: [friend match](../engines/melee/tests/friend_match.test.mjs), [rooms](../engines/melee/tools/netplay/rooms.test.mjs), [relay](../engines/melee/tools/netplay/server.test.mjs). B: E1/E2/E19 | Real local sockets and browser room transitions; actual private HTTPS on one Mac. Gap: two physical devices across WAN. |
 | Confirmed input | Each peer acquires only its owned pad; both accept input and applied result at logical ticks; disagreement fails closed | A: [protocol](../engines/melee/tests/confirmed_input.test.mjs), [bridge](../engines/melee/tests/browser_bridge.test.mjs), [identity](../engines/melee/tests/netplay_identity.test.mjs). B: E1 | Distinct input traces, progress, mutation/disconnect/fresh-session controls and selected-state parity. No rollback/full snapshot. Ordered message faults over WebSocket/TCP are not transport packet loss. |
-| Disc storage and handoff | Verified local or configured hosted disc; separate setup controls, visible download/check/save phases, saved-copy restore and paired transfer cleanup | A: [disc cache](../engines/melee/tests/browser_disc_cache.test.mjs), [hosted download](../engines/melee/tests/host_disc_download.test.mjs), [handoff](../engines/melee/tests/private_handoff.test.mjs). B: [historical transfer proof](multiplayer/disc-transfer-proof.json), E2/E26/E27 | E26 covers controlled download presentation and bounded transfer/storage measurements. E27 records the live post-transfer persistence blocker. Historical standalone transfer does not establish current phone or WAN handoff. |
+| Disc storage and handoff | Verified local or configured hosted disc; separate setup controls, visible download/check/save phases, saved-copy restore and paired transfer cleanup | A: [disc cache](../engines/melee/tests/browser_disc_cache.test.mjs), [hosted download](../engines/melee/tests/host_disc_download.test.mjs), [handoff](../engines/melee/tests/private_handoff.test.mjs). B: [historical transfer proof](multiplayer/disc-transfer-proof.json), E2/E26/E27/E30 | E26 covers controlled download presentation and bounded transfer/storage measurements. E27 records the live post-transfer persistence blocker. E30 adds safe local diagnostics and bounded verification; current iPhone acceptance remains open. Historical standalone transfer does not establish current phone or WAN handoff. |
 | Donor fitting and attachments | Source package fits requested accepted donor/slot; required companion costumes remain available | A: [target choices](../engines/melee/tests/test_roster_choices.py), [native target options](../engines/melee/tests/test_native_target_options.py), [source-pivot rejection](../engines/melee/tests/source_pivot_contract.test.mjs). B: E5; [native fitting benchmark](../engines/melee/validation/native-fit/README.md) | Geometry/slot contracts and bounded target samples. Acceptance is per source/base, not all catalog combinations. Source-pivot is opt-in, reviewed 39-joint/four-donor browser/WebGPU only; standard DAT/desktop unsupported. Donor collision, attack and jump behavior is retained. |
 | Private deployment boundary | Existing tailnet release remains separate; shared-password hosting protects app/API/assets/upgrades, requires HTTPS through its exact-host connector and tokenizes the loopback helper; disc delivery requires explicit private configuration | A: [shared auth](../web-prototype/server/shared-password.test.js), [helper](../engines/melee/tests/test_shared_host_helper.py), [secure TTY](../engines/melee/tests/test_shared_password_cli.py), [release](../engines/melee/tests/test_mac_release.py), [origin policy](../engines/melee/tests/friend_origin.test.mjs), [disc server](../engines/melee/tests/host_disc_server.test.mjs). B: E2/E4/E5; E20/E21/E22/E23/E24/E25 | E24 covers the styled public login and isolated authenticated real-file transfer; E28 covers its minimal entry revision. E25 adds explicit upgrade-rejection framing. Authenticated custom-host transfer/gameplay and external-device acceptance remain unverified. |
 | Relocated private roots (separate candidate) | Retain imports and derived files outside checkout | A: [PR #2](https://github.com/alex-furrier/opensmash/pull/2), head `3d5907e`, contract and route/retry tests | 31 Python passes, four fixture skips, five JS passes. Candidate is separate from this map's source checkpoint. Gap: actual gameplay after root relocation; no private migration performed. |
@@ -503,3 +503,38 @@ tailnet origin. This historical checkpoint did not perform deployment work.
   browser storage or live services changed for these checks. This checkpoint
   establishes presentation and regression evidence, not deployment or public
   transfer performance; private runtime receipts record those separately.
+
+
+- **E30 — local disc diagnostics and bounded verification:** implementation
+  `ae2a44678086fd9fa4fc2df1c10ed9ef6b38c209`, checked 2026-10-16 UTC on macOS,
+  Node 26.7.0 and Chrome 155.0.8059.82. The setup details action reports known
+  error stages, numeric byte counts and capability flags. Its separate 64 KiB
+  storage probe reads 16 bytes, removes its own file and leaves the saved game
+  untouched. The report excludes error messages, filenames, URLs and credentials.
+  Reopened incoming and saved files must match the expected size before acceptance
+  or replacing the saved-copy pointer. Verification covers the same complete
+  pinned image with sequential reads bounded to 4 MiB.
+
+  The focused regression command passed 59 tests, with two environment-dependent
+  skips and no failures:
+
+  ```sh
+  node --test engines/melee/tests/host_disc_download.test.mjs engines/melee/tests/browser_disc_cache.test.mjs engines/melee/tests/verify_disc.test.mjs engines/melee/tests/browser_disc.test.mjs engines/melee/tests/private_handoff.test.mjs engines/melee/tests/disc_read_cache.test.mjs engines/melee/tests/r2_disc.test.mjs web-prototype/shared/handoff-transfer.test.js engines/melee/tools/netplay/server.test.mjs engines/melee/tests/host_disc_server.test.mjs web-prototype/server/shared-password.test.js
+  ```
+
+  Repeating the verification test with `MELEE_ISO` set to the approved private
+  disc passed all nine tests without skips. No image bytes are committed. A fresh
+  Chrome context with a 390 by 844 viewport and touch emulation opened setup
+  details twice. Both probes preserved the saved-copy fixture and its pointer,
+  removed their probe files, emitted no personal content and requested no disc.
+  No game was started during this check. The frontend production build passed.
+
+  Earlier baseline code passed a complete Chrome download, verification, 120 game
+  ticks and return. Desktop Safari 26.6 read a full-size synthetic file through the
+  original receiver and verifier-sized slices. Neither baseline certifies this
+  candidate or an iPhone. The reported phone failures remain unresolved pending
+  actual-device diagnostics. Candidate gameplay is deferred during a separate
+  roster GPU batch. The archive regression cannot load its pre-existing tracked
+  developer-specific dependency symlink in this checkout. Independent committed
+  review is blocked because the current session has no configured review route.
+  Production activation and actual-device acceptance have not occurred.
