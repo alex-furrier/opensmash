@@ -716,22 +716,18 @@ export default function RetroHome({
               <h2 id="about-title" className="launch-flow-title about-title">About</h2>
               <div id="about-copy" className="about-copy">
                 <p className="launch-flow-copy">
-                  Smash.fun is a fan-made browser port of Super Smash Bros. for the Nintendo 64 which allows you to
-                  create custom fighters and play them inside the original game.
+                  Built on{" "}
+                  <a className="about-link" href="https://github.com/turtlesoupy/opensmash" target="_blank" rel="noreferrer">OpenSmash</a>.
                 </p>
-                <p className="launch-flow-copy">You must supply a legally obtained copy of the game ROM to play.</p>
-                <p className="launch-flow-copy">Your ROM and its assets stay on your device. Nothing is uploaded.</p>
-                <p className="launch-flow-copy">
-                  The source is open at{" "}
-                  <a className="about-link" href="https://github.com/turtlesoupy/opensmash" target="_blank" rel="noreferrer">
-                    github.com/turtlesoupy/opensmash
-                  </a>.
-                </p>
-                <p className="launch-flow-copy about-legal">
-                  Smash.fun is not affiliated with, endorsed by, or sponsored by Nintendo. Super Smash Bros., Nintendo
-                  64, and all related characters, names, and marks are trademarks of Nintendo and their respective
-                  owners.
-                </p>
+                <details className="about-legal">
+                  <summary>Credits &amp; notices</summary>
+                  <p className="launch-flow-copy">Use a legally obtained copy of the game. Your local disc and its assets stay on your device.</p>
+                  <p className="launch-flow-copy">
+                    Smash.fun is not affiliated with, endorsed by, or sponsored by Nintendo. Super Smash Bros., Nintendo
+                    64, and all related characters, names, and marks are trademarks of Nintendo and their respective
+                    owners.
+                  </p>
+                </details>
               </div>
               <button
                 ref={aboutCancelRef}

@@ -1925,3 +1925,7 @@
 .controller-callout[hidden] { display: none !important; }
 .controller-callouts.is-melee [data-control-callout="c-buttons"],
 .controller-callouts.is-melee [data-control-line="c-buttons"] { opacity: 1; visibility: inherit; }
+
+/* Secondary notices remain reachable without filling the entry screen. */
+.about-copy details > summary { min-height: 44px; padding: 12px 0; cursor: pointer; }
+.about-copy details > summary:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }

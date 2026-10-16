@@ -2647,7 +2647,7 @@ function showLaunchFlow(fighter, { create = false } = {}) {
   if (flowTitle) flowTitle.textContent = create ? 'Create a fighter' : usesDisc() ? 'Get ready to play' : 'Play Smash.fun';
   if (flowCopy) {
     flowCopy.textContent = usesDisc()
-      ? APP_BRIDGE?.hostDiscConfigured?.() ? 'Download the hosted game (1.46 GB), or choose your local Melee USA 1.02 disc.' : 'Insert your Melee USA 1.02 disc (.iso or .gcm). It stays on your device.'
+      ? APP_BRIDGE?.hostDiscConfigured?.() ? 'Melee · USA 1.02 · 1.46 GB' : 'Choose your Melee USA 1.02 disc (.iso or .gcm).'
       : create
       ? 'To create a fighter, choose your legally obtained USA-release Super Smash Bros. 64 ROM. It never leaves your device.'
       : 'To play, choose your legally obtained USA-release Super Smash Bros. 64 ROM. It never leaves your device.';
