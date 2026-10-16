@@ -538,3 +538,37 @@ tailnet origin. This historical checkpoint did not perform deployment work.
   developer-specific dependency symlink in this checkout. Independent committed
   review is blocked because the current session has no configured review route.
   Production activation and actual-device acceptance have not occurred.
+
+
+- **E31 — phone storage-report interpretation and fallback control:** deployed
+  source `46334669d16cff91a28e451ceca317976abae0eb`, checked 2026-10-16 UTC.
+  U: Safari reported `UnknownError` during restore and the tiny probe, with no
+  saved-size, restore-error or writable-handle fields. In this source, that probe
+  shape identifies rejection of the first `navigator.storage.getDirectory()`;
+  saved-file lookup and probe creation have not run. It does not establish a
+  missing or truncated disc. DuckDuckGo reported no reachable saved entry and a
+  successful 65,536-byte write plus 16-byte read. That small probe does not certify
+  full-size storage, verification or gameplay. Private-tab status and iOS version
+  remain unknown.
+
+  A: Eleven cache tests passed without skips, including injected root rejection
+  and missing-entry controls that reproduce these distinct report shapes:
+
+  ```sh
+  node --test engines/melee/tests/browser_disc_cache.test.mjs
+  ```
+
+  B: In a fresh desktop Chrome 155 context with `Element.prototype.moveBefore`
+  removed, the fallback path verified and saved the approved private disc,
+  advanced 120 game ticks, returned to the roster and restored the saved copy on
+  reload without another disc GET. This is a control for the selected code path,
+  not Safari or iPhone acceptance. Native Safari automation stalled before the
+  requested small comparison, so it yielded no new Safari result.
+
+  WebKit's [root-handle implementation](https://github.com/WebKit/WebKit/blob/main/Source/WebKit/NetworkProcess/storage/FileSystemStorageManager.cpp)
+  can return a generic unknown failure for several backing-store conditions.
+  Its [storage policy](https://webkit.org/blog/14403/updates-to-storage-policy/)
+  distinguishes origin quota from device free space; quota exhaustion uses
+  `QuotaExceededError`. Neither the error text nor the reported free space proves
+  the underlying cause. No browser data, storage permissions or live source were
+  changed for these checks. Actual-device recovery remains open.

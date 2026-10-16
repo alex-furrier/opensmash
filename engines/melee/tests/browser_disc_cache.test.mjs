@@ -117,3 +117,24 @@ test('setup diagnostics use only a 64KiB probe and retain the existing saved gam
   assert.equal(await(await restoreCachedDisc()).text(),'retained');assert.equal(root.entries.get('opensmash-disc-diagnostics-v1').entries.size,0);assert.doesNotMatch(JSON.stringify(report),/filename|incoming|disc-|http|private/);
  }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
 });
+test('inaccessible storage root is not reported as a missing or truncated saved disc',async()=>{
+ const {inspectDiscStorage}=await import('../web/lib/disc-cache.mjs');const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator');let rootCalls=0;
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{storage:{getDirectory:async()=>{rootCalls++;throw new DOMException('private internal storage path','UnknownError');}}}});
+ try{
+  const report=await inspectDiscStorage();
+  assert.deepEqual(report,{storageAvailable:true,probeError:'UnknownError'});
+  assert.equal(rootCalls,1,'failure precedes the saved-copy lookup and probe file creation');
+  assert.equal(Object.hasOwn(report,'savedBytes'),false);assert.equal(Object.hasOwn(report,'writableAvailable'),false);
+  await assert.rejects(restoreCachedDisc(1459978240),{name:'UnknownError'});
+  assert.doesNotMatch(JSON.stringify(report),/private|internal|path/);
+ }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
+});
+test('missing saved entry with a working root still passes the tiny storage probe',async()=>{
+ const {inspectDiscStorage}=await import('../web/lib/disc-cache.mjs');const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator'),root=new Directory();
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{storage:{getDirectory:async()=>root}}});
+ try{
+  assert.deepEqual(await inspectDiscStorage(),{storageAvailable:true,savedBytes:null,writableAvailable:true,probeBytes:65536,probeReadBytes:16});
+  assert.equal(root.entries.has('opensmash-melee-disc-v1'),false,'probe never creates or alters the saved-game directory');
+  assert.equal(root.entries.get('opensmash-disc-diagnostics-v1').entries.size,0);
+ }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
+});
