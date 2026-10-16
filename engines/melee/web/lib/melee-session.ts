@@ -1,5 +1,5 @@
 import {downloadHostDisc,hostDiscSource,hostDiscProgress} from './host-disc-download.mjs';
-import {ISO_SIZE,ISO_SHA256,discStorageError} from '../../runtime/web/disc.mjs';
+import {ISO_SIZE,ISO_SHA256,discStorageError,discFailureDetails} from '../../runtime/web/disc.mjs';
 import {cacheDisc,restoreCachedDisc,removeCachedDisc,inspectDiscStorage} from './disc-cache.ts';
 import {unlockAudio} from './audio.ts';
 import {MeleeFrameWorker} from './melee-frame-worker.ts';
@@ -17,16 +17,7 @@ let discRevision=0,restoreStarted=false;
 let cacheAbort:AbortController|undefined;
 let restoring:Promise<void>|undefined;
 let lastDiscFailure:Record<string,unknown>|undefined;
-function recordDiscFailure(error:any){
- lastDiscFailure={name:['UnknownError','QuotaExceededError','NotReadableError','NotAllowedError','SecurityError','InvalidStateError','AbortError'].includes(error?.name)?error.name:'Error'};
- if(/^[a-z-]+(?:@\d+)?$/.test(error?.discStage||''))lastDiscFailure.discStage=error.discStage;
- for(const key of ['expectedBytes','actualBytes','receivedBytes','writtenBytes','readOffset','expectedReadBytes','actualReadBytes'])if(Number.isSafeInteger(error?.[key])&&error[key]>=0)lastDiscFailure[key]=error[key];
- // The existing iframe reports strings. Recover only our exact numeric marker.
- if(!lastDiscFailure.discStage){
-  const match=/\b((?:verification-(?:file|read|digest)(?:@\d+)?|disc-inspection)); expected (\d+) bytes(?:, actual (\d+) bytes)?\)/.exec(error?.message||'');
-  if(match){lastDiscFailure.discStage=match[1];lastDiscFailure.expectedBytes=Number(match[2]);if(match[3])lastDiscFailure.actualBytes=Number(match[3]);}
- }
-}
+function recordDiscFailure(error:unknown){lastDiscFailure=discFailureDetails(error);}
 export async function inspectLocalDiscSetup(){let timer:ReturnType<typeof setTimeout>|undefined;let storage;try{storage=await Promise.race([inspectDiscStorage(),new Promise(resolve=>{timer=setTimeout(()=>resolve({probeError:'Timeout'}),5000);})]);}finally{clearTimeout(timer);}return{version:1,state:discSetup.state,expectedBytes:ISO_SIZE,lastFailure:lastDiscFailure,...storage as object,sharedMemory:crossOriginIsolated&&typeof SharedArrayBuffer!=='undefined',graphicsAvailable:!!navigator.gpu,iframeMoveAvailable:canReparentRuntime()};}
 export const localDiscReady=()=>discSetup.ready;
 let consumers=0;

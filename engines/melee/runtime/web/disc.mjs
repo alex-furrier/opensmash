@@ -13,6 +13,25 @@ export function discStorageError(cause, stage, expectedBytes, actualBytes) {
   return Object.assign(Error(`${reasons[cause.name]} (${cause.name}; ${stage}; ${bytes}). Your saved game has not been cleared.`, {cause}), {name:cause.name, discStage:stage, expectedBytes, ...(actualBytes === undefined ? {} : {actualBytes})});
 }
 
+/** Copy only safe diagnostics, including the existing iframe's string error format. */
+export function discFailureDetails(error) {
+  const names=['UnknownError','QuotaExceededError','NotReadableError','NotAllowedError','SecurityError','InvalidStateError','AbortError'];
+  const result={name:names.includes(error?.name)?error.name:'Error'};
+  const counts=['expectedBytes','actualBytes','receivedBytes','writtenBytes','readOffset','expectedReadBytes','actualReadBytes'];
+  const count=(key,value)=>{if(Number.isSafeInteger(value)&&value>=0)result[key]=value;};
+  if(/^[a-z-]+(?:@\d+)?$/.test(error?.discStage||''))result.discStage=error.discStage;
+  for(const key of counts)count(key,error?.[key]);
+  if(!result.discStage){
+    const match=/\((?:(UnknownError|QuotaExceededError|NotReadableError|NotAllowedError|SecurityError|InvalidStateError); )?((?:verification-(?:file|read|digest)(?:@\d+)?|disc-inspection)); expected (\d+) bytes(?:, actual (\d+) bytes)?(?:; readOffset (\d+), expectedReadBytes (\d+), actualReadBytes (\d+))?\)/.exec(error?.message||'');
+    if(match){
+      if(match[1])result.name=match[1];
+      result.discStage=match[2];
+      for(const [key,index] of [['expectedBytes',3],['actualBytes',4],['readOffset',5],['expectedReadBytes',6],['actualReadBytes',7]])if(match[index]!==undefined)count(key,Number(match[index]));
+    }
+  }
+  return result;
+}
+
 export async function inspectDisc(file) {
   if (file.size !== ISO_SIZE) throw discSizeError('disc-inspection', ISO_SIZE, file.size);
   const read = async (offset, length) => {

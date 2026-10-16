@@ -42,3 +42,21 @@ test('native verification read failures preserve safe stage and byte counts',asy
 test('production verification uses at most 4MiB reads with every byte covered',async()=>{
  const{default:manifest}=await import('../runtime/web/disc-chunks.mjs');assert.equal(manifest.chunkBytes,4*1024*1024);assert.equal(manifest.chunks.length,Math.ceil(manifest.size/manifest.chunkBytes));
 });
+
+test('iframe string diagnostics retain whole-file and short-read counts separately',async()=>{
+ const {discFailureDetails}=await import('../runtime/web/disc.mjs');
+ await assert.rejects(verifyDiscChunks({size:35,slice:()=>new Blob([])},trusted),error=>{
+  const expected={name:'Error',discStage:'verification-read@0',expectedBytes:35,actualBytes:35,readOffset:0,expectedReadBytes:16,actualReadBytes:0};
+  assert.deepEqual(discFailureDetails(error),expected);
+  assert.deepEqual(discFailureDetails(Error(error.message)),expected);
+  return true;
+ });
+});
+test('iframe string diagnostics preserve allowlisted native errors without private text',async()=>{
+ const {discFailureDetails}=await import('../runtime/web/disc.mjs');
+ await assert.rejects(verifyDiscChunks({size:35,slice(){return{arrayBuffer:async()=>{throw new DOMException('https://private.example/?token=secret filename','UnknownError');}};}},trusted),error=>{
+  assert.deepEqual(discFailureDetails(Error(error.message)),{name:'UnknownError',discStage:'verification-read@0',expectedBytes:35,actualBytes:35});
+  assert.doesNotMatch(JSON.stringify(discFailureDetails(Error(error.message))),/private|token|filename|https/);
+  return true;
+ });
+});

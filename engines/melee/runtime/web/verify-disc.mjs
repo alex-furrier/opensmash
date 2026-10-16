@@ -17,7 +17,7 @@ export async function verifyDiscChunks(file, trusted, onProgress = () => {}) {
     let bytes;
     try { bytes = await file.slice(offset, end).arrayBuffer(); }
     catch (error) { throw discStorageError(error, `verification-read@${offset}`, size, file.size); }
-    if (bytes.byteLength !== end - offset) throw Object.assign(Error(`The selected disc could not be read completely (verification-read@${offset}; expected ${end-offset} bytes, actual ${bytes.byteLength} bytes).`),{discStage:`verification-read@${offset}`,expectedBytes:size,actualBytes:file.size,readOffset:offset,expectedReadBytes:end-offset,actualReadBytes:bytes.byteLength});
+    if (bytes.byteLength !== end - offset) throw Object.assign(Error(`The selected disc could not be read completely (verification-read@${offset}; expected ${size} bytes, actual ${file.size} bytes; readOffset ${offset}, expectedReadBytes ${end-offset}, actualReadBytes ${bytes.byteLength}).`),{discStage:`verification-read@${offset}`,expectedBytes:size,actualBytes:file.size,readOffset:offset,expectedReadBytes:end-offset,actualReadBytes:bytes.byteLength});
     let hash;
     try { hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), byte => byte.toString(16).padStart(2, '0')).join(''); }
     catch (error) { throw discStorageError(error, `verification-digest@${offset}`, size, file.size); }
