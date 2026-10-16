@@ -29,6 +29,9 @@ test('real loopback HTTP/WebSocket create, join, verify, Ready, relay, disconnec
   assert.equal(response.headers.get('cross-origin-embedder-policy'),'require-corp');
   await verifyRuntime(relay.manifest,async url=>new Uint8Array(await(await fetch(relay.origin+url)).arrayBuffer()));
   assert.equal((await fetch(relay.origin+'/private.iso')).status,404);
+  const transfer=await fetch(relay.origin+'/shared/handoff-transfer.js');assert.equal(transfer.status,200);
+  const discImport=/from '([^']+disc\.mjs)'/.exec(await transfer.text())[1];
+  assert.equal((await fetch(new URL(discImport,relay.origin+'/shared/handoff-transfer.js'))).status,200,'standalone handoff resolves its disc diagnostics dependency');
   const pairing=relay.origin+'/api/handoff/rooms';
   assert.equal((await fetch(pairing)).status,405);
   assert.equal((await fetch(pairing,{method:'POST',headers:{Origin:'https://wrong.invalid','Content-Type':'application/json'},body:'{}'})).status,403);

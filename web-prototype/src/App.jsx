@@ -8,7 +8,7 @@ import {meleeRosterPresentation} from '../shared/melee-roster.js';
 import {MeleeSettings,MeleeDiscSettings as MeleeRomSettings,resetMeleePreferences} from '../../engines/melee/launcher/Settings';
 import {loadSharedRom} from './shared-game-files.js';
 import {loadSettings as loadMeleeSettings} from '../../engines/melee/web/lib/launch';
-import {restoreLocalDisc,localDiscReady,selectLocalDisc,subscribeLocalDisc,retainMelee,hostDiscConfigured,selectHostDisc,discoverHostDisc} from '../../engines/melee/web/lib/melee-session';
+import {restoreLocalDisc,localDiscReady,selectLocalDisc,subscribeLocalDisc,retainMelee,hostDiscConfigured,selectHostDisc,discoverHostDisc,inspectLocalDiscSetup} from '../../engines/melee/web/lib/melee-session';
 import {desktop as meleeDesktop} from '../../engines/melee/web/lib/desktop';
 import {pollService as pollMeleeService} from '../../engines/melee/web/lib/service-poll';
 import {selectionPorts as meleeSelectionPorts} from '../../engines/melee/launcher/launch-plan.mjs';
@@ -1690,6 +1690,7 @@ export default function App() {
       isAuthorized() { return isMelee ? meleeDiscReady : authorized; },
       hostDiscConfigured,discoverHostDisc,
       loadHostDisc:selectHostDisc,
+      inspectDiscSetup:inspectLocalDiscSetup,
       async restoreDisc(onStatus) {
         if(meleeDesktop())return meleeDiscReady;
         const unsubscribe=subscribeLocalDisc(status=>onStatus?.(status.message));

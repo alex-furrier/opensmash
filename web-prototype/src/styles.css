@@ -2164,3 +2164,19 @@ body.is-native-fullscreen .intro-video-stage:has(.ssb64-native-game) { position:
 .retro-room-button:disabled { opacity:.4;cursor:default; }
 .replica-cell[data-pick="1P"]::before { background:#9d3028;color:white; }
 .replica-cell[data-pick="2P"]::before { background:#245da5;color:white; }
+
+.launch-flow-diagnostics {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-height: 10em;
+  margin-top: 12px;
+  padding: 10px;
+  color: #f3eee4;
+  background: #110e0b;
+  border: 1px solid #a7856b;
+  font: 12px/1.5 ui-monospace, monospace;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.launch-flow-diagnostics[hidden] { display: none; }

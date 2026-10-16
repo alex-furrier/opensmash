@@ -1,6 +1,6 @@
 import {downloadHostDisc,hostDiscSource,hostDiscProgress} from './host-disc-download.mjs';
-import {ISO_SIZE,ISO_SHA256} from '../../runtime/web/disc.mjs';
-import {cacheDisc,restoreCachedDisc,removeCachedDisc} from './disc-cache.ts';
+import {ISO_SIZE,ISO_SHA256,discStorageError} from '../../runtime/web/disc.mjs';
+import {cacheDisc,restoreCachedDisc,removeCachedDisc,inspectDiscStorage} from './disc-cache.ts';
 import {unlockAudio} from './audio.ts';
 import {MeleeFrameWorker} from './melee-frame-worker.ts';
 import {meleePath} from './paths.ts';
@@ -16,6 +16,18 @@ const discListeners=new Set<(status:DiscSetup)=>void>();
 let discRevision=0,restoreStarted=false;
 let cacheAbort:AbortController|undefined;
 let restoring:Promise<void>|undefined;
+let lastDiscFailure:Record<string,unknown>|undefined;
+function recordDiscFailure(error:any){
+ lastDiscFailure={name:['UnknownError','QuotaExceededError','NotReadableError','NotAllowedError','SecurityError','InvalidStateError','AbortError'].includes(error?.name)?error.name:'Error'};
+ if(/^[a-z-]+(?:@\d+)?$/.test(error?.discStage||''))lastDiscFailure.discStage=error.discStage;
+ for(const key of ['expectedBytes','actualBytes','receivedBytes','writtenBytes','readOffset','expectedReadBytes','actualReadBytes'])if(Number.isSafeInteger(error?.[key])&&error[key]>=0)lastDiscFailure[key]=error[key];
+ // The existing iframe reports strings. Recover only our exact numeric marker.
+ if(!lastDiscFailure.discStage){
+  const match=/\b((?:verification-(?:file|read|digest)(?:@\d+)?|disc-inspection)); expected (\d+) bytes(?:, actual (\d+) bytes)?\)/.exec(error?.message||'');
+  if(match){lastDiscFailure.discStage=match[1];lastDiscFailure.expectedBytes=Number(match[2]);if(match[3])lastDiscFailure.actualBytes=Number(match[3]);}
+ }
+}
+export async function inspectLocalDiscSetup(){let timer:ReturnType<typeof setTimeout>|undefined;let storage;try{storage=await Promise.race([inspectDiscStorage(),new Promise(resolve=>{timer=setTimeout(()=>resolve({probeError:'Timeout'}),5000);})]);}finally{clearTimeout(timer);}return{version:1,state:discSetup.state,expectedBytes:ISO_SIZE,lastFailure:lastDiscFailure,...storage as object,sharedMemory:crossOriginIsolated&&typeof SharedArrayBuffer!=='undefined',graphicsAvailable:!!navigator.gpu,iframeMoveAvailable:canReparentRuntime()};}
 export const localDiscReady=()=>discSetup.ready;
 let consumers=0;
 let suspendTimer:ReturnType<typeof setTimeout>|undefined;
@@ -63,11 +75,11 @@ async function restoreDiscFromStorage(){
  restoreStarted=true;const revision=discRevision;
  updateDisc({state:'checking',ready:false,message:'Looking for your saved disc…'});
  try{
-  const file=await restoreCachedDisc();
+  const file=await restoreCachedDisc(ISO_SIZE);
   if(revision!==discRevision)return;
   if(file)await selectLocalDisc(file,true);
   else updateDisc({state:'missing',ready:false,message:'Choose your Melee disc.'});
- }catch(e){if(revision===discRevision)updateDisc({state:'error',ready:false,message:`Could not restore your disc. Choose it again. ${(e as Error).message}`});}
+ }catch(cause){const e=discStorageError(cause,'cache-restore',ISO_SIZE);recordDiscFailure(e);if(revision===discRevision)updateDisc({state:'error',ready:false,message:`Could not restore your disc. ${(e as Error).message}`});}
 }
 export async function selectLocalDisc(file:File,restored=false,signal?:AbortSignal){
  if(!restored&&hostDownload&&signal!==hostDownload.signal)hostDownload.abort();
@@ -112,7 +124,9 @@ export async function selectLocalDisc(file:File,restored=false,signal?:AbortSign
    try{storageMessage=await cacheDisc(file,controller.signal,fraction=>{
     const percent=Math.floor(fraction*100);
     if(revision===discRevision&&percent!==lastPercent){lastPercent=percent;updateDisc({state:'checking',ready:false,message:`Saving disc on this device… ${percent}%`});}
-   });}catch(e){
+   });}catch(cause){
+    const e=discStorageError(cause,(cause as any).discStage||'cache-save',ISO_SIZE,(cause as any).actualBytes);
+    if(Number.isSafeInteger((cause as any).writtenBytes))e.writtenBytes=(cause as any).writtenBytes;
     if(controller.signal.aborted)return;
     if((file as any)[Symbol.for('opensmash.received-disc')])throw e;
     storageMessage=`Playing without a saved copy. ${(e as Error).name==='QuotaExceededError'?'Not enough browser storage.':(e as Error).message} Choose the disc again next visit.`;
@@ -120,6 +134,7 @@ export async function selectLocalDisc(file:File,restored=false,signal?:AbortSign
   }
   if(revision===discRevision&&currentSession()===session)updateDisc({state:'ready',ready:true,message:'Ready to play.',storageMessage});
  }catch(error){
+  recordDiscFailure(error);
   if(localDisc===file&&currentSession()===session){
    standby=undefined;localDisc=undefined;session?.worker.terminate();
    updateDisc({state:'error',ready:false,message:(error as Error).message});
@@ -208,5 +223,8 @@ export async function selectHostDisc(signal:AbortSignal,onProgress:(message:stri
    const unsubscribe=subscribeLocalDisc(({state,message})=>{if(state==='checking'||state==='ready')onProgress(message);});
    try{await selectLocalDisc(file,false,signal);}finally{unsubscribe();}
   }});
+  controller.signal.throwIfAborted();
+  if(!localDiscReady())throw Object.assign(Error('Game setup did not finish. Open setup details before trying another download.'),{discStage:'setup-ready',expectedBytes:ISO_SIZE});
+ }catch(error){recordDiscFailure(error);throw error;
  }finally{clearTimeout(timeout);signal.removeEventListener('abort',cancel);if(hostDownload===controller)hostDownload=undefined;}
 }

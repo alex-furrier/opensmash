@@ -6,7 +6,7 @@ from pathlib import Path
 
 ISO_SHA256 = '0de05981a34156b9cedcef73c73d4244ac05cf6149ab3c9cfed917698819e464'
 ISO_SIZE = 1459978240
-CHUNK_BYTES = 64 * 1024 * 1024
+CHUNK_BYTES = 4 * 1024 * 1024
 
 
 def generate(path):

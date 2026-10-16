@@ -89,3 +89,31 @@ test('another tab Forget preserves locked incoming verification and adoption che
   dir.entries.set(receipt.name,new File(['truncated'],receipt.name));await assert.rejects(cacheDisc(file,new AbortController().signal,()=>{}),/no longer complete/);assert.equal(receipt.adopted,false);
  }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
 });
+
+test('truncated saved-copy metadata is reported without clearing the pointer or file',async()=>{
+ const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator'),root=new Directory();Object.defineProperty(globalThis,'navigator',{configurable:true,value:{storage:{getDirectory:async()=>root}}});
+ try{
+  await cacheDisc(new File(['complete'],'game.iso'),new AbortController().signal,()=>{});
+  const dir=root.entries.get('opensmash-melee-disc-v1'),name=await dir.entries.get('current').text();dir.entries.set(name,new File(['short'],name));
+  await assert.rejects(restoreCachedDisc(8),error=>{assert.equal(error.discStage,'cache-restore');assert.equal(error.expectedBytes,8);assert.equal(error.actualBytes,5);return true;});
+  assert.equal(await dir.entries.get('current').text(),name);assert.equal(dir.entries.get(name).size,5);
+ }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
+});
+for(const failure of ['pointer','truncated'])test(`failed ${failure} persistence never replaces the previous saved-copy pointer`,async()=>{
+ const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator'),root=new Directory();Object.defineProperty(globalThis,'navigator',{configurable:true,value:{storage:{getDirectory:async()=>root}}});
+ try{
+  await cacheDisc(new File(['retained'],'old.iso'),new AbortController().signal,()=>{});
+  const dir=root.entries.get('opensmash-melee-disc-v1'),current=await dir.entries.get('current').text(),original=dir.getFileHandle.bind(dir);
+  dir.getFileHandle=async(name,options)=>{const handle=await original(name,options);return{...handle,createWritable:async()=>{const writer=await handle.createWritable();return{...writer,write:async value=>{if(failure==='pointer'&&name==='current')throw new DOMException('opaque','UnknownError');await writer.write(value);},close:async()=>{await writer.close();if(failure==='truncated'&&name!==current&&name.startsWith('disc-'))dir.entries.set(name,new File([],name));}};}};};
+  await assert.rejects(cacheDisc(new File(['replacement'],'new.iso'),new AbortController().signal,()=>{}),error=>{assert.equal(error.discStage,failure==='pointer'?'cache-pointer':'cache-saved-file');assert.equal(error.expectedBytes,11);if(failure==='truncated')assert.equal(error.actualBytes,0);return true;});
+  assert.equal(await dir.entries.get('current').text(),current);assert.equal(await(await restoreCachedDisc()).text(),'retained');
+ }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
+});
+test('setup diagnostics use only a 64KiB probe and retain the existing saved game',async()=>{
+ const{inspectDiscStorage}=await import('../web/lib/disc-cache.mjs');const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator'),root=new Directory();Object.defineProperty(globalThis,'navigator',{configurable:true,value:{storage:{getDirectory:async()=>root}}});
+ try{
+  await cacheDisc(new File(['retained'],'private-filename.iso'),new AbortController().signal,()=>{});
+  const report=await inspectDiscStorage();assert.deepEqual(report,{storageAvailable:true,savedBytes:8,writableAvailable:true,probeBytes:65536,probeReadBytes:16});
+  assert.equal(await(await restoreCachedDisc()).text(),'retained');assert.equal(root.entries.get('opensmash-disc-diagnostics-v1').entries.size,0);assert.doesNotMatch(JSON.stringify(report),/filename|incoming|disc-|http|private/);
+ }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
+});

@@ -19,6 +19,7 @@ export async function startRelay({engineRoot,port=0,httpsOrigin,devDisc,testBot}
  const {manifest,unavailable}=runtimeAssets;
  const files=new Map([['/',resolve(web,'netplay/lobby.html')],['/lobby-client.mjs',resolve(web,'netplay/lobby-client.mjs')],['/lobby.css',resolve(web,'netplay/lobby.css')]]);
  files.set('/touch-controls.css',resolve(here,'../../web/app/MeleeTouchControls.css'));
+ files.set('/engines/melee/runtime/web/disc.mjs',resolve(web,'disc.mjs'));
  for(const [url,path] of [['/transfer/disc-transfer.mjs',resolve(web,'netplay/disc-transfer.mjs')],['/transfer/disc-cache.mjs',resolve(here,'../../web/lib/disc-cache.mjs')],['/transfer/rom-handoff-client.js',resolve(here,'../../../../web-prototype/src/rom-handoff-client.js')],['/shared/handoff-transfer.js',resolve(here,'../../../../web-prototype/shared/handoff-transfer.js')],['/shared/rom-handoff.js',resolve(here,'../../../../web-prototype/shared/rom-handoff.js')]])files.set(url,path);
  const dev=devDisc&&await createDevDisc({...devDisc,httpsOrigin});
  const handoff=createPrivateHandoff();

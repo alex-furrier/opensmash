@@ -2,8 +2,19 @@ export const ISO_SHA256 = '0de05981a34156b9cedcef73c73d4244ac05cf6149ab3c9cfed91
 export const DOL_SHA256 = 'dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646';
 export const ISO_SIZE = 1459978240;
 
+// Keep diagnostics to known stages and byte counts, never file names or URLs.
+export function discSizeError(stage, expectedBytes, actualBytes) {
+  return Object.assign(Error(`This image has an unexpected size (${stage}; expected ${expectedBytes} bytes, actual ${actualBytes} bytes).`), {discStage:stage, expectedBytes, actualBytes});
+}
+export function discStorageError(cause, stage, expectedBytes, actualBytes) {
+  const reasons = {UnknownError:'The browser could not finish preparing the game', NotReadableError:'The browser could not read game storage', QuotaExceededError:'The browser does not have enough storage for the game', InvalidStateError:'Game storage became unavailable', NotAllowedError:'The browser did not allow access to game storage', SecurityError:'The browser blocked access to game storage'};
+  if (!Object.hasOwn(reasons, cause?.name)) return cause;
+  const bytes = `expected ${expectedBytes} bytes${actualBytes === undefined ? '' : `, actual ${actualBytes} bytes`}`;
+  return Object.assign(Error(`${reasons[cause.name]} (${cause.name}; ${stage}; ${bytes}). Your saved game has not been cleared.`, {cause}), {name:cause.name, discStage:stage, expectedBytes, ...(actualBytes === undefined ? {} : {actualBytes})});
+}
+
 export async function inspectDisc(file) {
-  if (file.size !== ISO_SIZE) throw Error('Choose the full USA 1.02 Melee ISO. This image has an unexpected size.');
+  if (file.size !== ISO_SIZE) throw discSizeError('disc-inspection', ISO_SIZE, file.size);
   const read = async (offset, length) => {
     if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length < 0 || offset + length > file.size)
       throw Error('Invalid disc file range.');

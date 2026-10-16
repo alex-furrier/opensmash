@@ -35,3 +35,10 @@ test('releases verified chunk backing stores before reading the next chunk',
  }},trusted);
  assert.ok(inputs.every(buffer=>buffer.byteLength===0));
 });
+
+test('native verification read failures preserve safe stage and byte counts',async()=>{
+ await assert.rejects(verifyDiscChunks({size:35,slice(){return{arrayBuffer:async()=>{throw new DOMException('opaque filename or URL','UnknownError');}};}},trusted),error=>{assert.equal(error.name,'UnknownError');assert.equal(error.discStage,'verification-read@0');assert.equal(error.expectedBytes,35);assert.equal(error.actualBytes,35);assert.doesNotMatch(error.message,/opaque filename|URL/);return true;});
+});
+test('production verification uses at most 4MiB reads with every byte covered',async()=>{
+ const{default:manifest}=await import('../runtime/web/disc-chunks.mjs');assert.equal(manifest.chunkBytes,4*1024*1024);assert.equal(manifest.chunks.length,Math.ceil(manifest.size/manifest.chunkBytes));
+});

@@ -126,6 +126,8 @@ export function LaunchFlow() {
           Get ROM from another device
         </button>
         <p id="rom-form-error" className="launch-flow-error" role="alert" hidden />
+        <button id="rom-diagnostics-button" className="launch-flow-text-link" type="button" hidden>Show setup details</button>
+        <textarea id="rom-diagnostics-report" className="launch-flow-diagnostics" aria-label="Game setup details to copy" readOnly hidden />
       </section>
       <section
         id="rom-handoff-page"

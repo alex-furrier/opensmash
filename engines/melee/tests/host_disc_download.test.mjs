@@ -66,3 +66,31 @@ test('host stream uses existing verification/cache, supports retry, and preserve
   assert.equal(await(await restoreCachedDisc()).text(),'private test fixture');
  }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
 });
+
+test('completed downloads retain the original disk-backed File and reject a truncated saved file before verification',async()=>{
+ const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator'),root=new Directory();
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{storage:{getDirectory:async()=>root}}});
+ const bytes=new TextEncoder().encode('complete downloaded file');
+ try{
+  await cacheDisc(new File(['previous saved game'],'old.iso'),new AbortController().signal,()=>{});
+  const directory=root.entries.get('opensmash-melee-disc-v1');let accepted=0;
+  const run=()=>downloadHostDisc({url:'/disc',size:bytes.length,signal:new AbortController().signal,fetchFile:async()=>new Response(bytes,{headers:{'content-length':String(bytes.length)}}),acceptFile:async file=>{accepted++;const receipt=file[Symbol.for('opensmash.received-disc')];assert.equal(file,directory.entries.get(receipt.name),'no full-size File/Blob rewrapping');await cacheDisc(file,new AbortController().signal,()=>{});}});
+  await run();assert.equal(accepted,1);assert.equal(await(await restoreCachedDisc()).text(),'complete downloaded file');
+  const original=directory.getFileHandle.bind(directory);
+  directory.getFileHandle=async(name,options)=>{const handle=await original(name,options);if(name.startsWith('incoming-')){return{...handle,createWritable:async()=>{const writer=await handle.createWritable();return{...writer,close:async()=>{await writer.close();directory.entries.set(name,new File([],name));}};}};}return handle;};
+  await assert.rejects(run(),error=>{assert.equal(error.discStage,'download-saved-file');assert.equal(error.expectedBytes,bytes.length);assert.equal(error.actualBytes,0);assert.equal(error.receivedBytes,bytes.length);return true;});
+  assert.equal(accepted,1);assert.equal(await(await restoreCachedDisc()).text(),'complete downloaded file');
+ }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
+});
+for(const failure of ['write','close','getFile'])test(`native ${failure} failure reports its exact download stage and preserves the saved game`,async()=>{
+ const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator'),root=new Directory();
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{storage:{getDirectory:async()=>root}}});
+ try{
+  await cacheDisc(new File(['retained'],'old.iso'),new AbortController().signal,()=>{});
+  const directory=root.entries.get('opensmash-melee-disc-v1'),original=directory.getFileHandle.bind(directory);
+  directory.getFileHandle=async(name,options)=>{const handle=await original(name,options);if(!name.startsWith('incoming-'))return handle;const fail=()=>{throw new DOMException('native opaque error with a private filename','UnknownError');};return{getFile:failure==='getFile'?fail:handle.getFile,createWritable:async()=>{const writer=await handle.createWritable();return{...writer,...(failure==='getFile'?{}:{[failure]:fail})};}};};
+  let accepted=false;
+  await assert.rejects(downloadHostDisc({url:'/disc',size:3,signal:new AbortController().signal,fetchFile:async()=>new Response('abc',{headers:{'content-length':'3'}}),acceptFile:async()=>{accepted=true;}}),error=>{assert.equal(error.name,'UnknownError');assert.equal(error.discStage,{write:'download-write',close:'download-close',getFile:'download-saved-file'}[failure]);assert.equal(error.expectedBytes,3);assert.equal(error.receivedBytes,3);assert.doesNotMatch(error.message,/private filename/);return true;});
+  assert.equal(accepted,false);assert.equal(await(await restoreCachedDisc()).text(),'retained');assert.equal([...directory.entries.keys()].filter(name=>name.startsWith('incoming-')).length,0);
+ }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
+});

@@ -1,1 +1,1 @@
-export {restoreCachedDisc,cacheDisc,removeCachedDisc} from './disc-cache.mjs';
+export {restoreCachedDisc,cacheDisc,removeCachedDisc,inspectDiscStorage} from './disc-cache.mjs';

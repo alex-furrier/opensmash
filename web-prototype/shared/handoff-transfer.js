@@ -1,5 +1,6 @@
 // Ordered, bounded transfer: the receiver acknowledges each MiB only after it
 // has written it. Disc images stay in OPFS instead of a multi-gigabyte buffer.
+import {discSizeError,discStorageError} from '../../engines/melee/runtime/web/disc.mjs';
 export const TRANSFER_LIMITS = { ssb64: 64 * 1024 * 1024, melee: 2 * 1024 * 1024 * 1024 };
 export function validateTransferHeader(header, game) {
   if (header.type !== 'header' || header.game !== game || !Number.isSafeInteger(header.size) || header.size <= 0 || header.size > TRANSFER_LIMITS[game]) throw new Error('The sending device offered an unexpected game or file size.');
@@ -91,7 +92,8 @@ export async function receiveGameFile(channel, inbox, game, onState, setCleanup,
       } else if(message.type==='done') {
         if(received!==header.size) throw new Error('The transfer ended before the whole file arrived.');
         if(writer) await writer.close();
-        const file=new File(handle ? [await handle.getFile()] : chunks,header.name,{type:'application/octet-stream'});
+        const file=handle ? await handle.getFile() : new File(chunks,header.name,{type:'application/octet-stream'});
+        if(file.size!==header.size)throw discSizeError('handoff-saved-file',header.size,file.size);
         if (handle) Object.defineProperty(file,Symbol.for('opensmash.received-disc'),{value:receipt});
         channel.send(JSON.stringify({type:'received'}));
         onState('done',{total:received});
@@ -130,10 +132,12 @@ async function incomingDisc(setCleanup){
 /** Save a bounded HTTP stream using the same incoming-disc receipt as handoff. */
 export async function receiveDiscResponse(response,size,signal,onProgress,setCleanup){
  if(!response.ok||Number(response.headers.get('content-length'))!==size)throw Error('The game file could not be loaded completely.');
- signal.throwIfAborted();const stage=await incomingDisc(setCleanup),reader=response.body.getReader();let received=0,written=0;
+ signal.throwIfAborted();let stage;
+ try{stage=await incomingDisc(setCleanup);}catch(error){throw discStorageError(error,'download-open',size);}
+ const reader=response.body.getReader();let received=0,written=0,phase='download-read';
  // Coalesce small network fragments into bounded writes, without splitting large reads.
  const pending=new Uint8Array(1024*1024);let queued=0;
- const write=async bytes=>{signal.throwIfAborted();await stage.writer.write(bytes);written+=bytes.byteLength;onProgress(written);};
+ const write=async bytes=>{signal.throwIfAborted();phase='download-write';await stage.writer.write(bytes);written+=bytes.byteLength;onProgress(written);phase='download-read';};
  const flush=async()=>{if(queued){await write(pending.subarray(0,queued));queued=0;}};
  const abort=()=>{void reader.cancel(signal.reason).catch(()=>{});};signal.addEventListener('abort',abort,{once:true});
  try{
@@ -148,8 +152,10 @@ export async function receiveDiscResponse(response,size,signal,onProgress,setCle
    }
   }
   if(received!==size)throw Error('The game download ended before the whole file arrived.');
-  await flush();signal.throwIfAborted();await stage.writer.close();
-  const file=new File([await stage.handle.getFile()],'melee-usa-1.02.iso',{type:'application/octet-stream'});
+  await flush();signal.throwIfAborted();phase='download-close';await stage.writer.close();
+  phase='download-saved-file';const file=await stage.handle.getFile();
+  if(file.size!==size)throw discSizeError(phase,size,file.size);
   Object.defineProperty(file,Symbol.for('opensmash.received-disc'),{value:stage.receipt});return file;
- }finally{signal.removeEventListener('abort',abort);await reader.cancel().catch(()=>{});reader.releaseLock();}
+ }catch(error){throw Object.assign(discStorageError(error,phase,size),{receivedBytes:received,writtenBytes:written});}
+ finally{signal.removeEventListener('abort',abort);await reader.cancel().catch(()=>{});reader.releaseLock();}
 }

@@ -445,6 +445,8 @@ let pendingPickSlots = "";
 
 const hostLoadButton=document.getElementById('rom-host-load-button');
 const hostLoadCell=document.getElementById('rom-host-load-cell');
+const setupDetailsButton=document.getElementById('rom-diagnostics-button');
+const setupDetailsReport=document.getElementById('rom-diagnostics-report');
 let hostLoadOperation;
 let localSelection;
 let controllerSelection;
@@ -459,6 +461,7 @@ function localState() {
 }
 function renderLocalSelection() {
   if(hostLoadCell)hostLoadCell.hidden=!APP_BRIDGE?.hostDiscConfigured?.()||APP_BRIDGE?.experience!=='melee';
+  if(setupDetailsButton)setupDetailsButton.hidden=APP_BRIDGE?.experience!=='melee';
   const panel=document.getElementById('local-fighter-selection');
   if(!panel)return;
   panel.hidden=!APP_BRIDGE?.explicitLocalSelection||document.body.classList.contains('is-game-running');
@@ -3139,3 +3142,15 @@ async function mountHostDiscAction(){
 }
 
 void mountHostDiscAction();
+
+if(setupDetailsButton)setupDetailsButton.onclick=async()=>{
+ if(!APP_BRIDGE?.inspectDiscSetup||!setupDetailsReport)return;
+ setupDetailsButton.disabled=true;setupDetailsButton.textContent='Checking browser storage…';
+ try{
+  const report=await APP_BRIDGE.inspectDiscSetup();
+  setupDetailsReport.value='OpenSmash game setup\n'+JSON.stringify(report,null,2);
+  setupDetailsReport.hidden=false;setupDetailsReport.focus();setupDetailsReport.select();
+  setupDetailsButton.textContent='Refresh setup details';
+ }catch{setupDetailsButton.textContent='Setup details unavailable. Try again.';}
+ finally{setupDetailsButton.disabled=false;}
+};
