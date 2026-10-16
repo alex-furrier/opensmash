@@ -40,7 +40,7 @@ support exactly two humans with one local input source per peer.
 | Confirmed input | Each peer acquires only its owned pad; both accept input and applied result at logical ticks; disagreement fails closed | A: [protocol](../engines/melee/tests/confirmed_input.test.mjs), [bridge](../engines/melee/tests/browser_bridge.test.mjs), [identity](../engines/melee/tests/netplay_identity.test.mjs). B: E1 | Distinct input traces, progress, mutation/disconnect/fresh-session controls and selected-state parity. No rollback/full snapshot. Ordered message faults over WebSocket/TCP are not transport packet loss. |
 | Disc storage and handoff | Verified local or configured hosted disc; separate setup controls, visible download/check/save phases, saved-copy restore and paired transfer cleanup | A: [disc cache](../engines/melee/tests/browser_disc_cache.test.mjs), [hosted download](../engines/melee/tests/host_disc_download.test.mjs), [handoff](../engines/melee/tests/private_handoff.test.mjs). B: [historical transfer proof](multiplayer/disc-transfer-proof.json), E2/E26/E27 | E26 covers controlled download presentation and bounded transfer/storage measurements. E27 records the live post-transfer persistence blocker. Historical standalone transfer does not establish current phone or WAN handoff. |
 | Donor fitting and attachments | Source package fits requested accepted donor/slot; required companion costumes remain available | A: [target choices](../engines/melee/tests/test_roster_choices.py), [native target options](../engines/melee/tests/test_native_target_options.py), [source-pivot rejection](../engines/melee/tests/source_pivot_contract.test.mjs). B: E5; [native fitting benchmark](../engines/melee/validation/native-fit/README.md) | Geometry/slot contracts and bounded target samples. Acceptance is per source/base, not all catalog combinations. Source-pivot is opt-in, reviewed 39-joint/four-donor browser/WebGPU only; standard DAT/desktop unsupported. Donor collision, attack and jump behavior is retained. |
-| Private deployment boundary | Existing tailnet release remains separate; shared-password hosting protects app/API/assets/upgrades, requires HTTPS through its exact-host connector and tokenizes the loopback helper; disc delivery requires explicit private configuration | A: [shared auth](../web-prototype/server/shared-password.test.js), [helper](../engines/melee/tests/test_shared_host_helper.py), [secure TTY](../engines/melee/tests/test_shared_password_cli.py), [release](../engines/melee/tests/test_mac_release.py), [origin policy](../engines/melee/tests/friend_origin.test.mjs), [disc server](../engines/melee/tests/host_disc_server.test.mjs). B: E2/E4/E5; E20/E21/E22/E23/E24/E25 | E24 covers the styled public login and isolated authenticated real-file transfer. E25 adds explicit upgrade-rejection framing. Authenticated custom-host transfer/gameplay and external-device acceptance remain unverified. |
+| Private deployment boundary | Existing tailnet release remains separate; shared-password hosting protects app/API/assets/upgrades, requires HTTPS through its exact-host connector and tokenizes the loopback helper; disc delivery requires explicit private configuration | A: [shared auth](../web-prototype/server/shared-password.test.js), [helper](../engines/melee/tests/test_shared_host_helper.py), [secure TTY](../engines/melee/tests/test_shared_password_cli.py), [release](../engines/melee/tests/test_mac_release.py), [origin policy](../engines/melee/tests/friend_origin.test.mjs), [disc server](../engines/melee/tests/host_disc_server.test.mjs). B: E2/E4/E5; E20/E21/E22/E23/E24/E25 | E24 covers the styled public login and isolated authenticated real-file transfer; E28 covers its minimal entry revision. E25 adds explicit upgrade-rejection framing. Authenticated custom-host transfer/gameplay and external-device acceptance remain unverified. |
 | Relocated private roots (separate candidate) | Retain imports and derived files outside checkout | A: [PR #2](https://github.com/alex-furrier/opensmash/pull/2), head `3d5907e`, contract and route/retry tests | 31 Python passes, four fixture skips, five JS passes. Candidate is separate from this map's source checkpoint. Gap: actual gameplay after root relocation; no private migration performed. |
 
 ## Evidence checkpoints
@@ -483,3 +483,23 @@ tailnet origin. This historical checkpoint did not perform deployment work.
   changing its origin or downloading it again. Candidate browser results, review,
   user interruption acknowledgment and deployment health belong to the private
   handoff; this source checkpoint does not claim activation.
+
+- **E28 — minimal lobby entry:** implementation
+  `d2c0748f9c51434389d8a88dc6b88d59e4891bfe`, checked 2026-10-16 UTC on macOS
+  in Chrome 155.0.8059.82. Public login retains the wordmark, labelled password
+  input, submit action and escaped inline failure. Repeated headings, slogans,
+  panel framing and footer copy are removed. About retains the upstream source
+  link, with disc-use and trademark notices in a keyboard-accessible disclosure.
+  The repository license is unchanged. Hosted Melee setup keeps the required
+  version and download size without the explanatory paragraph.
+
+  Fourteen existing shared-password regressions passed. An isolated loopback
+  browser fixture checked five viewport sizes (320–1440 pixels wide), keyboard
+  focus, touch targets, failed login and successful login using synthetic
+  credentials. Candidate frontend assets served only inside a separate browser
+  fixture passed desktop/mobile About disclosure checks and six idle/download
+  setup layouts, including cancellation, retry, Escape and handoff return.
+  Actual ISO requests were blocked in that UI fixture. No production credentials,
+  browser storage or live services changed for these checks. This checkpoint
+  establishes presentation and regression evidence, not deployment or public
+  transfer performance; private runtime receipts record those separately.
