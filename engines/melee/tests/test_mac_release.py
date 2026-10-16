@@ -6,6 +6,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
 
 TOOLS = Path(__file__).resolve().parents[1] / 'tools'
 sys.path.insert(0, str(TOOLS))
@@ -205,6 +207,39 @@ class MacReleaseTests(unittest.TestCase):
         for invalid in ('relative.iso', '', 1, str(self.root), str(link), str(release_disc), str(self.root / 'absent.iso')):
             value['hostDiscFile'] = invalid; file.write_text(json.dumps(value))
             with self.subTest(invalid=invalid), self.assertRaises(ValueError): service.config(file)
+
+    def test_r2_signer_credentials_are_exact_read_only_destinations_and_web_only(self):
+        value = {key: str(self.root / key) for key in ('helper', 'authFile', 'engineRoot', 'characterRoot')}
+        value['hostDiscFile'] = str(self.root / 'private.iso')
+        value['r2Disc'] = {'account': '7fbcb24dd4d4e29d9c4c2c6df9a898eb', 'bucket': 'opensmash-private-disc', 'key': 'disc/melee-usa-1.02.iso', 'doppler': '/fixture/doppler'}
+        with patch.object(service.subprocess, 'run', side_effect=[SimpleNamespace(stdout='a' * 32 + '\n'), SimpleNamespace(stdout='b' * 64 + '\n')]) as run:
+            web = service.service_environment(value, 'web', '0' * 64)
+        self.assertEqual(web['MELEE_DISC_R2_ACCESS_KEY_ID'], 'a' * 32)
+        self.assertEqual(web['MELEE_DISC_R2_SECRET_ACCESS_KEY'], 'b' * 64)
+        self.assertEqual([call.args[0][3] for call in run.call_args_list], ['OPENSMASH_DISC_R2_ACCESS_KEY_ID', 'OPENSMASH_DISC_R2_SECRET_ACCESS_KEY'])
+        self.assertTrue(all(call.kwargs['capture_output'] for call in run.call_args_list))
+        self.assertNotIn('CLOUDFLARE_API_TOKEN', web)
+        self.assertNotIn('AWS_SESSION_TOKEN', web)
+        with patch.object(service.subprocess, 'run') as run:
+            helper = service.service_environment(value, 'helper', '0' * 64)
+        run.assert_not_called(); self.assertNotIn('MELEE_DISC_R2_ACCESS_KEY_ID', helper)
+        with patch.object(service.subprocess, 'run', side_effect=OSError('unavailable')):
+            fallback = service.service_environment(value, 'web', '0' * 64)
+        self.assertNotIn('MELEE_DISC_R2_ACCOUNT', fallback)
+        self.assertEqual(fallback['MELEE_HOST_DISC_FILE'], value['hostDiscFile'])
+
+    def test_r2_configuration_rejects_other_accounts_objects_or_missing_fallback(self):
+        value = {key: str(self.root / key) for key in ('release', 'helper', 'node', 'python', 'authFile', 'engineRoot', 'characterRoot', 'roster', 'logs')}
+        disc = self.root / 'private.iso'; disc.write_bytes(b'synthetic')
+        value['hostDiscFile'] = str(disc)
+        r2 = {'account': '7fbcb24dd4d4e29d9c4c2c6df9a898eb', 'bucket': 'opensmash-private-disc', 'key': 'disc/melee-usa-1.02.iso', 'doppler': '/fixture/doppler'}
+        file = self.root / 'service.json'; value['r2Disc'] = r2; file.write_text(json.dumps(value)); file.chmod(0o600)
+        self.assertEqual(service.config(file)['r2Disc'], r2)
+        for change in ({'account': 'other'}, {'bucket': 'other'}, {'key': 'other'}, {'doppler': 'relative'}):
+            value['r2Disc'] = {**r2, **change}; file.write_text(json.dumps(value))
+            with self.subTest(change=change), self.assertRaises(ValueError): service.config(file)
+        value['r2Disc'] = r2; del value['hostDiscFile']; file.write_text(json.dumps(value))
+        with self.assertRaises(ValueError): service.config(file)
 
 
 if __name__ == '__main__': unittest.main()

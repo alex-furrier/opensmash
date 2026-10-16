@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,writeFile,rm,symlink} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';import {createHash} from 'node:crypto';import http from 'node:http';
-import {createHostDisc,HOST_DISC_PATH} from '../server/host-disc.mjs';import {privateMeleeRequestAllowed,allowedHostedRoute} from '../server/handler.mjs';
+import {createHostDisc,HOST_DISC_PATH,HOST_DISC_FALLBACK_PATH} from '../server/host-disc.mjs';import {privateMeleeRequestAllowed,allowedHostedRoute} from '../server/handler.mjs';
 test('fixed file is size/digest verified and restart-stable; unrelated paths, methods and ranges never return bytes',async()=>{
  const dir=await mkdtemp(join(tmpdir(),'host-disc-')),file=join(dir,'private.iso'),bytes=Buffer.alloc(3*1024*1024,73),digest=createHash('sha256').update(bytes).digest('hex');await writeFile(file,bytes);
  let disc,server;
@@ -13,6 +13,7 @@ test('fixed file is size/digest verified and restart-stable; unrelated paths, me
    const origin=await start();assert.deepEqual(disc.metadata,{available:true,url:HOST_DISC_PATH,size:bytes.length,sha256:digest});
    const response=await fetch(origin+HOST_DISC_PATH);assert.equal(response.status,200);assert.equal(response.headers.get('content-length'),String(bytes.length));assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(createHash('sha256').update(Buffer.from(await response.arrayBuffer())).digest('hex'),digest);
    const head=await fetch(origin+HOST_DISC_PATH,{method:'HEAD'});assert.equal(head.status,200);assert.equal((await head.arrayBuffer()).byteLength,0);
+   const fallback=await fetch(origin+HOST_DISC_FALLBACK_PATH);assert.equal(fallback.status,200);assert.equal(createHash('sha256').update(Buffer.from(await fallback.arrayBuffer())).digest('hex'),digest);
    for(const [path,options] of [['/melee/api/disc?file=other',{}],['/melee/api/disc/other',{}],['/melee/api/disc',{method:'POST'}],['/melee/api/disc',{headers:{range:'bytes=0-99'}}]])assert.equal((await fetch(origin+path,options)).status,404);
    const cancel=new AbortController(),active=await fetch(origin+HOST_DISC_PATH,{signal:cancel.signal});cancel.abort();await assert.rejects(active.arrayBuffer(),{name:'AbortError'});
    const retry=await fetch(origin+HOST_DISC_PATH);assert.equal((await retry.arrayBuffer()).byteLength,bytes.length);

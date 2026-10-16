@@ -5,6 +5,7 @@ import {createHash} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {ISO_SIZE,ISO_SHA256} from '../runtime/web/disc.mjs';
 export const HOST_DISC_PATH='/melee/api/disc';
+export const HOST_DISC_FALLBACK_PATH='/melee/api/disc-host';
 export const HOST_DISC_CONFIG_PATH='/melee/api/disc-source';
 /** One explicitly configured, verified file; no caller-supplied filesystem path. */
 export async function createHostDisc({file,expectedSize=ISO_SIZE,expectedHash=ISO_SHA256}){
@@ -21,7 +22,7 @@ export async function createHostDisc({file,expectedSize=ISO_SIZE,expectedHash=IS
   metadata:{available:true,url:HOST_DISC_PATH,size:expectedSize,sha256:expectedHash},
   async respond(req,res){
    const reject=status=>{res.writeHead(status,{'Cache-Control':'no-store'});res.end();};
-   if(req.url!==HOST_DISC_PATH||!['GET','HEAD'].includes(req.method)||req.headers.range)return reject(404);
+   if(![HOST_DISC_PATH,HOST_DISC_FALLBACK_PATH].includes(req.url)||!['GET','HEAD'].includes(req.method)||req.headers.range)return reject(404);
    if(closed||!unchanged(await handle.stat()))return reject(503);
    res.writeHead(200,{'Content-Type':'application/octet-stream','Content-Length':expectedSize,'Cache-Control':'no-store','Cross-Origin-Resource-Policy':'same-origin','X-Content-Type-Options':'nosniff'});
    if(req.method==='HEAD'){res.end();return;}

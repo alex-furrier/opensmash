@@ -8,8 +8,19 @@ import {randomBytes} from 'node:crypto';
 import {sealData} from 'iron-session';
 import {createSharedPasswordGate, passwordRecord} from './shared-password.js';
 import {EventEmitter, once} from 'node:events';
+import {createR2Disc} from '../../engines/melee/server/r2-disc.mjs';
+import {ISO_SIZE,ISO_SHA256} from '../../engines/melee/runtime/web/disc.mjs';
 
 const origin = 'https://smash.alexfurrier.dev';
+test('only an authenticated HTTPS request can obtain an expiring private R2 redirect',async t=>{
+ const r2=await createR2Disc({account:'a'.repeat(32),bucket:'opensmash-private-disc',key:'disc/melee-usa-1.02.iso',accessKeyId:'b'.repeat(32),secretAccessKey:'c'.repeat(64),fetchObject:async()=>new Response(null,{headers:{'content-length':String(ISO_SIZE),'x-amz-meta-sha256':ISO_SHA256}})});
+ let issued=0;const f=await fixture(t,{allowHostDisc:true,requireProxyHttps:true,protectedHandler:async(req,res)=>{issued++;await r2.redirect(res);}});
+ const route='/melee/api/disc',headers={'X-Forwarded-Proto':'https'};
+ for(const method of ['GET','HEAD']){const response=await f.request(route,{method,headers});assert.equal(response.status,401);assert.equal(response.headers.location,undefined);}assert.equal(issued,0);
+ const cookie=await f.session();assert.equal((await f.request(route,{headers:{...headers,cookie,Origin:'https://other.example'}})).status,403);assert.equal(issued,0);
+ const response=await f.request(route,{headers:{...headers,cookie}});assert.equal(response.status,302);assert.equal(response.headers['cache-control'],'no-store');assert.equal(response.headers['cloudflare-cdn-cache-control'],'no-store');const signed=new URL(response.headers.location);assert.equal(signed.pathname,'/opensmash-private-disc/disc/melee-usa-1.02.iso');assert.equal(signed.searchParams.get('X-Amz-Expires'),'900');assert.equal(issued,1);
+ await f.rotate();assert.equal((await f.request(route,{headers:{...headers,cookie}})).status,401);assert.equal(issued,1);
+});
 const password = 'isolated-test-only-password';
 test('password policy accepts eight alphabetic characters without composition rules and rejects seven', async () => {
   const record = await passwordRecord('abcdefgh');assert.match(record.hash,/^[a-f0-9]{64}$/);

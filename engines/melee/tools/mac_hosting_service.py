@@ -12,6 +12,7 @@ import secrets
 import re
 import sys
 import time
+import subprocess
 from urllib.request import Request, urlopen
 from package_mac_release import verify, digest, regular
 
@@ -41,6 +42,10 @@ def config(path):
         path = Path(disc)
         if path.is_symlink() or not path.is_file() or path.stat().st_uid != os.getuid() or path.resolve().is_relative_to(release):
             raise ValueError('hostDiscFile must be an owner-owned regular file outside the release')
+    r2 = value.get('r2Disc')
+    if r2 is not None:
+        if not isinstance(r2, dict) or r2.get('account') != '7fbcb24dd4d4e29d9c4c2c6df9a898eb' or r2.get('bucket') != 'opensmash-private-disc' or r2.get('key') != 'disc/melee-usa-1.02.iso' or not isinstance(r2.get('doppler'), str) or not Path(r2['doppler']).is_absolute() or not disc:
+            raise ValueError('r2Disc requires the dedicated account/bucket/object, Doppler path and host fallback')
     return value
 
 
@@ -91,6 +96,19 @@ def service_environment(value, role, helper_key):
         env['COOKIE_SECRET'] = secrets.token_hex(32)
         if value.get('hostDiscFile') is not None:
             env['MELEE_HOST_DISC_FILE'] = value['hostDiscFile']
+        if value.get('r2Disc') is not None:
+            r2 = value['r2Disc']
+            try:
+                credentials = {}
+                for field in ('ACCESS_KEY_ID', 'SECRET_ACCESS_KEY'):
+                    result = subprocess.run([r2['doppler'], 'secrets', 'get', 'OPENSMASH_DISC_R2_' + field, '--plain', '--project', 'dots', '--config', 'prd'], capture_output=True, text=True, timeout=20, check=True, env={'HOME': str(Path.home()), 'PATH': '/usr/bin:/bin:/usr/sbin:/sbin'})
+                    secret = result.stdout.rstrip('\r\n')
+                    if not re.fullmatch('[a-f0-9]{' + ('32' if field == 'ACCESS_KEY_ID' else '64') + '}', secret):
+                        raise ValueError('Invalid private R2 credential')
+                    credentials['MELEE_DISC_R2_' + field] = secret
+                env.update(credentials, MELEE_DISC_R2_ACCOUNT=r2['account'], MELEE_DISC_R2_BUCKET=r2['bucket'], MELEE_DISC_R2_KEY=r2['key'])
+            except (OSError, ValueError, subprocess.SubprocessError):
+                print('Private R2 credentials unavailable; retaining verified host fallback.', file=sys.stderr)
     return env
 
 

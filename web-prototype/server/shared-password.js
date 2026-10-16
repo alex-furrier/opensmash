@@ -169,7 +169,7 @@ export function createSharedPasswordGate({file, origin, allowHostDisc = false, r
     if (pathname === '/logout' && req.method === 'POST') { res.setHeader('Set-Cookie', setCookie(SESSION, '', 0)); res.writeHead(303, {Location: '/login'}); res.end(); return false; }
     if (pathname.startsWith('/__/auth/') || (pathname.startsWith('/api/auth/') && pathname !== '/api/auth/config')) { reply(res, 404, '{"error":"Not found"}'); return false; }
     // Opt-in routes remain authenticated, uncached and tracked for revocation.
-    if (allowHostDisc !== true && /^\/melee\/api\/disc(?:-source)?$/.test(pathname)) { reply(res, 404, '{"available":false}'); return false; }
+    if (allowHostDisc !== true && /^\/melee\/api\/disc(?:-source|-host)?$/.test(pathname)) { reply(res, 404, '{"available":false}'); return false; }
     const release = track(() => res.destroy(), auth);
     if (!release) return false;
     res.once('close', release); res.once('finish', release);

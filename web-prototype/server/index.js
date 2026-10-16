@@ -44,11 +44,17 @@ if (process.env.MELEE_SHARED_AUTH_FILE && !sharedHosting) throw Error('Auth file
 if (sharedHosting && (!process.env.MELEE_SHARED_AUTH_FILE || process.env.MELEE_PRIVATE_ORIGIN !== 'https://smash.alexfurrier.dev' || !['127.0.0.1','localhost','::1'].includes(HOST))) throw Error('Shared hosting requires auth file, exact origin and loopback HOST.');
 if (sharedHosting && process.env.CREATION_ENABLED !== '0') throw Error('Shared hosting requires CREATION_ENABLED=0.');
 if(process.env.MELEE_PRIVATE_ORIGIN){const {privateFriendOrigin}=await import('../../engines/melee/server/friend-rooms.mjs');privateFriendOrigin(process.env.MELEE_PRIVATE_ORIGIN);}
-const {createHostDisc,HOST_DISC_PATH,HOST_DISC_CONFIG_PATH}=await import('../../engines/melee/server/host-disc.mjs');
+const {createHostDisc,HOST_DISC_PATH,HOST_DISC_CONFIG_PATH,HOST_DISC_FALLBACK_PATH}=await import('../../engines/melee/server/host-disc.mjs');
 let hostDisc;
 if(process.env.MELEE_HOST_DISC_FILE){
  if(!['127.0.0.1','localhost','::1'].includes(HOST)||!process.env.MELEE_PRIVATE_ORIGIN)throw Error('Host disc requires the existing private origin and a loopback HOST.');
  hostDisc=await createHostDisc({file:process.env.MELEE_HOST_DISC_FILE});
+}
+let r2Disc;
+if(process.env.MELEE_DISC_R2_ACCOUNT){
+ if(!sharedHosting||!hostDisc)throw Error('Private R2 delivery requires existing shared hosting and verified host fallback.');
+ try{const {createR2Disc}=await import('../../engines/melee/server/r2-disc.mjs');r2Disc=await createR2Disc({account:process.env.MELEE_DISC_R2_ACCOUNT,bucket:process.env.MELEE_DISC_R2_BUCKET,key:process.env.MELEE_DISC_R2_KEY,accessKeyId:process.env.MELEE_DISC_R2_ACCESS_KEY_ID,secretAccessKey:process.env.MELEE_DISC_R2_SECRET_ACCESS_KEY});}
+ catch{console.warn('Private R2 delivery unavailable; using verified host fallback.');}
 }
 const sharedPassword = sharedHosting ? createSharedPasswordGate({file: process.env.MELEE_SHARED_AUTH_FILE, origin: process.env.MELEE_PRIVATE_ORIGIN, allowHostDisc: Boolean(hostDisc), requireProxyHttps: true}) : null;
 const handleMelee = createEmbeddedMeleeHandler();
@@ -852,8 +858,12 @@ async function handleRequest(req, res, vite) {
   res.setHeader('Cross-Origin-Embedder-Policy','require-corp');
 
   if(!privateMeleeRequestAllowed(req,process.env.MELEE_PRIVATE_ORIGIN))return json(res,404,{error:'Not found'});
-  if(pathname===HOST_DISC_CONFIG_PATH&&req.method==='GET'&&!url.search)return json(res,200,hostDisc?.metadata||{available:false});
-  if(pathname===HOST_DISC_PATH){if(!hostDisc)return json(res,404,{error:'Game download is not configured.'});await hostDisc.respond(req,res);return;}
+  if(pathname===HOST_DISC_CONFIG_PATH&&req.method==='GET'&&!url.search)return json(res,200,hostDisc?{...hostDisc.metadata,...(r2Disc?{fallbackUrl:HOST_DISC_FALLBACK_PATH}:{})}:{available:false});
+  if(pathname===HOST_DISC_PATH||pathname===HOST_DISC_FALLBACK_PATH){
+   if(!hostDisc)return json(res,404,{error:'Game download is not configured.'});
+   if(r2Disc&&req.url===HOST_DISC_PATH&&req.method==='GET'&&!req.headers.range){try{await r2Disc.redirect(res);return;}catch{console.warn('Private disc link unavailable; using verified host fallback.');}}
+   await hostDisc.respond(req,res);return;
+  }
   if(pathname==='/melee/api/netplay/config'&&req.method==='GET')return json(res,200,{enabled:!!friendRuntime,...(simulatedPeer?{simulatedOpponent:true}:{})});
   if(friendRuntime?.handle(req,res))return;
 

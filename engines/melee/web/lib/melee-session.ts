@@ -179,12 +179,13 @@ if((import.meta as any).hot)(import.meta as any).hot.dispose(()=>{
 });
 
 let configuredHostDisc=(import.meta as any).env?.VITE_MELEE_DISC_SOURCE||'';
+let configuredHostFallback:string|undefined;
 let hostDiscovery:Promise<void>|undefined;
 export function discoverHostDisc():Promise<void>{
  if(configuredHostDisc||hostDiscovery)return hostDiscovery||Promise.resolve();
  hostDiscovery=fetch(meleePath('/api/disc-source'),{cache:'no-store'}).then(async response=>{
   if(!response.ok)return;const source=await response.json();
-  if(source.available===true&&source.url==='/melee/api/disc'&&source.size===ISO_SIZE&&source.sha256===ISO_SHA256){configuredHostDisc=source.url;}
+  if(source.available===true&&source.url==='/melee/api/disc'&&source.size===ISO_SIZE&&source.sha256===ISO_SHA256){configuredHostDisc=source.url;configuredHostFallback=source.fallbackUrl==='/melee/api/disc-host'?source.fallbackUrl:undefined;}
  }).catch(()=>{}).finally(()=>{hostDiscovery=undefined;});return hostDiscovery;
 }
 export const hostDiscConfigured=()=>!!configuredHostDisc.trim();
@@ -200,7 +201,7 @@ export async function selectHostDisc(signal:AbortSignal,onProgress:(message:stri
   await discoverHostDisc();controller.signal.throwIfAborted();
   const url=hostDiscSource(configuredHostDisc,location.href);
   const started=performance.now();let reported=0;
-  await downloadHostDisc({url,size:ISO_SIZE,signal:controller.signal,onProgress:(bytes:number)=>{
+  await downloadHostDisc({url,fallbackUrl:configuredHostFallback,size:ISO_SIZE,signal:controller.signal,onProgress:(bytes:number)=>{
    const now=performance.now();
    if(!reported||now-reported>=250||bytes===ISO_SIZE){reported=now;onProgress(hostDiscProgress(bytes,ISO_SIZE,now-started));}
   },acceptFile:async(file:File,signal:AbortSignal)=>{

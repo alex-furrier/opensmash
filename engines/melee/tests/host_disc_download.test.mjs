@@ -37,6 +37,14 @@ test('early download progress shows received bytes before the first whole percen
  assert.match(hostDiscProgress(1048576,size,2000),/0\.5 MB\/s/);
  assert.match(hostDiscProgress(size,size,10000),/100%/);
 });
+test('redirect failure may use the explicit host fallback, but byte/hash failures and cancellation do not hide behind retries',async()=>{
+ const controller=new AbortController(),calls=[];let accepted=0;
+ const run=(fetchFile,extra={})=>downloadHostDisc({url:'/melee/api/disc',fallbackUrl:'/melee/api/disc-host',size:3,signal:controller.signal,fetchFile,receive:async(response)=>{assert.equal(response.ok,true);return new File(['abc'],'fixture.iso');},acceptFile:async()=>{accepted++;},...extra});
+ await run(async url=>{calls.push(url);if(calls.length===1)throw TypeError('network');return new Response('abc');});assert.deepEqual(calls,['/melee/api/disc','/melee/api/disc-host']);assert.equal(accepted,1);
+ calls.length=0;await run(async url=>{calls.push(url);return new Response('abc',{status:calls.length===1?403:200});});assert.equal(calls.length,2);
+ calls.length=0;await assert.rejects(run(async url=>{calls.push(url);return new Response('abc');},{acceptFile:async()=>{throw Error('disc hash mismatch');}}),/hash/);assert.equal(calls.length,1);
+ calls.length=0;controller.abort();await assert.rejects(run(async url=>{calls.push(url);return new Response('abc');}),{name:'AbortError'});assert.equal(calls.length,0);
+});
 test('host stream uses existing verification/cache, supports retry, and preserves saved copy on all failures',async()=>{
  const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator'),root=new Directory();
  Object.defineProperty(globalThis,'navigator',{configurable:true,value:{storage:{getDirectory:async()=>root,persist:async()=>true}}});

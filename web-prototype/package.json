@@ -18,6 +18,7 @@
     "@google-cloud/storage": "^8.0.1",
     "@vitejs/plugin-react": "latest",
     "@zip.js/zip.js": "^2.8.61",
+    "aws4fetch": "1.0.20",
     "busboy": "^1.6.0",
     "firebase": "^12.18.0",
     "firebase-admin": "^14.3.0",
