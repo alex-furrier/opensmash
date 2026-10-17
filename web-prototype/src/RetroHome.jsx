@@ -127,7 +127,12 @@ export function LaunchFlow() {
         </button>
         <p id="rom-form-error" className="launch-flow-error" role="alert" hidden />
         <button id="rom-diagnostics-button" className="launch-flow-text-link" type="button" hidden>Show setup details</button>
-        <textarea id="rom-diagnostics-report" className="launch-flow-diagnostics" aria-label="Game setup details to copy" readOnly hidden />
+        <div id="rom-capture-controls" className="launch-flow-capture" hidden>
+          <label><input id="rom-capture-next" type="checkbox" aria-describedby="rom-capture-help" /> Send next setup failure</label>
+          <small id="rom-capture-help">Technical setup details only. No game files or account data. Expires in 15 minutes.</small>
+          <small id="rom-capture-status" role="status" aria-live="polite" />
+        </div>
+        <textarea id="rom-diagnostics-report" className="launch-flow-diagnostics" aria-label="Game setup details" readOnly hidden />
       </section>
       <section
         id="rom-handoff-page"

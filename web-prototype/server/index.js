@@ -1,3 +1,5 @@
+import {createSetupReports} from './setup-reports.js';
+import {SETUP_REPORT_PATH} from '../shared/setup-report.js';
 import {createSharedPasswordGate} from './shared-password.js';
 import {privateMeleeRequestAllowed} from '../../engines/melee/server/handler.mjs';
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
@@ -70,6 +72,15 @@ const {
   pipelineUiRoot: PIPELINE_UI_ROOT,
 } = resolveProjectPaths(APP_ROOT);
 const DIST_ROOT = path.join(APP_ROOT, "dist");
+// Capture is shared-hosting-only and remains behind the existing password gate.
+let setupReports;
+if(sharedHosting){
+ let sourceCommit='local';
+ try{const manifest=JSON.parse(await readFile(path.join(APP_ROOT,'../release.json'),'utf8'));if(/^[a-f0-9]{40}$/.test(manifest.sourceCommit))sourceCommit=manifest.sourceCommit;}catch{}
+ try{setupReports=await createSetupReports({directory:path.join(path.dirname(process.env.MELEE_SHARED_AUTH_FILE),'setup-diagnostics'),origin:process.env.MELEE_PRIVATE_ORIGIN,sourceCommit});}
+ catch{console.warn('Private setup capture is unavailable.');}
+}
+
 const APP_SHELL_PATHS = new Set([
   "/",
   "/melee",
@@ -857,7 +868,13 @@ async function handleRequest(req, res, vite) {
   res.setHeader('Cross-Origin-Opener-Policy','same-origin');
   res.setHeader('Cross-Origin-Embedder-Policy','require-corp');
 
+  if(pathname===SETUP_REPORT_PATH){
+    if(!sharedPassword)return json(res,404,{error:'Not found'});
+    if(!setupReports)return json(res,503,{error:'Setup capture unavailable'});
+    return setupReports.handle(req,res);
+  }
   if(!privateMeleeRequestAllowed(req,process.env.MELEE_PRIVATE_ORIGIN))return json(res,404,{error:'Not found'});
+
   if(pathname===HOST_DISC_CONFIG_PATH&&req.method==='GET'&&!url.search)return json(res,200,hostDisc?{...hostDisc.metadata,...(r2Disc?{fallbackUrl:HOST_DISC_FALLBACK_PATH}:{})}:{available:false});
   if(pathname===HOST_DISC_PATH||pathname===HOST_DISC_FALLBACK_PATH){
    if(!hostDisc)return json(res,404,{error:'Game download is not configured.'});

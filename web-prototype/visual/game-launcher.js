@@ -1,3 +1,4 @@
+import {mountSetupReportCapture} from '../shared/setup-report-client.js';
 import {reconcileControllers,lockControllerChoice,unlockControllerChoice,controllerLaunchChoices,isPrimaryController,invalidateControllerChoices,controllerOwner,setControllerChoiceTarget,baseSelectionOwner} from '../shared/controller-selection.js';
 import {reconcileSelection,selectFighter,readyFighters} from '../shared/local-fighter-selection.js';
 import {startMenuPointer} from './menu-pointer.js';
@@ -447,6 +448,12 @@ const hostLoadButton=document.getElementById('rom-host-load-button');
 const hostLoadCell=document.getElementById('rom-host-load-cell');
 const setupDetailsButton=document.getElementById('rom-diagnostics-button');
 const setupDetailsReport=document.getElementById('rom-diagnostics-report');
+const captureControls=document.getElementById('rom-capture-controls');
+const captureNext=document.getElementById('rom-capture-next');
+const captureStatus=document.getElementById('rom-capture-status');
+const setupCapture=captureNext&&captureStatus&&APP_BRIDGE?.subscribeDiscFailures?mountSetupReportCapture({bridge:APP_BRIDGE,checkbox:captureNext,status:captureStatus}):null;
+window.addEventListener('pagehide',()=>setupCapture?.disable());
+
 let hostLoadOperation;
 let localSelection;
 let controllerSelection;
@@ -462,6 +469,7 @@ function localState() {
 function renderLocalSelection() {
   if(hostLoadCell)hostLoadCell.hidden=!APP_BRIDGE?.hostDiscConfigured?.()||APP_BRIDGE?.experience!=='melee';
   if(setupDetailsButton)setupDetailsButton.hidden=APP_BRIDGE?.experience!=='melee';
+  if(captureControls)captureControls.hidden=APP_BRIDGE?.experience!=='melee';
   const panel=document.getElementById('local-fighter-selection');
   if(!panel)return;
   panel.hidden=!APP_BRIDGE?.explicitLocalSelection||document.body.classList.contains('is-game-running');

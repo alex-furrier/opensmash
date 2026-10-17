@@ -2180,3 +2180,9 @@ body.is-native-fullscreen .intro-video-stage:has(.ssb64-native-game) { position:
   -webkit-user-select: text;
 }
 .launch-flow-diagnostics[hidden] { display: none; }
+
+.launch-flow-capture { margin-top:12px;color:#d9b98f;font:500 13px/1.4 "Kanit",sans-serif;text-align:left; }
+.launch-flow-capture label { display:flex;align-items:center;gap:8px;cursor:pointer; }
+.launch-flow-capture input { width:16px;height:16px;accent-color:#d9b98f; }
+.launch-flow-capture small { display:block;margin-top:4px;font-size:12px; }
+.launch-flow-capture[hidden] { display:none; }

@@ -17,7 +17,9 @@ let discRevision=0,restoreStarted=false;
 let cacheAbort:AbortController|undefined;
 let restoring:Promise<void>|undefined;
 let lastDiscFailure:Record<string,unknown>|undefined;
-function recordDiscFailure(error:unknown){lastDiscFailure=discFailureDetails(error);}
+const discFailureListeners=new Set<(failure:Record<string,unknown>)=>void>();
+export function subscribeDiscFailures(listener:(failure:Record<string,unknown>)=>void){discFailureListeners.add(listener);return()=>{discFailureListeners.delete(listener);};}
+function recordDiscFailure(error:unknown){lastDiscFailure=discFailureDetails(error);for(const listener of discFailureListeners){try{listener({...lastDiscFailure});}catch{}}}
 export async function inspectLocalDiscSetup(){let timer:ReturnType<typeof setTimeout>|undefined;let storage;try{storage=await Promise.race([inspectDiscStorage(),new Promise(resolve=>{timer=setTimeout(()=>resolve({probeError:'Timeout'}),5000);})]);}finally{clearTimeout(timer);}return{version:1,state:discSetup.state,expectedBytes:ISO_SIZE,lastFailure:lastDiscFailure,...storage as object,sharedMemory:crossOriginIsolated&&typeof SharedArrayBuffer!=='undefined',graphicsAvailable:!!navigator.gpu,iframeMoveAvailable:canReparentRuntime()};}
 export const localDiscReady=()=>discSetup.ready;
 let consumers=0;
