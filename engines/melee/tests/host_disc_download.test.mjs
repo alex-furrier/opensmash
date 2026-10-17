@@ -5,8 +5,9 @@ import {cacheDisc,restoreCachedDisc} from '../web/lib/disc-cache.mjs';
 import {createHash} from 'node:crypto';
 class Directory{
  entries=new Map();writes=[];
- async getDirectoryHandle(n,{create=false}={}){if(!this.entries.has(n)){if(!create)throw new DOMException('missing','NotFoundError');this.entries.set(n,new Directory());}return this.entries.get(n);}
- async getFileHandle(n,{create=false}={}){if(!this.entries.has(n)){if(!create)throw new DOMException('missing','NotFoundError');this.entries.set(n,new File([],n));}return{getFile:async()=>this.entries.get(n),createWritable:async()=>{let parts=[];return{write:async b=>{if(ArrayBuffer.isView(b)){this.writes.push(b.byteLength);parts.push(new Uint8Array(b.buffer,b.byteOffset,b.byteLength).slice());}else parts.push(b);},close:async()=>this.entries.set(n,new File(parts,n)),abort:async()=>{parts=[];}};}};}
+ constructor(wholeBackingBuffer=false){this.wholeBackingBuffer=wholeBackingBuffer;}
+ async getDirectoryHandle(n,{create=false}={}){if(!this.entries.has(n)){if(!create)throw new DOMException('missing','NotFoundError');this.entries.set(n,new Directory(this.wholeBackingBuffer));}return this.entries.get(n);}
+ async getFileHandle(n,{create=false}={}){if(!this.entries.has(n)){if(!create)throw new DOMException('missing','NotFoundError');this.entries.set(n,new File([],n));}return{getFile:async()=>this.entries.get(n),createWritable:async()=>{let parts=[];return{write:async b=>{if(ArrayBuffer.isView(b)){this.writes.push(b.byteLength);parts.push((this.wholeBackingBuffer?new Uint8Array(b.buffer):new Uint8Array(b.buffer,b.byteOffset,b.byteLength)).slice());}else parts.push(b);},close:async()=>this.entries.set(n,new File(parts,n)),abort:async()=>{parts=[];}};}};}
  async removeEntry(n){this.entries.delete(n);}async *keys(){yield* this.entries.keys();}
 }
 test('optional source is absent by default and rejects embedded credentials or unsafe schemes',()=>{
@@ -92,5 +93,33 @@ for(const failure of ['write','close','getFile'])test(`native ${failure} failure
   let accepted=false;
   await assert.rejects(downloadHostDisc({url:'/disc',size:3,signal:new AbortController().signal,fetchFile:async()=>new Response('abc',{headers:{'content-length':'3'}}),acceptFile:async()=>{accepted=true;}}),error=>{assert.equal(error.name,'UnknownError');assert.equal(error.discStage,{write:'download-write',close:'download-close',getFile:'download-saved-file'}[failure]);assert.equal(error.expectedBytes,3);assert.equal(error.receivedBytes,3);assert.doesNotMatch(error.message,/private filename/);return true;});
   assert.equal(accepted,false);assert.equal(await(await restoreCachedDisc()).text(),'retained');assert.equal([...directory.entries.keys()].filter(name=>name.startsWith('incoming-')).length,0);
+ }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
+});
+
+// iOS 27.1 Simulator Safari wrote a view's entire backing buffer. Model that
+// filesystem boundary so the real receiver must preserve exact bytes and size.
+for(const {name,size,fragmentBytes,offset=0,padding=0} of [
+ {name:'64 KiB coalesced tail',size:65536,fragmentBytes:8192},
+ {name:'ISO-sized final tail after full batches',size:2*1048576+360448,fragmentBytes:8192},
+ {name:'large zero-offset stream view',size:1048576+13,fragmentBytes:1048576+13,padding:29},
+ {name:'large nonzero-offset stream view',size:1048576+13,fragmentBytes:1048576+13,offset:17,padding:29},
+ {name:'exact whole-buffer stream chunk',size:1048576,fragmentBytes:1048576},
+])test(`whole-backing-buffer writer preserves ${name}`,async()=>{
+ const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator'),root=new Directory(true);
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{storage:{getDirectory:async()=>root}}});
+ const backing=new Uint8Array(offset+size+padding).fill(255),bytes=backing.subarray(offset,offset+size);
+ for(let index=0;index<size;index++)bytes[index]=(index*13+(index>>>13))&255;
+ const expected=createHash('sha256').update(bytes).digest('hex');let position=0;
+ const response=new Response(new ReadableStream({pull(controller){if(position===size){controller.close();return;}const end=Math.min(position+fragmentBytes,size);controller.enqueue(bytes.subarray(position,end));position=end;}}),{headers:{'content-length':String(size)}});
+ try{
+  await cacheDisc(new File(['previous verified copy'],'old.iso'),new AbortController().signal,()=>{});
+  await downloadHostDisc({url:'http://127.0.0.1/fixture',size,signal:new AbortController().signal,fetchFile:async()=>response,acceptFile:async(file,signal)=>{
+   assert.equal(file.size,size);assert.equal(createHash('sha256').update(new Uint8Array(await file.arrayBuffer())).digest('hex'),expected);
+   await cacheDisc(file,signal,()=>{});
+  }});
+  const restored=await restoreCachedDisc(size);
+  assert.equal(restored.size,size);assert.equal(createHash('sha256').update(new Uint8Array(await restored.arrayBuffer())).digest('hex'),expected);
+  const directory=root.entries.get('opensmash-melee-disc-v1');
+  assert.equal([...directory.entries.keys()].filter(name=>name.startsWith('incoming-')).length,1,'only the adopted incoming file remains');
  }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
 });

@@ -38,7 +38,7 @@ support exactly two humans with one local input source per peer.
 | Local companion | Explicit scripted second browser verifies/prepares/readies; Stop closes its owned session | A: [startup progress](../engines/melee/tests/local_opponent_progress.test.mjs), [simulated peer](../engines/melee/tests/test_simulated_peer.test.mjs). B: E2/E3/E14 | Two engines on the same Mac and fresh-session recovery. This helper is scripted, not native CPU AI or WAN evidence. |
 | Online room lifecycle | Create/share/join; both verified identities must Ready; Stop ends both; rematch is fresh | A: [friend match](../engines/melee/tests/friend_match.test.mjs), [rooms](../engines/melee/tools/netplay/rooms.test.mjs), [relay](../engines/melee/tools/netplay/server.test.mjs). B: E1/E2/E19 | Real local sockets and browser room transitions; actual private HTTPS on one Mac. Gap: two physical devices across WAN. |
 | Confirmed input | Each peer acquires only its owned pad; both accept input and applied result at logical ticks; disagreement fails closed | A: [protocol](../engines/melee/tests/confirmed_input.test.mjs), [bridge](../engines/melee/tests/browser_bridge.test.mjs), [identity](../engines/melee/tests/netplay_identity.test.mjs). B: E1 | Distinct input traces, progress, mutation/disconnect/fresh-session controls and selected-state parity. No rollback/full snapshot. Ordered message faults over WebSocket/TCP are not transport packet loss. |
-| Disc storage and handoff | Verified local or configured hosted disc; separate setup controls, visible download/check/save phases, saved-copy restore and paired transfer cleanup | A: [disc cache](../engines/melee/tests/browser_disc_cache.test.mjs), [hosted download](../engines/melee/tests/host_disc_download.test.mjs), [handoff](../engines/melee/tests/private_handoff.test.mjs). B: [historical transfer proof](multiplayer/disc-transfer-proof.json), E2/E26/E27/E30 | E26 covers controlled download presentation and bounded transfer/storage measurements. E27 records the live post-transfer persistence blocker. E30 adds safe local diagnostics and bounded verification; current iPhone acceptance remains open. Historical standalone transfer does not establish current phone or WAN handoff. |
+| Disc storage and handoff | Verified local or configured hosted disc; separate setup controls, visible download/check/save phases, saved-copy restore and paired transfer cleanup | A: [disc cache](../engines/melee/tests/browser_disc_cache.test.mjs), [hosted download](../engines/melee/tests/host_disc_download.test.mjs), [handoff](../engines/melee/tests/private_handoff.test.mjs). B: [historical transfer proof](multiplayer/disc-transfer-proof.json), E2/E26/E27/E30 | E26 covers controlled download presentation and bounded transfer/storage measurements. E27 records the live post-transfer persistence blocker. E30 adds safe local diagnostics and bounded verification. E32 fixes oversized partial-view writes observed in Simulator Safari; current physical iPhone acceptance and the root-handle UnknownError remain open. Historical standalone transfer does not establish current phone or WAN handoff. |
 | Donor fitting and attachments | Source package fits requested accepted donor/slot; required companion costumes remain available | A: [target choices](../engines/melee/tests/test_roster_choices.py), [native target options](../engines/melee/tests/test_native_target_options.py), [source-pivot rejection](../engines/melee/tests/source_pivot_contract.test.mjs). B: E5; [native fitting benchmark](../engines/melee/validation/native-fit/README.md) | Geometry/slot contracts and bounded target samples. Acceptance is per source/base, not all catalog combinations. Source-pivot is opt-in, reviewed 39-joint/four-donor browser/WebGPU only; standard DAT/desktop unsupported. Donor collision, attack and jump behavior is retained. |
 | Private deployment boundary | Existing tailnet release remains separate; shared-password hosting protects app/API/assets/upgrades, requires HTTPS through its exact-host connector and tokenizes the loopback helper; disc delivery requires explicit private configuration | A: [shared auth](../web-prototype/server/shared-password.test.js), [helper](../engines/melee/tests/test_shared_host_helper.py), [secure TTY](../engines/melee/tests/test_shared_password_cli.py), [release](../engines/melee/tests/test_mac_release.py), [origin policy](../engines/melee/tests/friend_origin.test.mjs), [disc server](../engines/melee/tests/host_disc_server.test.mjs). B: E2/E4/E5; E20/E21/E22/E23/E24/E25 | E24 covers the styled public login and isolated authenticated real-file transfer; E28 covers its minimal entry revision. E25 adds explicit upgrade-rejection framing. Authenticated custom-host transfer/gameplay and external-device acceptance remain unverified. |
 | Relocated private roots (separate candidate) | Retain imports and derived files outside checkout | A: [PR #2](https://github.com/alex-furrier/opensmash/pull/2), head `3d5907e`, contract and route/retry tests | 31 Python passes, four fixture skips, five JS passes. Candidate is separate from this map's source checkpoint. Gap: actual gameplay after root relocation; no private migration performed. |
@@ -572,3 +572,69 @@ tailnet origin. This historical checkpoint did not perform deployment work.
   `QuotaExceededError`. Neither the error text nor the reported free space proves
   the underlying cause. No browser data, storage permissions or live source were
   changed for these checks. Actual-device recovery remains open.
+
+
+- **E32 — bounded OPFS view writes in Simulator Safari:** 2026-10-17 UTC,
+  branch base `30e9abc998ada5fe7a3e452c4970bef772ceb7f4`, fixed receiver Git blob
+  `13f1944a4e87dc405448fd4507f7caa3836b988a`. This identifies the tested source;
+  no production deployment or physical-phone acceptance is implied.
+
+  B: Xcode 27.1 (27A9275), existing iPhone Duo simulator on iOS 27.1 (24A94425),
+  ordinary Simulator Safari at an isolated loopback origin. The deployed receiver
+  reopened 65,536 received bytes as 1,048,576 bytes, and 1,459,978,240 received
+  bytes as 1,460,666,368 bytes, rejecting both at `download-saved-file`. Independent
+  primitive checks showed `write(Uint8Array.subarray(...))` wrote the backing
+  buffer for zero and nonzero offsets; copied views, sliced ArrayBuffers and
+  Blob-wrapped views wrote the selected length. Aligned 4 MiB and 32 MiB cases
+  passed. The 688,128-byte full-size excess matches its final 360,448-byte view
+  into the 1 MiB coalescing buffer.
+
+  The receiver now copies only views whose offset/length do not span their
+  backing buffer. Whole-buffer views keep the existing path; no full-disc copy
+  is introduced. A: Four new behavior regressions failed before the fix, while
+  the exact-buffer control passed. All five passed after the fix, asserting file
+  size, content digest, cached restoration and staging adoption. The existing
+  host-download file passed 14/14 tests in independent review. The focused command
+  below passed 68 tests with two real-disc tests skipped because `MELEE_ISO` was
+  not supplied. Those skips remain open; synthetic bytes are not a legal-disc or
+  game-rendering acceptance test.
+
+  ```sh
+  node --test engines/melee/tests/host_disc_download.test.mjs engines/melee/tests/browser_disc_cache.test.mjs engines/melee/tests/verify_disc.test.mjs engines/melee/tests/browser_disc.test.mjs engines/melee/tests/private_handoff.test.mjs engines/melee/tests/disc_read_cache.test.mjs engines/melee/tests/r2_disc.test.mjs web-prototype/shared/handoff-transfer.test.js engines/melee/tools/netplay/server.test.mjs engines/melee/tests/host_disc_server.test.mjs web-prototype/server/shared-password.test.js
+  npm test --prefix web-prototype
+  npm run build --prefix web-prototype -- --configLoader runner
+  ```
+
+  The website suite passed 379/379 tests, and the production build passed.
+  Existing dependencies were linked into the isolated worktree; none were installed.
+  The initial focused attempt could not load `aws4fetch` before that link. The
+  default Vite config loader could not write its temporary file through the shared
+  dependency link inside the sandbox; the supported runner loader passed without
+  changing dependency directories. These were environment failures, retained in
+  the local receipts, rather than suppressed test failures.
+
+  B: Final automatic capture served the storage modules directly from the integrated
+  worktree, with byte-for-byte served/source comparisons. The fixed receiver passed
+  synthetic 64 KiB, 4 MiB and 32 MiB saves/restores and a fresh document navigation.
+  A prior 32 MiB copy survived termination of simulator Safari after 1 MiB of a new
+  transfer was written, then verified after relaunch. The integrated full-size
+  1,459,978,240-byte case passed every-chunk verification before adoption, on
+  restoration, after a fresh document navigation and again after simulator Safari
+  termination/relaunch. Its synthetic cache was then removed and a final probe
+  reported no saved entry. No phone or game data was used. The final URL-open command timed out but completed later: the append-only log
+  records the successful full-size restore and cleanup at 04:35:37 UTC. A duplicate
+  restore navigation after cleanup found no fixture checkpoint and produced a
+  harness error; both receipts remain visible, and the successful complete receipt
+  is retained separately. Completed fixture checkpoints now refuse duplicate
+  execution. This is an automation recovery limit, not a receiver failure.
+  Raw local synthetic reports, event timestamps, source hashes and review
+  output are retained outside the repository in the task's `integration-proof/`.
+
+  The independent review found no correctness issues in cancellation, accounting,
+  adoption, cleanup or the new regression cases. No natural first-call
+  `navigator.storage.getDirectory()` UnknownError occurred; that separate phone
+  condition remains unresolved. The size guard already rejects oversized writes
+  before cache adoption, so this fix neither explains every old cache-restore
+  failure nor repairs existing saved files. Simulator Safari does not recreate
+  physical memory pressure, existing phone storage, or the DuckDuckGo release
+  container/configuration. Real-phone Safari/DDG verification remains open.

@@ -137,7 +137,12 @@ export async function receiveDiscResponse(response,size,signal,onProgress,setCle
  const reader=response.body.getReader();let received=0,written=0,phase='download-read';
  // Coalesce small network fragments into bounded writes, without splitting large reads.
  const pending=new Uint8Array(1024*1024);let queued=0;
- const write=async bytes=>{signal.throwIfAborted();phase='download-write';await stage.writer.write(bytes);written+=bytes.byteLength;onProgress(written);phase='download-read';};
+ const write=async bytes=>{
+  signal.throwIfAborted();phase='download-write';
+  // Some Safari OPFS writers use the entire backing buffer for a partial view.
+  const data=bytes.byteOffset===0&&bytes.byteLength===bytes.buffer.byteLength?bytes:bytes.slice();
+  await stage.writer.write(data);written+=bytes.byteLength;onProgress(written);phase='download-read';
+ };
  const flush=async()=>{if(queued){await write(pending.subarray(0,queued));queued=0;}};
  const abort=()=>{void reader.cancel(signal.reason).catch(()=>{});};signal.addEventListener('abort',abort,{once:true});
  try{
