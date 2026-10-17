@@ -10,7 +10,10 @@ export function discStorageError(cause, stage, expectedBytes, actualBytes) {
   const reasons = {UnknownError:'The browser could not finish preparing the game', NotReadableError:'The browser could not read game storage', QuotaExceededError:'The browser does not have enough storage for the game', InvalidStateError:'Game storage became unavailable', NotAllowedError:'The browser did not allow access to game storage', SecurityError:'The browser blocked access to game storage'};
   if (!Object.hasOwn(reasons, cause?.name)) return cause;
   const bytes = `expected ${expectedBytes} bytes${actualBytes === undefined ? '' : `, actual ${actualBytes} bytes`}`;
-  return Object.assign(Error(`${reasons[cause.name]} (${cause.name}; ${stage}; ${bytes}). Your saved game has not been cleared.`, {cause}), {name:cause.name, discStage:stage, expectedBytes, ...(actualBytes === undefined ? {} : {actualBytes})});
+  const rootUnavailable = cause.name === 'UnknownError' && stage === 'download-open-root';
+  const reason = rootUnavailable ? 'The browser could not open game storage' : reasons[cause.name];
+  const recovery = rootUnavailable ? ' Try again in a regular browser tab. If you already have the disc file, try choosing it instead. A chosen disc can be used for this visit if it cannot be saved.' : '';
+  return Object.assign(Error(`${reason} (${cause.name}; ${stage}; ${bytes}). Your saved game has not been cleared.${recovery}`, {cause}), {name:cause.name, discStage:stage, expectedBytes, ...(actualBytes === undefined ? {} : {actualBytes})});
 }
 
 /** Copy only safe diagnostics, including the existing iframe's string error format. */

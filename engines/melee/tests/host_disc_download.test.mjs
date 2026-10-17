@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {hostDiscSource,downloadHostDisc,hostDiscProgress} from '../web/lib/host-disc-download.mjs';
 import {verifyDiscChunks} from '../runtime/web/verify-disc.mjs';
-import {discFailureDetails} from '../runtime/web/disc.mjs';
+import {discFailureDetails,discStorageError} from '../runtime/web/disc.mjs';
 import {cacheDisc,restoreCachedDisc} from '../web/lib/disc-cache.mjs';
 import {createHash} from 'node:crypto';
 class Directory{
@@ -144,7 +144,16 @@ for(const operation of ['root','directory','lock','file','writable'])test(`downl
   await assert.rejects(downloadHostDisc({url:'/disc',size:1459978240,signal:new AbortController().signal,fetchFile:async()=>new Response(new Uint8Array(65536),{headers:{'content-length':'1459978240'}}),onProgress:bytes=>progress.push(bytes),acceptFile:async()=>{accepted=true;}}),error=>{
    assert.equal(error.name,'UnknownError');assert.equal(error.discStage,`download-open-${operation}`);assert.equal(error.expectedBytes,1459978240);
    assert.deepEqual(discFailureDetails(error),{name:'UnknownError',discStage:`download-open-${operation}`,expectedBytes:1459978240});
-   assert.doesNotMatch(error.message,/private|filename|https:/);return true;
+   assert.doesNotMatch(error.message,/private|filename|https:/);
+   if(operation==='root'){
+    assert.match(error.message,/could not open game storage/);
+    assert.match(error.message,/Try again in a regular browser tab/);
+    assert.match(error.message,/already have the disc file, try choosing it instead/);
+    assert.match(error.message,/chosen disc can be used for this visit if it cannot be saved/);
+    assert.match(error.message,/saved game has not been cleared/);
+    assert.doesNotMatch(error.message,/quota|not enough|private browsing|clear.*(?:data|storage)/i);
+   }else assert.doesNotMatch(error.message,/regular browser tab|chosen disc can be used/);
+   return true;
   });
   assert.equal(failures,1,'diagnostics must not introduce automatic storage retries');assert.equal(accepted,false);assert.deepEqual(progress,[]);
   navigator.storage.getDirectory=async()=>root;delete navigator.locks;root.getDirectoryHandle=getDirectory;directory.getFileHandle=getFile;
@@ -161,4 +170,16 @@ for(const cancelRejects of [false,true])test(`storage open failure cancels the u
   await assert.rejects(downloadHostDisc({url:'/disc',size:1459978240,signal:new AbortController().signal,fetchFile:async()=>response,acceptFile:async()=>{accepted=true;}}),error=>error.name==='UnknownError'&&error.discStage==='download-open-root');
   await Promise.resolve();assert.equal(cancelled,1);assert.equal(accepted,false);
  }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
+});
+
+test('root recovery guidance is limited to UnknownError and preserves its original cause',()=>{
+ const cause=new DOMException('opaque native error','UnknownError');
+ const error=discStorageError(cause,'download-open-root',1459978240);
+ assert.equal(error.cause,cause);
+ assert.equal(error.name,cause.name);
+ assert.equal(error.discStage,'download-open-root');
+ for(const name of ['QuotaExceededError','NotAllowedError','SecurityError']){
+  const other=discStorageError(new DOMException('opaque native error',name),'download-open-root',1459978240);
+  assert.doesNotMatch(other.message,/regular browser tab|chosen disc can be used/);
+ }
 });
