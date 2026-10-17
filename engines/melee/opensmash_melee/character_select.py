@@ -347,5 +347,7 @@ def catalog_identities(root, catalog, costumes, *, source_root=None):
         else:
             if source_root is not None:ident=cache_id(row['slug'],row['target'],row.get('original_target',row['target']))
             source=Path(root) / 'assets/characters' / ident
+        from .source_identity import presentation_source
+        source = presentation_source(root, source, row.get('displayName'))
         entries.append((fighter, color, source))
     return entries

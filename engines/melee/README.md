@@ -136,6 +136,21 @@ are absent. Performance gates for the browser engine (≥58.5 FPS, p95 ≤20 ms,
 audio underruns) and the Playwright recipe that measures them are in
 [UPSTREAM.md](UPSTREAM.md); the last reports are under `validation/upstream/`.
 
+The canonical display-name regression checks the game header, settings choices,
+trailer selector, native accessibility name and interactive base picker across six
+validated bases, without starting a game or requiring a disc:
+
+```sh
+MELEE_PLAYWRIGHT_MODULE=/path/to/playwright TEST_OUTPUT=/tmp/display-label-proof \
+  node engines/melee/tools/prove_display_labels.mjs
+```
+
+It uses synthetic identities by default. For a private reproduction, set
+`DISPLAY_LABEL_FIXTURE` to a local roster-row JSON file and keep both that file
+and the output outside source control. Python `test_source_identity.py` also
+checks the generated full-width selected-player name, raster title, cache
+invalidation and preservation of original source assets.
+
 ## Desktop and native
 
 The standalone app (Windows x64 and Apple Silicon) wraps a native engine in an

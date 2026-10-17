@@ -2,7 +2,7 @@ import {gameInputBlocked} from '../lib/controls';
 import {meleePath} from '../lib/paths.ts';
 import { useEffect, useRef, useState } from "react";
 import { desktop } from "@/lib/desktop";
-import { type Fighter } from "../lib/fighter";
+import { fighterLabel, type Fighter } from "../lib/fighter";
 import { plan, type Settings } from "@/lib/launch";
 import { pollService } from "../lib/service-poll";
 import { nativeBindings, rawGamepads, sampleMeleePad } from "@/lib/controls";
@@ -119,8 +119,9 @@ export default function NativeGame({
         }
         let prepared = 0;
         const preparationStatus = () => {
+          const selected = roster.find((f) => f.slug === launch.costumes[0]?.character);
           const name = launch.costumes.length === 1
-            ? roster.find((f) => f.slug === launch.costumes[0].character)?.name || launch.costumes[0].character
+            ? selected ? fighterLabel(selected) : launch.costumes[0].character
             : "characters";
           setStatus(`Preparing ${name}… (${prepared}/${launch.costumes.length})`);
         };
@@ -201,7 +202,7 @@ export default function NativeGame({
             width={960}
             height={720}
             tabIndex={0}
-            aria-label={`Play as ${fighter.name}`}
+            aria-label={`Play as ${fighterLabel(fighter)}`}
             onClick={() => canvas.current?.focus()}
           />
           {!(hasFrame && gameReady) && !error && (

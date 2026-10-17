@@ -1,6 +1,6 @@
 import {meleeTargetFor} from "../../../web-prototype/shared/melee-targets.js";
 import {meleePath} from '../web/lib/paths';
-import type {Fighter} from '../web/lib/fighter';
+import {fighterLabel,type Fighter} from '../web/lib/fighter';
 import {desktop} from '../web/lib/desktop';
 import {resolvedLaunchRoster} from './launch-roster.mjs';
 // Resolve generated website fighters through the existing source-export format.
@@ -21,7 +21,7 @@ export async function resolveFighters(action:any,roster:Fighter[],signal:AbortSi
  for(const pick of [action.character,...(action.picks||[])].filter(Boolean)){
   if(sourceOnly&&!available.some((row:Fighter)=>row.slug===pick.slug))throw Error('This fighter has no installed Melee source. Choose an available fighter.');
   if(roster.some(f=>f.slug===pick.slug)||resolved.has(pick.slug))continue;
-  onStatus('Preparing '+pick.name+' for Melee…');
+  onStatus('Preparing '+fighterLabel(pick)+' for Melee…');
   const target=meleeTargetFor(pick);
   const source=await json('/api/melee/source/'+encodeURIComponent(pick.slug),{method:'POST',body:'{}'});
   let job=await json(meleePath('/api/imports'),{method:'POST',body:JSON.stringify({url:new URL(source.url,location.origin).href,target,sourceOnly})});

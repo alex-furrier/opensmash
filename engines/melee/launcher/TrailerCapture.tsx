@@ -1,6 +1,7 @@
 import {forwardRef,useEffect,useImperativeHandle,useMemo,useState} from 'react';
 import MeleeExperience,{roster} from './Experience';
 import {desktop} from '../web/lib/desktop';
+import {fighterLabel} from '../web/lib/fighter';
 import './trailer-capture.css';
 
 // Keep this instance mounted when revealing it: remounting releases the warmed engine.
@@ -36,9 +37,9 @@ export default forwardRef(function TrailerCapture({characters,soundOn}:{characte
  if(desktop())return <aside className="melee-trailer-controls">Trailer preloading is available in the browser launcher.</aside>;
  return <>
   {!visible&&controlsVisible&&<aside className="melee-trailer-controls">
-   <label>Trailer player <select value={slug} onChange={e=>arm(e.target.value)}>{available.map(f=><option key={f.slug} value={f.slug}>{f.name}</option>)}</select></label>
+   <label>Trailer player <select value={slug} onChange={e=>arm(e.target.value)}>{available.map(f=><option key={f.slug} value={f.slug}>{fighterLabel(f)}</option>)}</select></label>
    <span role="status">{ready?'VS ready — click your player to reveal.':status}</span>
-   <small>vs. {action.picks.map(p=>p?.name).join(' vs. ')} vs. Marth</small>
+   <small>vs. {action.picks.map(p=>p?fighterLabel(p):'').join(' vs. ')} vs. Marth</small>
    {notice&&<small>{notice}</small>}
    <button disabled={!ready} onClick={()=>reveal()}>Reveal VS</button>
    <button onClick={()=>arm(slug)}>Rearm</button>

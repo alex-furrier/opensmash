@@ -18,12 +18,14 @@ _guard = threading.Lock()
 _locks = {}
 
 
-def prepare(root, source, slug, restore=None):
+def prepare(root, source, slug, restore=None, *, display_name=None):
     root, source = Path(root), Path(source)
     if not re.fullmatch(r'[a-z0-9][a-z0-9_-]{0,63}', slug):
         raise ValueError('Invalid character identifier')
     if not (source/'rigged.glb').is_file():
         raise ValueError('This character’s model is unavailable.')
+    from .source_identity import presentation_source
+    source = presentation_source(root, source, display_name)
     started = time.monotonic()
     digest = hashlib.sha256(b'native-source-v1\0')
     # Only source art/geometry and preprocessing code affect these assets.

@@ -341,7 +341,7 @@ class Handler(BaseHTTPRequestHandler):
             if row.get('imported'):source=ROOT/'assets/characters'/cache_id(slug,row['target'],row['target'])
             try:
                 from opensmash_melee.native_source import prepare
-                return self.json(prepare(ROOT,source,slug,restore=getattr(self,'restore_native_source',None)))
+                return self.json(prepare(ROOT,source,slug,restore=getattr(self,'restore_native_source',None),display_name=row.get('displayName')))
             except (ValueError,OSError) as error:
                 return self.json({'error':str(error)},422)
         if self.path == '/api/setup/clear':
