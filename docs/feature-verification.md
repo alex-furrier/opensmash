@@ -638,3 +638,46 @@ tailnet origin. This historical checkpoint did not perform deployment work.
   failure nor repairs existing saved files. Simulator Safari does not recreate
   physical memory pressure, existing phone storage, or the DuckDuckGo release
   container/configuration. Real-phone Safari/DDG verification remains open.
+
+
+- **E33 — distinguish storage-open operations (local candidate):** 2026-10-17 UTC,
+  based on deployed `869faaa7ea64029a031d67c004a7262a28b8395c`, receiver Git blob
+  `92a03fa63c4c231f000f5d62dfa82c936a8b5335`. A new phone screenshot reports
+  UnknownError at `download-open`. That stage wraps root acquisition, cache-directory
+  opening, an optional Web Lock, staging-file creation and writable-stream creation.
+  The current screenshot does not identify which operation rejected. Its expected
+  byte count is context, not proof of allocation, quota exhaustion or written data.
+
+  The local candidate emits fixed `download-open-root`, `-directory`, `-lock`,
+  `-file` and `-writable` stages through the existing error and setup-report path.
+  A: All five controlled failures lacked the required distinction before the
+  change; all pass after it. Each case retains the previous saved pointer and
+  content, emits no progress/acceptance, sanitizes private native text and attempts
+  the failing API only once. Controlled failures test attribution, not the phone's
+  underlying cause. Two additional tests prove that an open failure cancels the unread HTTP body
+  exactly once and retains the storage error even if cancellation rejects. Both
+  failed before that cleanup change and pass after it. The existing bounded-view
+  regressions remain passing.
+
+  ```sh
+  node --test engines/melee/tests/host_disc_download.test.mjs engines/melee/tests/browser_disc_cache.test.mjs engines/melee/tests/private_handoff.test.mjs engines/melee/tests/verify_disc.test.mjs web-prototype/shared/handoff-transfer.test.js
+  npm test --prefix web-prototype
+  npm run build --prefix web-prototype -- --configLoader runner
+  ```
+
+  Focused: 51 passes, zero failures, one real-disc check skipped because `MELEE_ISO`
+  was not supplied. Website: 379 passes. Build: passed. B: ordinary iOS 27.1
+  Simulator Safari passed eight natural 64 KiB probe/save/verify/restore cycles and
+  reload using deployed code, and eight using the local candidate. No natural
+  UnknownError occurred; no phone/DDG recovery is claimed. Fixture cache was removed.
+
+  Existing setup details are rendered locally; the deployed server has no storage
+  report submission endpoint and cannot observe OPFS API rejection. No USB iPhone
+  was detected, so the actual failing phone tab was not inspected. Precise phone
+  attribution remains blocked by missing client evidence. A separately approved
+  one-shot opt-in submission of the existing sanitized report could remove manual
+  copying; no new collection endpoint is implemented or enabled by this candidate.
+  Unread response cancellation is best-effort and does not await a possibly stuck
+  browser cleanup promise. It does not recover inaccessible OPFS storage.
+  No automatic retry, storage reset, browser-data deletion, deployment or push was
+  performed. Local evidence is retained outside Git in the task's `open-proof/`.

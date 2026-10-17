@@ -107,13 +107,15 @@ export async function receiveGameFile(channel, inbox, game, onState, setCleanup,
   }
 }
 
-async function incomingDisc(setCleanup){
+async function incomingDisc(setCleanup,onOpenStage=()=>{}){
  let writer;
- const directory=await (await navigator.storage.getDirectory()).getDirectoryHandle("opensmash-melee-disc-v1",{create:true});
+ onOpenStage('root');const root=await navigator.storage.getDirectory();
+ onOpenStage('directory');const directory=await root.getDirectoryHandle("opensmash-melee-disc-v1",{create:true});
  const temporaryName=`incoming-${crypto.randomUUID()}.iso`;
  const receipt={name:temporaryName,adopted:false};
  let releaseLock=()=>{};
  if(navigator.locks) {
+   onOpenStage('lock');
    const held=new Promise(resolve=>{releaseLock=resolve;});
    await new Promise((resolve,reject)=>{navigator.locks.request(`opensmash-disc:${temporaryName}`,async()=>{resolve();await held;}).catch(reject);});
  }
@@ -124,16 +126,21 @@ async function incomingDisc(setCleanup){
      try {await directory.removeEntry(temporaryName);} catch {}
    } finally {releaseLock();}
  });
- const handle=await directory.getFileHandle(temporaryName,{create:true});
- writer=await handle.createWritable();
+ onOpenStage('file');const handle=await directory.getFileHandle(temporaryName,{create:true});
+ onOpenStage('writable');writer=await handle.createWritable();
  return{writer,handle,receipt};
 }
 
 /** Save a bounded HTTP stream using the same incoming-disc receipt as handoff. */
 export async function receiveDiscResponse(response,size,signal,onProgress,setCleanup){
  if(!response.ok||Number(response.headers.get('content-length'))!==size)throw Error('The game file could not be loaded completely.');
- signal.throwIfAborted();let stage;
- try{stage=await incomingDisc(setCleanup);}catch(error){throw discStorageError(error,'download-open',size);}
+ signal.throwIfAborted();let stage,openStage='root';
+ try{stage=await incomingDisc(setCleanup,value=>{openStage=value;});}
+ catch(error){
+  // Storage failed before acquiring a reader; stop the unused HTTP stream.
+  void response.body?.cancel().catch(()=>{});
+  throw discStorageError(error,`download-open-${openStage}`,size);
+ }
  const reader=response.body.getReader();let received=0,written=0,phase='download-read';
  // Coalesce small network fragments into bounded writes, without splitting large reads.
  const pending=new Uint8Array(1024*1024);let queued=0;

@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {hostDiscSource,downloadHostDisc,hostDiscProgress} from '../web/lib/host-disc-download.mjs';
 import {verifyDiscChunks} from '../runtime/web/verify-disc.mjs';
+import {discFailureDetails} from '../runtime/web/disc.mjs';
 import {cacheDisc,restoreCachedDisc} from '../web/lib/disc-cache.mjs';
 import {createHash} from 'node:crypto';
 class Directory{
@@ -121,5 +122,43 @@ for(const {name,size,fragmentBytes,offset=0,padding=0} of [
   assert.equal(restored.size,size);assert.equal(createHash('sha256').update(new Uint8Array(await restored.arrayBuffer())).digest('hex'),expected);
   const directory=root.entries.get('opensmash-melee-disc-v1');
   assert.equal([...directory.entries.keys()].filter(name=>name.startsWith('incoming-')).length,1,'only the adopted incoming file remains');
+ }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
+});
+
+for(const operation of ['root','directory','lock','file','writable'])test(`download open diagnostics identify ${operation} failure without changing the saved copy`,async()=>{
+ const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator'),root=new Directory();
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{storage:{getDirectory:async()=>root}}});
+ let failures=0,accepted=false;const progress=[];
+ const fail=()=>{failures++;throw new DOMException('private staging filename and https://private.invalid/token','UnknownError');};
+ try{
+  await cacheDisc(new File(['retained verified copy'],'old.iso'),new AbortController().signal,()=>{});
+  const directory=root.entries.get('opensmash-melee-disc-v1'),getDirectory=root.getDirectoryHandle.bind(root),getFile=directory.getFileHandle.bind(directory);
+  const pointer=await directory.entries.get('current').text();
+  if(operation==='root')navigator.storage.getDirectory=fail;
+  if(operation==='directory')root.getDirectoryHandle=fail;
+  if(operation==='lock')navigator.locks={request:async()=>fail()};
+  if(operation==='file'||operation==='writable')directory.getFileHandle=async(name,options)=>{
+   if(name.startsWith('incoming-')&&operation==='file')return fail();
+   const handle=await getFile(name,options);return name.startsWith('incoming-')?{...handle,createWritable:fail}:handle;
+  };
+  await assert.rejects(downloadHostDisc({url:'/disc',size:1459978240,signal:new AbortController().signal,fetchFile:async()=>new Response(new Uint8Array(65536),{headers:{'content-length':'1459978240'}}),onProgress:bytes=>progress.push(bytes),acceptFile:async()=>{accepted=true;}}),error=>{
+   assert.equal(error.name,'UnknownError');assert.equal(error.discStage,`download-open-${operation}`);assert.equal(error.expectedBytes,1459978240);
+   assert.deepEqual(discFailureDetails(error),{name:'UnknownError',discStage:`download-open-${operation}`,expectedBytes:1459978240});
+   assert.doesNotMatch(error.message,/private|filename|https:/);return true;
+  });
+  assert.equal(failures,1,'diagnostics must not introduce automatic storage retries');assert.equal(accepted,false);assert.deepEqual(progress,[]);
+  navigator.storage.getDirectory=async()=>root;delete navigator.locks;root.getDirectoryHandle=getDirectory;directory.getFileHandle=getFile;
+  assert.equal(await directory.entries.get('current').text(),pointer);assert.equal(await(await restoreCachedDisc()).text(),'retained verified copy');
+  assert.equal([...directory.entries.keys()].filter(name=>name.startsWith('incoming-')).length,0,'only the failed attempt staging may be removed');
+ }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
+});
+
+for(const cancelRejects of [false,true])test(`storage open failure cancels the unread HTTP body when cancel rejects=${cancelRejects}`,async()=>{
+ const previous=Object.getOwnPropertyDescriptor(globalThis,'navigator');let cancelled=0,accepted=false;
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{storage:{getDirectory:async()=>{throw new DOMException('private root','UnknownError');}}}});
+ const response=new Response(new ReadableStream({start(controller){controller.enqueue(new Uint8Array(65536));},cancel(){cancelled++;if(cancelRejects)return Promise.reject(Error('cancel failed'));}}),{headers:{'content-length':'1459978240'}});
+ try{
+  await assert.rejects(downloadHostDisc({url:'/disc',size:1459978240,signal:new AbortController().signal,fetchFile:async()=>response,acceptFile:async()=>{accepted=true;}}),error=>error.name==='UnknownError'&&error.discStage==='download-open-root');
+  await Promise.resolve();assert.equal(cancelled,1);assert.equal(accepted,false);
  }finally{if(previous)Object.defineProperty(globalThis,'navigator',previous);else delete globalThis.navigator;}
 });
