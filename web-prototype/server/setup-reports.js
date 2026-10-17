@@ -3,7 +3,7 @@ import {constants} from 'node:fs';
 import path from 'node:path';
 import {randomBytes} from 'node:crypto';
 import {SETUP_REPORT_LIMIT,validSetupReport} from '../shared/setup-report.js';
-const MINUTE=60000,HOUR=60*MINUTE;
+const MINUTE=60000,RETENTION_MS=7*24*60*MINUTE;
 const tokenOK=v=>typeof v==='string'&&/^[a-f0-9]{32}$/.test(v);
 const keys=(v,list)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===list.length&&list.every(k=>Object.hasOwn(v,k));
 export async function createSetupReports({directory,origin,sourceCommit='local',now=Date.now,schedule=setTimeout,unschedule=clearTimeout}={}){
@@ -25,10 +25,10 @@ export async function createSetupReports({directory,origin,sourceCommit='local',
  }
  function armExpiry(retryDelay){
   unschedule(timer);if(closed||!reports.length)return;
-  timer=schedule(()=>{void serialize(async()=>{await purge();}).catch(()=>{});},retryDelay??Math.max(1,Math.min(...reports.map(r=>r.receivedAt+HOUR))-now()));timer?.unref?.();
+  timer=schedule(()=>{void serialize(async()=>{await purge();}).catch(()=>{});},retryDelay??Math.max(1,Math.min(...reports.map(r=>r.receivedAt+RETENTION_MS))-now()));timer?.unref?.();
  }
  async function purge(){
-  const fresh=reports.filter(r=>r.receivedAt<=now()&&r.receivedAt+HOUR>now());
+  const fresh=reports.filter(r=>r.receivedAt<=now()&&r.receivedAt+RETENTION_MS>now());
   if(fresh.length!==reports.length){
    const previous=reports;reports=fresh;
    try{await save();}catch(error){reports=previous;armExpiry(MINUTE);throw error;}

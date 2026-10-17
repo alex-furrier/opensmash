@@ -39,7 +39,7 @@ support exactly two humans with one local input source per peer.
 | Online room lifecycle | Create/share/join; both verified identities must Ready; Stop ends both; rematch is fresh | A: [friend match](../engines/melee/tests/friend_match.test.mjs), [rooms](../engines/melee/tools/netplay/rooms.test.mjs), [relay](../engines/melee/tools/netplay/server.test.mjs). B: E1/E2/E19 | Real local sockets and browser room transitions; actual private HTTPS on one Mac. Gap: two physical devices across WAN. |
 | Confirmed input | Each peer acquires only its owned pad; both accept input and applied result at logical ticks; disagreement fails closed | A: [protocol](../engines/melee/tests/confirmed_input.test.mjs), [bridge](../engines/melee/tests/browser_bridge.test.mjs), [identity](../engines/melee/tests/netplay_identity.test.mjs). B: E1 | Distinct input traces, progress, mutation/disconnect/fresh-session controls and selected-state parity. No rollback/full snapshot. Ordered message faults over WebSocket/TCP are not transport packet loss. |
 | Disc storage and handoff | Verified local or configured hosted disc; separate setup controls, visible download/check/save phases, saved-copy restore and paired transfer cleanup | A: [disc cache](../engines/melee/tests/browser_disc_cache.test.mjs), [hosted download](../engines/melee/tests/host_disc_download.test.mjs), [handoff](../engines/melee/tests/private_handoff.test.mjs). B: [historical transfer proof](multiplayer/disc-transfer-proof.json), E2/E26/E27/E30 | E26 covers controlled download presentation and bounded transfer/storage measurements. E27 records the live post-transfer persistence blocker. E30 adds safe local diagnostics and bounded verification. E32 fixes oversized partial-view writes observed in Simulator Safari; current physical iPhone acceptance and the root-handle UnknownError remain open. Historical standalone transfer does not establish current phone or WAN handoff. |
-| One-shot setup capture | Visible opt-in sends the next setup failure, then turns off; permit expires after 15 minutes | A: [client/schema](../web-prototype/shared/setup-report.test.js), [private receiver](../web-prototype/server/setup-reports.test.js). B: E34 | Authenticated exact-origin POST only; fixed technical fields, ten private reports, one-hour expiry and bounded request admission. Controlled browser failure establishes capture/error isolation, not the physical phone cause. |
+| One-shot setup capture | Visible opt-in sends the next setup failure, then turns off; permit expires after 15 minutes | A: [client/schema](../web-prototype/shared/setup-report.test.js), [private receiver](../web-prototype/server/setup-reports.test.js). B: E34 | Authenticated exact-origin POST only; fixed technical fields, ten private reports, seven-day expiry and bounded request admission. Controlled browser failure establishes capture/error isolation, not the physical phone cause. |
 | Donor fitting and attachments | Source package fits requested accepted donor/slot; required companion costumes remain available | A: [target choices](../engines/melee/tests/test_roster_choices.py), [native target options](../engines/melee/tests/test_native_target_options.py), [source-pivot rejection](../engines/melee/tests/source_pivot_contract.test.mjs). B: E5; [native fitting benchmark](../engines/melee/validation/native-fit/README.md) | Geometry/slot contracts and bounded target samples. Acceptance is per source/base, not all catalog combinations. Source-pivot is opt-in, reviewed 39-joint/four-donor browser/WebGPU only; standard DAT/desktop unsupported. Donor collision, attack and jump behavior is retained. |
 | Private deployment boundary | Existing tailnet release remains separate; shared-password hosting protects app/API/assets/upgrades, requires HTTPS through its exact-host connector and tokenizes the loopback helper; disc delivery requires explicit private configuration | A: [shared auth](../web-prototype/server/shared-password.test.js), [helper](../engines/melee/tests/test_shared_host_helper.py), [secure TTY](../engines/melee/tests/test_shared_password_cli.py), [release](../engines/melee/tests/test_mac_release.py), [origin policy](../engines/melee/tests/friend_origin.test.mjs), [disc server](../engines/melee/tests/host_disc_server.test.mjs). B: E2/E4/E5; E20/E21/E22/E23/E24/E25 | E24 covers the styled public login and isolated authenticated real-file transfer; E28 covers its minimal entry revision. E25 adds explicit upgrade-rejection framing. Authenticated custom-host transfer/gameplay and external-device acceptance remain unverified. |
 | Relocated private roots (separate candidate) | Retain imports and derived files outside checkout | A: [PR #2](https://github.com/alex-furrier/opensmash/pull/2), head `3d5907e`, contract and route/retry tests | 31 Python passes, four fixture skips, five JS passes. Candidate is separate from this map's source checkpoint. Gap: actual gameplay after root relocation; no private migration performed. |
@@ -729,3 +729,26 @@ tailnet origin. This historical checkpoint did not perform deployment work.
   abandoned-temporary-file gaps; final review had no material findings. Local
   raw receipts, screenshot, harness, logs and deployment proposal are retained
   outside Git in the task's `capture-proof/`. No push or deployment was performed.
+
+
+- **E35 — seven-day diagnostic retention and DuckDuckGo compatibility:**
+  2026-10-17 UTC, follow-up to local capture commit
+  `49363fea8a2c34285ada969c3d023b3c2202c379`. At the user's request, retention
+  increases from one hour to seven days; the ten-report cap, owner-private files,
+  exact-origin shared-password endpoint and strict technical allowlist remain.
+  Fifteen-minute opt-in expiry remains separate from server retention.
+  This supersedes E34's one-hour retention contract. A new exact-boundary test
+  fails against the one-hour receiver and passes after the change, proving survival
+  at one hour and just before seven days, followed by deletion at seven days.
+  Timer, request and restart cleanup use the same seven-day constant.
+  Website suite:396 passes; focused capture:17 passes; production build passes.
+  Independent read-only review found no material issues in the final capture diff.
+
+  Capture runs as ordinary JavaScript in the loaded page and sends a same-origin
+  authenticated fetch. It requires no Safari Web Inspector, extension, USB link,
+  remote debugging permission or Safari-specific native bridge. Browser-specific
+  storage denial is a reportable failure; inspection also has a bounded fallback.
+  Static compatibility is separate from actual DuckDuckGo execution. Runtime
+  receipts and any official-source simulator-build limitations are retained in
+  the task's `capture-proof/`; neither generic WebKit nor Safari alone establishes
+  retail DuckDuckGo acceptance or resolves the natural physical-phone UnknownError.

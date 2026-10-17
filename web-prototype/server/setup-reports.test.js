@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import http from 'node:http';
 import {mkdtemp,writeFile,readFile,stat,chmod,rm,symlink,access} from 'node:fs/promises';import {tmpdir} from 'node:os';import path from 'node:path';import {once} from 'node:events';import {randomBytes} from 'node:crypto';import {sealData} from 'iron-session';
 import {createSharedPasswordGate} from './shared-password.js';import {createSetupReports} from './setup-reports.js';
+const RETENTION_MS=7*24*60*60*1000;
 const origin='https://smash.alexfurrier.dev',route='/melee/api/setup-report';
 const report={version:1,state:'error',expectedBytes:1459978240,lastFailure:{name:'UnknownError',discStage:'download-open-root',expectedBytes:1459978240},storageAvailable:true,probeError:'UnknownError'};
 async function fixture(t){
@@ -43,13 +44,13 @@ test('permits expire at15minutes, can be cancelled, and active permits are bound
  const cancelled=await f.arm();assert.equal((await f.request({action:'cancel',token:cancelled})).status,204);assert.equal((await f.request({action:'report',token:cancelled,report})).status,410);
  for(let i=0;i<10;i++)await f.arm();assert.equal((await f.request({action:'arm'})).status,429);f.advance(900000);assert.equal((await f.request({action:'arm'})).status,200);
 });
-test('retains at most10reports and scheduled expiration removes private file after1hour',async t=>{
+test('retains at most10reports and scheduled expiration removes private file after7days',async t=>{
  const f=await fixture(t);for(let i=0;i<11;i++){f.advance(1);const token=await f.arm();assert.equal((await f.request({action:'report',token,report})).status,201);}
- const rows=JSON.parse(await readFile(f.file));assert.equal(rows.length,10);assert.equal(rows[0].receivedAt,1002);assert.equal(f.timer().ms,3599991);
- f.advance(3600000);f.timer().fn();await f.capture.purge();await assert.rejects(access(f.file));
+ const rows=JSON.parse(await readFile(f.file));assert.equal(rows.length,10);assert.equal(rows[0].receivedAt,1002);assert.equal(f.timer().ms,RETENTION_MS-9);
+ f.advance(RETENTION_MS);f.timer().fn();await f.capture.purge();await assert.rejects(access(f.file));
 });
 test('restart purges expired reports and refuses symlink storage',async t=>{
- const f=await fixture(t),token=await f.arm();await f.request({action:'report',token,report});f.capture.close();f.advance(3600000);
+ const f=await fixture(t),token=await f.arm();await f.request({action:'report',token,report});f.capture.close();f.advance(RETENTION_MS);
  const restarted=await createSetupReports({directory:f.directory,origin,now:f.clock});await assert.rejects(access(f.file));restarted.close();
  const other=path.join(f.directory,'outside');await writeFile(other,'unchanged');await symlink(other,f.file);await assert.rejects(createSetupReports({directory:f.directory,origin}));assert.equal(await readFile(other,'utf8'),'unchanged');
 });
@@ -59,7 +60,7 @@ test('disk failure consumes the permit, returns503 and does not retain a failed 
 
 test('expiration retries after a transient delete failure without forgetting disk records',async t=>{
  const f=await fixture(t),token=await f.arm();await f.request({action:'report',token,report});
- await chmod(f.directory,0o500);f.advance(3600000);f.timer().fn();await assert.rejects(f.capture.purge());
+ await chmod(f.directory,0o500);f.advance(RETENTION_MS);f.timer().fn();await assert.rejects(f.capture.purge());
  assert.equal(JSON.parse(await readFile(f.file)).length,1);assert.equal(f.timer().ms,60000);
  assert.equal((await f.request({action:'arm'})).status,503);
  await chmod(f.directory,0o700);f.advance(60000);f.timer().fn();await f.capture.purge();await assert.rejects(access(f.file));
@@ -86,4 +87,11 @@ test('restart removes abandoned private report writes and leaves unrelated names
  await writeFile(orphan,JSON.stringify([{receivedAt:0,sourceCommit:'local',report}]),{mode:0o600});await writeFile(unrelated,'unchanged');
  const restarted=await createSetupReports({directory:f.directory,origin});t.after(()=>restarted.close());
  await assert.rejects(access(orphan));assert.equal(await readFile(unrelated,'utf8'),'unchanged');
+});
+
+test('accepted report survives the previous one-hour limit and expires at seven days',async t=>{
+ const f=await fixture(t),token=await f.arm();await f.request({action:'report',token,report});
+ f.advance(60*60*1000);await f.capture.purge();assert.equal(JSON.parse(await readFile(f.file)).length,1);
+ f.advance(RETENTION_MS-60*60*1000-1);await f.capture.purge();assert.equal(JSON.parse(await readFile(f.file)).length,1);
+ f.advance(1);await f.capture.purge();await assert.rejects(access(f.file));
 });
