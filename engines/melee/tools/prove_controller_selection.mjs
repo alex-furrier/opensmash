@@ -1,26 +1,30 @@
 import schema from '../runtime/launch-options.json' with {type:'json'};
 import {assertOwnedPadPhase} from './proof/owned-pad-phase.mjs';
 // Opt-in private local acceptance; no disc, roster or evidence is stored in Git.
+import {pathToFileURL} from 'node:url';import {resolve} from 'node:path';
 import {createRequire} from 'node:module';import assert from 'node:assert/strict';import {writeFile} from 'node:fs/promises';
 const args=process.argv.slice(2),option=name=>{const index=args.indexOf('--'+name);return index<0?undefined:args[index+1];};
-const origin=option('origin'),iso=option('iso'),output=option('output');
-if(!origin||!iso||!output||!process.env.MELEE_PLAYWRIGHT_MODULE)throw Error('Supply --origin, --iso, --output and MELEE_PLAYWRIGHT_MODULE.');
+const origin=option('origin'),iso=option('iso'),output=option('output'),adapter=option('context-module'),count=Number(option('players')||2),slugs=option('characters')?.split(',');
+if(![2,3,4].includes(count))throw Error('--players must be 2, 3 or 4.');
+if(!origin||!output||(!adapter&&(!iso||!process.env.MELEE_PLAYWRIGHT_MODULE)))throw Error('Supply --origin, --iso, --output and MELEE_PLAYWRIGHT_MODULE.');
 const {mkdir}=await import('node:fs/promises');await mkdir(output,{recursive:true});
-const {chromium}=createRequire(import.meta.url)(process.env.MELEE_PLAYWRIGHT_MODULE);
-const browser=await chromium.launch({channel:'chrome',headless:!args.includes('--headed')});const context=await browser.newContext({viewport:{width:1440,height:1000}});const page=await context.newPage();page.setDefaultTimeout(120000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
-await context.addInitScript(defaults=>{
+const {chromium}=adapter?{}:createRequire(import.meta.url)(process.env.MELEE_PLAYWRIGHT_MODULE);
+const browser=adapter?undefined:await chromium.launch({channel:'chrome',headless:!args.includes('--headed')});const context=adapter?await (await import(pathToFileURL(resolve(adapter)).href)).createContext():await browser.newContext({viewport:{width:1440,height:1000}});const page=await context.newPage();page.setDefaultTimeout(120000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
+await context.addInitScript(({defaults,count})=>{
  window.proofEvents=[];window.addEventListener('message',({data})=>{if(['select','session','playable','pad','input','error'].includes(data?.type))window.proofEvents.push(data);});
- window.proofPads=[0,1].map(index=>({index,id:'Synthetic standard pad '+index,mapping:'standard',connected:true,axes:[0,0,0,0],buttons:Array.from({length:16},()=>({pressed:false,value:0}))}));
+ window.proofPads=Array.from({length:count},(_,index)=>({index,id:'Synthetic standard pad '+index,mapping:'standard',connected:true,axes:[0,0,0,0],buttons:Array.from({length:16},()=>({pressed:false,value:0}))}));
  navigator.getGamepads=()=>window.proofPads;
  localStorage.setItem('opensmash.melee-controls-complete.v1','complete');
- localStorage.setItem('melee-launch-v1',JSON.stringify({...defaults,stage:31,renderWidth:640,movesetPreferenceVersion:1,ports:defaults.ports.map((p,i)=>({...p,target:'auto',...(i>1?{device:'off'}:{})}))}));
-},schema.defaults);
+ localStorage.setItem('melee-launch-v1',JSON.stringify({...defaults,stage:31,renderWidth:640,movesetPreferenceVersion:1,ports:defaults.ports.map((p,i)=>({...p,target:'auto',...(i>=count?{device:'off'}:{})}))}));
+},{defaults:schema.defaults,count});
 try{
-await page.goto(origin+'/melee');await page.getByRole('button',{name:'High School',exact:true}).click();await page.waitForFunction(()=>window.openSmashReactBridge?.characters?.some(c=>c.meleeAvailable));
+await page.goto(origin+'/melee');await page.getByRole('button',{name:slugs?'Friends and Family':'High School',exact:true}).click();await page.waitForFunction(()=>window.openSmashReactBridge?.characters?.some(c=>c.meleeAvailable));
 const rows=await page.evaluate(()=>window.openSmashReactBridge.characters.filter(r=>r.meleeAvailable));
-const picks=rows.slice(0,2);assert.equal(picks.length,2);
+const picks=slugs?slugs.map(slug=>rows.find(r=>r.slug===slug)):rows.slice(0,count);assert.equal(picks.length,count);assert.ok(picks.every(Boolean));
+if(iso){
 await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'ROM Management',exact:true}).click();await page.getByRole('tab',{name:'Melee',exact:true}).click();
 await page.locator('.melee-disc-settings input[type=file]').setInputFiles(iso);await page.getByRole('button',{name:'Clear disc',exact:true}).waitFor();await page.getByRole('button',{name:'Back',exact:true}).click();await page.getByRole('button',{name:'Cancel',exact:true}).click();
+}
 async function controllerClick(locator,port=0){
  await page.waitForFunction(()=>document.body.style.position!=='fixed',{},{timeout:10000});
  await locator.evaluate(el=>el.scrollIntoView({block:'center',behavior:'instant'}));await page.waitForTimeout(600);
@@ -32,6 +36,16 @@ async function controllerClick(locator,port=0){
  await page.evaluate(port=>{window.proofPads[port].axes=[0,0,0,0];window.proofPads[port].buttons[0]={pressed:true,value:1};},port);await page.waitForTimeout(80);await page.evaluate(port=>window.proofPads[port].buttons[0]={pressed:false,value:0},port);await page.waitForTimeout(50);
 }
 
+if(count>2){
+ const start=page.locator('#local-fighter-selection').getByRole('button',{name:'Start match',exact:true});
+ for(let i=0;i<count;i++){await controllerClick(page.locator(`[data-roster-character="${picks[i].slug}"] .replica-select-control`),i);if(i<count-1)assert.equal(await start.isDisabled(),true);}
+ await start.click();await page.getByRole('button',{name:'Play locally',exact:true}).click();await page.waitForFunction(()=>window.proofEvents.some(e=>e.type==='playable'),{},{timeout:150000});
+ const frame=page.frames().find(f=>f.url().includes('/engine/upstream/runtime.html'));assert.ok(frame);
+ await frame.waitForFunction(count=>{const q=window.Module._direct_snapshot()>>>2;return Array.from({length:count},(_,i)=>HEAPF32[q+i*12+2]).every(x=>x===14);},count);
+ const snapshot=()=>frame.evaluate(()=>{const q=window.Module._direct_snapshot()>>>2;return Array.from(HEAPF32.subarray(q,q+48));});
+ const moves=[];for(let port=0;port<count;port++){const before=await snapshot();await page.evaluate(port=>window.proofPads[port].axes[0]=port%2?1:-1,port);await page.waitForTimeout(250);await page.evaluate(port=>window.proofPads[port].axes[0]=0,port);const after=await snapshot();assert.ok(Math.abs(after[port*12+3]-before[port*12+3])>.5,'independent movement on port'+port);moves.push({port,before:before[port*12+3],after:after[port*12+3]});}
+ await page.getByRole('button',{name:'Return to roster',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.game-overlay'));assert.deepEqual(errors,[]);await writeFile(output+'/game.json',JSON.stringify({players:count,synthetic:true,nativePlayable:true,independentMovement:moves,returnToRoster:true,errors},null,2));
+}else{
 const tile=(row)=>page.locator(`[data-roster-character="${row.slug}"] .replica-select-control`);
 const play=page.locator('#local-fighter-selection').getByRole('button',{name:'Start match',exact:true});
 assert.equal(await page.locator('[data-selection-slot]').count(),0,'assignment menu removed');
@@ -55,9 +69,9 @@ assert.equal(await page.getByRole('button',{name:'Create room',exact:true}).isDi
 await page.evaluate(()=>{window.proofPads[1]=window.proofRemoved;window.proofPads[1].buttons[0]={pressed:true,value:1};window.dispatchEvent(Object.assign(new Event('gamepadconnected'),{gamepad:window.proofPads[1]}));});await page.waitForTimeout(300);
 assert.equal(await play.isDisabled(),true,'reconnected held A does not lock a ghost fighter');
 await page.evaluate(()=>window.proofPads[1].buttons[0]={pressed:false,value:0});await controllerClick(tile(picks[1]),1);
-await page.getByRole('button',{name:'Friends and Family',exact:true}).click();await page.waitForTimeout(400);
+await page.getByRole('button',{name:slugs?'High School':'Friends and Family',exact:true}).click();await page.waitForTimeout(400);
 assert.equal(await play.isDisabled(),true,'roster change invalidates hidden controller choices');
-await page.getByRole('button',{name:'High School',exact:true}).click();await page.waitForTimeout(400);
+await page.getByRole('button',{name:slugs?'Friends and Family':'High School',exact:true}).click();await page.waitForTimeout(400);
 assert.equal(await play.isDisabled(),true,'returning to roster requires fresh choices');
 await controllerClick(tile(picks[0]),0);await controllerClick(tile(picks[1]),1);
 // Duplicate selected sources still route a base edit through the actual P2 cursor.
@@ -138,4 +152,5 @@ const returned=await page.locator('#local-fighter-selection').innerText();
 assert.equal(await page.locator(`[data-roster-character="${picks[0].slug}"]`).getAttribute('data-pick'),'1P');
 assert.equal(await page.locator(`[data-roster-character="${picks[1].slug}"]`).getAttribute('data-pick'),'2P');
 await writeFile(output+'/game.json',JSON.stringify({select,before,after,ownedPhases,rightStickPhases,returned,independentOwnedPads:true,modesRestoredOnDisconnect:true,reconnectHeldButtonNeutral:true,assignmentMenuRemoved:true,rosterInvalidation:true,duplicateFighterP2BasePicker:true,uniqueMouseP2BasePicker:true,replacementDeviceAndKeyboardStayNeutral:true,errors},null,2));
-}finally{await browser.close();}
+}
+}catch(error){await page.screenshot({path:output+'/failure.png'}).catch(()=>{});await writeFile(output+'/failure.json',JSON.stringify({players:count,message:error.message,errors},null,2));throw error;}finally{await context.close();await browser?.close();}

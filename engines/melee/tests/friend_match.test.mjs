@@ -53,6 +53,11 @@ test('local friend input selects the configured human device independently of ga
  assert.equal(localFriendDevice([{device:'off'},{device:'cpu'},{device:'gamepad2'}]),'gamepad2');
  assert.equal(localFriendDevice([{device:'cpu'},{device:'off'}]),undefined);
 });
+test('friend input retains sparse physical gamepad indices accepted by local launch settings',async()=>{
+ const {localFriendDevice}=await import('../web/lib/friend-room.mjs');
+ for(const index of [4,7,12,99])assert.equal(localFriendDevice([{device:'off'},{device:'gamepad'+index}]),'gamepad'+index);
+ for(const device of ['gamepad100','gamepad-1','gamepad01','gamepadNaN'])assert.equal(localFriendDevice([{device}]),undefined);
+});
 test('friend proposal retains validated Ice Climbers and Zelda companion metadata',async()=>{
  const {validateFriendProposal}=await import('../server/friend-rooms.mjs');
  const companion={character:'existing',target:'nana',fighter:14,color:0,filename:'PlNnNr.dat',companion:true};

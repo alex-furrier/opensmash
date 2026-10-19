@@ -44,6 +44,15 @@ support exactly two humans with one local input source per peer.
 | Private deployment boundary | Existing tailnet release remains separate; shared-password hosting protects app/API/assets/upgrades, requires HTTPS through its exact-host connector and tokenizes the loopback helper; disc delivery requires explicit private configuration | A: [shared auth](../web-prototype/server/shared-password.test.js), [helper](../engines/melee/tests/test_shared_host_helper.py), [secure TTY](../engines/melee/tests/test_shared_password_cli.py), [release](../engines/melee/tests/test_mac_release.py), [origin policy](../engines/melee/tests/friend_origin.test.mjs), [disc server](../engines/melee/tests/host_disc_server.test.mjs). B: E2/E4/E5; E20/E21/E22/E23/E24/E25 | E24 covers the styled public login and isolated authenticated real-file transfer; E28 covers its minimal entry revision. E25 adds explicit upgrade-rejection framing. Authenticated custom-host transfer/gameplay and external-device acceptance remain unverified. |
 | Relocated private roots (separate candidate) | Retain imports and derived files outside checkout | A: [PR #2](https://github.com/alex-furrier/opensmash/pull/2), head `3d5907e`, contract and route/retry tests | 31 Python passes, four fixture skips, five JS passes. Candidate is separate from this map's source checkpoint. Gap: actual gameplay after root relocation; no private migration performed. |
 
+## Selecting current user-flow checks
+
+Use the [opt-in release journey matrix](release-journeys.md) for meaningful fixes
+and broad changes. It adds selected real-launcher E2E commands, explicit current
+pass/fail/untested status, and recovery paths. It is not a mandatory gate on every
+PR or release. Small regressions remain normal focused tests. Historical two-pad
+limits below describe their recorded source; candidate `29b9520` supports four
+local owned controllers, while online rooms remain two peers.
+
 ## Evidence checkpoints
 
 The public links are independently readable. E2–E5 are sanitized summaries of

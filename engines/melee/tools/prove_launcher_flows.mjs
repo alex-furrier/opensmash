@@ -7,7 +7,8 @@ import {resolve} from 'node:path';
 const args=process.argv.slice(2),option=name=>{const index=args.indexOf('--'+name);return index<0?undefined:args[index+1];};
 const origin=option('origin'),iso=option('iso'),output=option('output'),slug=option('character');
 if(!origin||!iso||!output||!slug||!process.env.MELEE_PLAYWRIGHT_MODULE)throw Error('Supply --origin, --iso, --output, --character and MELEE_PLAYWRIGHT_MODULE.');
-const profileSeconds=Number(option('profile-seconds')||0),debugScenario=option('debug-scenario');
+const profileSeconds=Number(option('profile-seconds')||0),debugScenario=option('debug-scenario'),only=option('only')||'all';
+if(!['all','solo','companion'].includes(only))throw Error('--only must be all,solo or companion.');
 if(profileSeconds!==0&&(!Number.isInteger(profileSeconds)||profileSeconds<30||profileSeconds>120))throw Error('Profile seconds must be 30–120.');
 if(debugScenario&&!['reference','delay','jitter','hold'].includes(debugScenario))throw Error('Invalid debug scenario.');
 const {chromium}=createRequire(import.meta.url)(process.env.MELEE_PLAYWRIGHT_MODULE);
@@ -70,16 +71,17 @@ let display;
 try{
  await page.goto(origin+'/melee');const initial=await page.evaluate(()=>({local:Object.keys(localStorage),session:Object.keys(sessionStorage)}));assert.ok(!initial.local.includes('melee-launch-v1'),'no launch settings seeded');
  const roster=await page.evaluate(()=>fetch('/melee/api/imports?roster=active').then(r=>r.json()));const fighter=roster.find(row=>row.slug===slug);assert.ok(fighter);display=fighter.displayName||fighter.name;
- await setupDisc();await begin('solo',true);await playable('solo-default');
+ await setupDisc();if(only!=='companion'){await begin('solo',true);await playable('solo-default');
  const defaultFits=consoleLog.filter(row=>row.text.startsWith('[Native fit]'));assert.ok(defaultFits.length>=3,'default custom CPU preparation exercised');assert.ok(!network.some(row=>row.status>=400),'default launch has no failing asset requests');await stop('solo');
  await shortMatch();await begin('solo');await playable('solo-short');await resultsScreen('solo-short');await stop('solo');
  // A real acquisition fault must be visible and recover through the user's Retry.
  let fault=true;await context.route('**/api/native-fit/source/**',route=>{if(fault){fault=false;return route.abort();}return route.continue();});
  await begin('solo');await page.getByRole('button',{name:'Try again',exact:true}).waitFor();await page.screenshot({path:out+'/solo-fault.png'});await page.evaluate(()=>{window.launcherProof=[];});await page.getByRole('button',{name:'Try again',exact:true}).click();await playable('solo-retry');await context.unroute('**/api/native-fit/source/**');await stop('solo');
- await page.reload();await pick().waitFor();await begin('computer',true);await playable('computer-refreshed-cache');await resultsScreen('computer');await stop('computer');
+ }
+ if(only!=='solo'){await page.reload();await pick().waitFor();await begin('computer',true);await playable('computer-refreshed-cache');await resultsScreen('computer');await stop('computer');
  await begin('computer');await playable('computer-fresh-room');await stop('computer');
- const sessions=wire.filter(row=>row.type==='joined').map(row=>row.session);assert.equal(new Set(sessions).size,2,'retry owns a fresh room');
- await writeFile(out+'/summary.json',JSON.stringify({complete:true,initialStorage:initial,character:{slug,sourceName:fighter.name,displayName:display},results,uniqueComputerSessions:2,scope:'fresh Mac browser UI; local disc and actual keyboard input; read-only selected native snapshots; no WAN/hardware controller/rollback claim'},null,2));
+ const sessions=wire.filter(row=>row.type==='joined').map(row=>row.session);assert.equal(new Set(sessions).size,2,'retry owns a fresh room');}
+ await writeFile(out+'/summary.json',JSON.stringify({complete:true,journey:only,initialStorage:initial,character:{slug,sourceName:fighter.name,displayName:display},results,uniqueComputerSessions:only==='solo'?0:2,scope:'fresh Mac browser UI; local disc and actual keyboard input; read-only selected native snapshots; no WAN/hardware controller/rollback claim'},null,2));
  console.log('LAUNCHER FLOWS PASS',JSON.stringify(results));
 }catch(error){await page.screenshot({path:out+'/failure.png'}).catch(()=>{});await writeFile(out+'/failure.json',JSON.stringify({error:error.message,body:await page.locator('body').innerText(),results},null,2));console.error(error);process.exitCode=1;}
 finally{await writeFile(out+'/evidence.json',JSON.stringify({consoleLog,network,wire,observations:await page.evaluate(()=>window.launcherProof).catch(()=>[])},null,2));await browser.close();}
