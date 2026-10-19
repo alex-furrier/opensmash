@@ -85,6 +85,26 @@ in the feature verification map.
 | MOBILE: touch, orientation, fullscreen, release on blur | `prove_ui_polish.mjs` uses actual game with emulated touch. `prove_touch_ui.mjs` is a mocked standalone UI surface and must retain that label. | Historical emulated Chrome pass E14; current physical phone/Safari/Android/controller certification untested. | [mobile-input.test.js](../web-prototype/shared/mobile-input.test.js), [mobile-controls.test.js](../web-prototype/shared/mobile-controls.test.js) |
 | HOST: switch, rollback, correct served bytes | Task-owned Standard launchd fixture before switching; scoped helper-first activation, authenticated roster readiness, public sealed-byte verification and repeat-match smoke after activation | Failed candidate activation 04:28 UTC; old helper recovered 04:31:13, web never stopped. Public rollback verified 04:48:18. Candidate Standard fixture later passed 30.923s. Public candidate gameplay remains untested. | [test_mac_release.py](../engines/melee/tests/test_mac_release.py); operator sequencing failure tests (8 passed) |
 
+## Supported mode inventory and remaining E2E gaps
+
+The shared [launch schema](../engines/melee/runtime/launch-options.json) and
+[mode contract](../engines/melee/docs/LAUNCH_MODES.md) expose five destinations.
+These are separate journeys; a successful Free-for-All does not cover the others.
+
+| Destination | Opt-in actual user-flow check | Current browser evidence |
+| --- | --- | --- |
+| Free-for-All (0) | Pick fighters, set rules, launch, control, results, return and repeat; use the solo/controller probes above | Passed candidate local native, including native CPU on unused ports. Frame progress is not a sustained-FPS claim. |
+| VS Menu (1) | In Settings select VS Menu, launch, navigate original VS menu, enter a match, then Back/return | Untested on this candidate; launch-option regressions validate destination encoding only. |
+| VS Character Select (2) | Select this destination, launch, change an injected identity/base in native CSS, Start, choose stage, play and return | Untested on this candidate; historical native CSS evidence does not certify this browser release. |
+| Classic Character Select (3) | Select Classic, launch, choose fighter/difficulty, start a stage, then Back and verify choices persist | Untested on this candidate; normal settings tests are not an end-to-end Classic run. |
+| Original Title / All Modes (4) | Use Start game or select this destination, pass original title/save flow, enter a supported native mode and return | Untested on this candidate. The destination exposes original menus; it does not promise every original mode is accepted. |
+
+Online friend rooms have exactly two human peers with one local human input
+source each. Multiple local controllers use the local path; they do not expand
+online rooms to four peers. A local scripted opponent is a second browser peer,
+whereas local CPU opponents run native AI. Desktop and Smash64 remain separate
+products/checks, linked from the feature map rather than certified by this matrix.
+
 ## Recording a run
 
 Record source/runtime identities, journey ID, browser/OS, real versus simulated
