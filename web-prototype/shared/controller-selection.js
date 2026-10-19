@@ -1,5 +1,5 @@
-// First slice is deliberately limited to the two human ports proven in Chrome.
-export const CONTROLLER_SELECTION_LIMIT = 2;
+// Local matches have four independent human ports.
+export const CONTROLLER_SELECTION_LIMIT = 4;
 const keyOf=pad=>`${pad.index}:${pad.id}`;
 export function reconcileControllers(state={devices:[],nextGeneration:1},pads=[]) {
  const connected=pads.filter(p=>p&&p.connected!==false&&Number.isInteger(p.index)&&typeof p.id==='string');

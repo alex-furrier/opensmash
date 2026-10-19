@@ -1,5 +1,5 @@
 import {mountSetupReportCapture} from '../shared/setup-report-client.js';
-import {reconcileControllers,lockControllerChoice,unlockControllerChoice,controllerLaunchChoices,isPrimaryController,invalidateControllerChoices,controllerOwner,setControllerChoiceTarget,baseSelectionOwner} from '../shared/controller-selection.js';
+import {reconcileControllers,lockControllerChoice,unlockControllerChoice,controllerLaunchChoices,isPrimaryController,invalidateControllerChoices,controllerOwner,setControllerChoiceTarget,baseSelectionOwner,CONTROLLER_SELECTION_LIMIT} from '../shared/controller-selection.js';
 import {reconcileSelection,selectFighter,readyFighters} from '../shared/local-fighter-selection.js';
 import {startMenuPointer} from './menu-pointer.js';
 import { n64Keyboard } from '../shared/n64-keyboard.js';
@@ -484,7 +484,7 @@ function renderLocalSelection() {
   const play=document.createElement('button');play.type='button';play.textContent='Start match';play.title='Start local match';
   play.disabled=!picks;play.onclick=()=>{const current=ownedState();const ready=current.devices.length?controllerLaunchChoices(current):readyFighters(localState());if(ready)requestLaunch({...ready[0],localPicks:ready});};
   const hint=document.createElement('small');
-  hint.textContent=owned.connectedCount>2?'Up to two local controllers are supported.':owned.connectedCount>1&&!picks?'Each player: choose a fighter. A locks · B releases.':'';
+  hint.textContent=owned.connectedCount>CONTROLLER_SELECTION_LIMIT?'Up to four local controllers are supported.':owned.connectedCount>1&&!picks?'Each player: choose a fighter. A locks · B releases.':'';
   hint.hidden=!hint.textContent;
   panel.replaceChildren(play,hint);
   window.characterGrid?.clearPicks?.();
@@ -605,6 +605,7 @@ function launch(fighter, selectedPicks) {
 }
 
 function closeGame() {
+  restoreLaunchSequence++;
   clearPicks();
   window.characterGrid?.select(null);
   if (!gameFrame || !videoFrame) return;
@@ -2901,6 +2902,7 @@ async function requestLaunch(fighter) {
       // Restoring the saved disc can take seconds on a cold page. Show the
       // disc step with a status right away instead of a silent click.
       showLaunchFlow(fighter);
+      const restoringFlow=flowSequence;
       if (uploadButton) { uploadButton.disabled = true; uploadButton.textContent = 'Checking your saved disc…'; }
       try {
         ready = await APP_BRIDGE?.restoreDisc?.(message => {
@@ -2909,11 +2911,11 @@ async function requestLaunch(fighter) {
           }
         });
       } catch (error) {
-        if (sequence !== restoreLaunchSequence) return;
+        if (sequence !== restoreLaunchSequence || flowSequence !== restoringFlow) return;
         showRomError(error?.message || 'Could not restore your disc. Choose it again.');
         ready = false;
       }
-      if(sequence!==restoreLaunchSequence||APP_BRIDGE?.experience!=='melee')return;
+      if(sequence!==restoreLaunchSequence||flowSequence!==restoringFlow||APP_BRIDGE?.experience!=='melee')return;
       if (uploadButton) { uploadButton.disabled = false; uploadButton.textContent = 'Choose disc'; }
       if (ready) closeLaunchFlow(true);
     }

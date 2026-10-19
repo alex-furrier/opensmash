@@ -2161,6 +2161,8 @@ body.is-native-fullscreen .intro-video-stage:has(.ssb64-native-game) { position:
 #local-fighter-selection small { font-size:12px; }
 .menu-controller-cursor { position:fixed;left:0;top:0;width:26px;height:26px;margin:-13px;border:3px solid white;border-radius:50%;background:#9d3028;box-shadow:0 0 0 2px #222;pointer-events:none;z-index:2147483647;color:white;font:bold 10px/20px monospace;text-align:center; }
 .menu-controller-cursor[data-player="2"] { background:#245da5; }
+.menu-controller-cursor[data-player="3"] { background:#987716; }
+.menu-controller-cursor[data-player="4"] { background:#27804b; }
 .retro-room-button:disabled { opacity:.4;cursor:default; }
 .replica-cell[data-pick="1P"]::before { background:#9d3028;color:white; }
 .replica-cell[data-pick="2P"]::before { background:#245da5;color:white; }

@@ -76,3 +76,5 @@ test('human friend drafts preserve both selected fighters across saved solo mode
   const match=friendMatchSettings(selected);assert.equal(match.mode,0);assert.deepEqual(match.ports.slice(0,2).map(p=>p.character),['one','two']);
  }
 });
+
+test('four logical human ports retain sparse browser gamepad indices',()=>{const portPlan=[1,3,5,7].map(index=>({kind:'gamepad',index,id:'same adapter'}));const next=applyLauncherSelection(structuredClone(schema.defaults),{type:'character',character:roster[0],picks:[roster[1],roster[0],roster[1]],portPlan});const result=planLaunch(schema,next,roster[0],roster);assert.deepEqual(result.ports.map(p=>p.device),['gamepad1','gamepad3','gamepad5','gamepad7']);assert.equal(result.packedPorts.length,4);});

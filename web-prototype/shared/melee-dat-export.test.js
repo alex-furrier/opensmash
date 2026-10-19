@@ -1,9 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { prepareNativeCostume } from '../../engines/melee/web/lib/native-fit.ts';
 
 test('DAT export requires a standard-format worker response and supports cancellation', async t => {
-  const previous = Object.fromEntries(['window', 'Worker', 'fetch'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  const previous = Object.fromEntries(['window', 'Worker', 'fetch', 'location'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
   t.after(() => {
     for (const [key, descriptor] of Object.entries(previous)) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
@@ -11,17 +10,21 @@ test('DAT export requires a standard-format worker response and supports cancell
     }
   });
   globalThis.window = {};
-  globalThis.fetch = async () => ({ ok: true, json: async () => ({ base: '/engine/source/test' }) });
+  globalThis.location = { origin: 'https://fixture.test' };
+  globalThis.fetch = async (_url, options={}) => options.method==='POST'
+    ? Response.json({ base: '/api/native-fit/assets/'+'6'.repeat(64)+'/sources/test' })
+    : new Response('asset');
   let worker;
   globalThis.Worker = class {
     constructor() { worker = this; }
     postMessage(message) { this.request = message; }
     terminate() { this.terminated = true; }
   };
+  const { prepareNativeCostume } = await import('../../engines/melee/web/lib/native-fit.ts');
   const entry = { character: 'test', target: 'mario', color: 0, format: 'dat' };
-  async function start() {
+  async function start(color=0) {
     const controller = new AbortController();
-    const promise = prepareNativeCostume(entry, controller.signal);
+    const promise = prepareNativeCostume({...entry,color}, controller.signal);
     await new Promise(resolve => setImmediate(resolve));
     return { promise, controller };
   }
@@ -38,7 +41,7 @@ test('DAT export requires a standard-format worker response and supports cancell
   assert.deepEqual(new Uint8Array(await file.blob.arrayBuffer()), new Uint8Array([1, 2, 3]));
   assert.equal(worker.terminated, true);
 
-  const cancelled = await start();
+  const cancelled = await start(1);
   cancelled.controller.abort();
   await assert.rejects(cancelled.promise, { name: 'AbortError' });
   assert.equal(worker.terminated, true);

@@ -27,7 +27,9 @@ export function planLaunch(schema, settings, selected, roster, random = Math.ran
     taken.add(row.slug);return row.slug;
   };
   const ports = settings.ports.map(p => {
-    if (!['keyboard','gamepad0','gamepad1','gamepad2','gamepad3','cpu','off'].includes(p.device)) throw Error('Invalid input device.');
+    // Browser indices can have gaps after disconnects; four logical ports do
+    // not imply physical Gamepad indices must be 0..3.
+    if (!['keyboard','cpu','off'].includes(p.device) && !/^gamepad(?:[0-9]|[1-9][0-9])$/.test(p.device)) throw Error('Invalid input device.');
     if (!['cpu','off'].includes(p.device)) {
       if (devices.has(p.device)) throw Error('Assign each keyboard or gamepad to only one player.');
       devices.add(p.device);

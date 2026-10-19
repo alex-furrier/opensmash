@@ -29,7 +29,7 @@ export function applyLauncherSelection(settings, action) {
 // owns two game slots and each browser retains its physical device assignments.
 export function friendMatchSettings(settings) {
  const active=settings.ports.filter(port=>port.device!=='off');
- const humans=active.filter(port=>port.device==='keyboard'||/^gamepad[0-3]$/.test(port.device));
+ const humans=active.filter(port=>port.device==='keyboard'||/^gamepad(?:[0-9]|[1-9][0-9])$/.test(port.device));
  const chosen=[...humans,...active.filter(port=>port.device==='cpu')].slice(0,2);
  if(chosen.length!==2)throw Error('Choose two active fighters in Players & Controllers before creating a room.');
  return {...settings,mode:0,ports:settings.ports.map((port,index)=>({...(index<2?chosen[index]:port),device:index<2?(index===0?'keyboard':'gamepad0'):'off'}))};

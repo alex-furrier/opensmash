@@ -17,7 +17,15 @@ self.onmessage=async ({data})=>{
       const response=await fetch(url);if(!response.ok)throw Error('The character’s model could not load. Please try again.');
       return json?response.json():response.arrayBuffer();
     };
-    const [module,source,rig,template,texture,identity]=await Promise.all([moduleReady,sourceGet('.json',true),get('targets/'+slug+'.json',true),get('targets/'+slug+'-'+color+'.dat'),sourceGet('.rgba8'),data.format==='dat'?null:sourceGet('.identity.dat')]);
+    // The launcher shares immutable Blob downloads across companion jobs.
+    // Keep direct worker callers compatible with the standalone fitting tools.
+    const assets=data.assets;
+    const [module,source,rig,template,texture,identity]=await Promise.all([moduleReady,
+      assets?assets.sourceJson.text().then(JSON.parse):sourceGet('.json',true),
+      assets?assets.rig.text().then(JSON.parse):get('targets/'+slug+'.json',true),
+      assets?assets.template.arrayBuffer():get('targets/'+slug+'-'+color+'.dat'),
+      assets?assets.texture.arrayBuffer():sourceGet('.rgba8'),
+      data.format==='dat'?null:assets?assets.identity.arrayBuffer():sourceGet('.identity.dat')]);
     if(!rig.layouts?.[color])throw Error('Character fitting assets are incomplete for this costume slot.');
     const target={...rig,...rig.layouts[color]};
     if(source.version!==1||target.version!==1)throw Error('Unsupported native fitting asset version');

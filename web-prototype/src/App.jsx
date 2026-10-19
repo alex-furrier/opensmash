@@ -375,6 +375,7 @@ export default function App() {
     if (result.cancelled) throw Error('No disc selected.');
   }
   function syncExperience() {
+    pendingBootRef.current++;
     setEngine(null);
     setPendingAction(null);
     setAdvancedOpen(false);
@@ -497,6 +498,7 @@ export default function App() {
   }, [isMelee]);
 
   function closeMeleeExperience(){
+    pendingBootRef.current++;
     if(/^#room=[a-f0-9]{32}$/.test(window.location.hash))window.history.replaceState({},'',window.location.pathname+window.location.search);
     setEngine(null);
   }
@@ -1024,6 +1026,7 @@ export default function App() {
   // tears and stutters. Wait for the scroll to settle first (fallback timer
   // for browsers without scrollend), then hand the iframe its URL.
   const pendingBootRef = useRef(0);
+  useEffect(() => () => { pendingBootRef.current++; }, []);
   function bootEngineAfterScroll(boot) {
     const token = ++pendingBootRef.current;
     if (window.scrollY <= 4) {
@@ -1670,7 +1673,7 @@ export default function App() {
         if (character) announceCharacter(character);
       },
       clearVerification,
-      closeGame() { setEngine(null); },
+      closeGame() { closeMeleeExperience(); },
       completeCreateRom() { setCreateStage("creator"); },
       hasGamepad() { return gamepads.length > 0; },
       selectionSlots() {

@@ -19,7 +19,7 @@ test('reconnection is a new owner and stale callbacks cannot lock it; no ghost c
  s=lockControllerChoice(s,old,{slug:'stale'});assert.equal(s.devices[0].choice,null);assert.equal(controllerLaunchChoices(s),null);
 });
 test('extra pads are counted but cannot create unsupported or duplicate human players',()=>{
- let s=reconcileControllers(undefined,[pad(0),pad(1),pad(2),pad(2)]);assert.equal(s.connectedCount,3);assert.equal(s.devices.length,2);
+ let s=reconcileControllers(undefined,[pad(0),pad(1),pad(2),pad(3),pad(4),pad(4)]);assert.equal(s.connectedCount,5);assert.equal(s.devices.length,4);
  for(const owner of s.devices)s=lockControllerChoice(s,owner,{slug:owner.id});
  assert.equal(controllerLaunchChoices(s),null);
  s=reconcileControllers(s,[pad(0),pad(1)]);assert.equal(controllerLaunchChoices(s).length,2);
@@ -63,3 +63,5 @@ test('base picker keeps unambiguous mouse ownership and explicit duplicate contr
  assert.equal(baseSelectionOwner(s,'one',two).port,1);assert.equal(baseSelectionOwner(s,'one',null).port,0);
  s=invalidateControllerChoices(s);assert.equal(baseSelectionOwner(s,'one',two),undefined,'stale actor never falls through to another owner');
 });
+
+for(const count of [2,3,4])test(count+' identical controllers retain independent locked choices',()=>{let s=reconcileControllers(undefined,Array.from({length:count},(_,index)=>({...pad(index),id:'same adapter'})));for(const owner of s.devices)s=lockControllerChoice(s,owner,{slug:'same fighter',target:['mario','fox','luigi','falco'][owner.port]});const picks=controllerLaunchChoices(s);assert.equal(picks.length,count);assert.equal(new Set(picks.map(p=>p.index)).size,count);for(const owner of s.devices){const next=unlockControllerChoice(s,owner);assert.equal(next.devices.filter(d=>!d.locked).length,1);}});
